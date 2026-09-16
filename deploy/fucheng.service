@@ -1,0 +1,22 @@
+[Unit]
+Description=府城球館會員管理系統
+After=network.target
+
+[Service]
+Type=simple
+User=fucheng
+Group=fucheng
+WorkingDirectory=/opt/fucheng/current
+EnvironmentFile=/etc/fucheng/fucheng.env
+ExecStart=/opt/fucheng/venv/bin/uvicorn fucheng.app:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/fucheng
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

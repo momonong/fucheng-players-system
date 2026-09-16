@@ -1,0 +1,16 @@
+[Unit]
+Description=府城球館 SQLite 一致性備份
+
+[Service]
+Type=oneshot
+User=fucheng
+Group=fucheng
+WorkingDirectory=/opt/fucheng/current
+EnvironmentFile=/etc/fucheng/fucheng.env
+ExecStart=/opt/fucheng/venv/bin/python /opt/fucheng/current/scripts/backup_daily.py /var/backups/fucheng
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/fucheng /var/lib/fucheng
+UMask=0077

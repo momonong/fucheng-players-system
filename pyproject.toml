@@ -1,0 +1,35 @@
+[project]
+name = "fucheng-players-system"
+version = "0.1.0"
+description = "府城球館會員管理系統"
+readme = "README.md"
+requires-python = ">=3.14.6,<3.15"
+dependencies = [
+  "alembic==1.20.0",
+  "fastapi==0.141.1",
+  "pydantic==2.13.5",
+  "sqlalchemy==2.0.53",
+  "uvicorn==0.41.0",
+]
+
+[dependency-groups]
+dev = [
+  "httpx==0.28.1",
+  "psutil==7.1.0",
+  "pytest==8.4.2",
+  "pytest-cov==7.0.0",
+]
+
+[project.scripts]
+fucheng = "fucheng.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fucheng"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

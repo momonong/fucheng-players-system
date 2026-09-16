@@ -216,3 +216,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-local generated files
+.uv-cache/
+.uv-python/
+data/
+backups/
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+src/fucheng/static/assets/
+src/fucheng/static/index.html
+test-results/
+playwright-report/
+.test-tmp*/

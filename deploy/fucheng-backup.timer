@@ -1,0 +1,10 @@
+[Unit]
+Description=每日備份府城球館資料庫
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 Asia/Taipei
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target
