@@ -13,7 +13,7 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 a { color: var(--teal); text-underline-offset: 3px; }
 button, .admin-link {
   min-height: 48px; border: 0; border-radius: 10px; padding: 0.65rem 1rem;
@@ -38,9 +38,10 @@ main { width: min(1240px, calc(100% - 2rem)); margin: 0 auto; padding: 1.5rem 0 
   box-shadow: 0 8px 30px rgba(28, 50, 43, .06);
 }
 label { display: grid; gap: .35rem; font-weight: 700; }
-input, select {
+input, select, textarea {
   width: 100%; min-height: 48px; padding: .65rem .75rem; border: 2px solid #a6aaa3; border-radius: 9px; background: white; color: var(--ink);
 }
+textarea { resize: vertical; }
 .result-summary { color: #535d58; font-weight: 700; }
 .level-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-items: start; }
 .level-card { background: white; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; break-inside: avoid; }
@@ -106,11 +107,47 @@ footer { border-top: 1px solid var(--line); padding: 2rem 1rem; text-align: cent
 .history article { border-left: 4px solid var(--teal); padding: .6rem .8rem; margin-bottom: 1rem; background: #faf9f5; }
 .history article > span { display: block; color: #68716d; font-size: .9rem; }
 .history ul { margin-bottom: 0; padding-left: 1.25rem; }
+.print-only { display: none; }
+.competition-layout { width: min(1500px, calc(100% - 2rem)); display: grid; grid-template-columns: minmax(260px, .65fr) minmax(640px, 2fr); gap: 1.25rem; align-items: start; }
+.competition-list { position: sticky; top: 1rem; }
+.competition-items, .competition-workspace { display: grid; gap: .8rem; }
+.competition-item { min-height: 82px; color: var(--ink); background: #faf9f5; border: 2px solid transparent; text-align: left; display: grid; gap: .1rem; }
+.competition-item span, .competition-item small { color: #5d6964; }
+.competition-item.selected, .competition-item:hover { background: #edf5f1; border-color: var(--teal); }
+.competition-editor form { display: grid; gap: 1rem; }
+.summary-grid { display: grid; grid-template-columns: repeat(5, minmax(110px, 1fr)); gap: .7rem; }
+.summary-card { border: 1px solid var(--line); border-radius: 12px; padding: .7rem; background: #faf9f5; display: grid; gap: .2rem; }
+.summary-card span { color: #5b6661; font-size: .85rem; }
+.summary-card strong { font-size: 1.45rem; }
+.level-summary { margin: .8rem 0; color: #46534e; }
+.late-reason { margin: 1rem 0; }
+.candidate-picker { border: 1px solid var(--line); border-radius: 12px; padding: .8rem; margin: 1rem 0; }
+.candidate-picker summary { cursor: pointer; font-weight: 800; }
+.filters.compact { margin-top: .8rem; grid-template-columns: 2fr 1fr 1fr; box-shadow: none; }
+.candidate-list { max-height: 280px; overflow: auto; display: grid; gap: .4rem; margin-top: .8rem; }
+.candidate { min-height: 56px; color: var(--ink); background: #f7f7f3; border: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: .8rem; text-align: left; }
+.candidate span:first-child { display: grid; }
+.candidate small { color: #66706c; }
+.roster-filters { display: grid; grid-template-columns: 2fr 1fr auto; align-items: end; gap: .8rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+.roster-filters p { font-weight: 700; color: #56625d; }
+.roster-section { margin-top: 1.2rem; }
+.roster-section h3 { border-bottom: 3px solid var(--teal); margin: 0; padding: .55rem 0; display: flex; justify-content: space-between; }
+.roster-section h3 span { font-size: .9rem; color: #66706c; align-self: center; }
+.roster-table-wrap { overflow-x: auto; }
+.roster-section select { min-width: 110px; min-height: 40px; padding: .35rem; }
+.row-actions { display: flex; gap: .4rem; min-width: 165px; }
+.row-actions button { min-height: 40px; padding: .35rem .55rem; }
+button.danger { background: #8c3026; }
+.muted { color: #68716d; }
 
 @media (max-width: 900px) {
   .level-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-main { grid-template-columns: 1fr; }
   .member-rows { max-height: 420px; }
+  .competition-layout { grid-template-columns: 1fr; }
+  .competition-list { position: static; }
+  .competition-items { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .summary-grid { grid-template-columns: repeat(3, minmax(100px, 1fr)); }
 }
 @media (max-width: 640px) {
   .hero { align-items: flex-start; flex-direction: column; }
@@ -146,6 +183,16 @@ footer { border-top: 1px solid var(--line); padding: 2rem 1rem; text-align: cent
   .member-row { grid-template-columns: 1fr auto; }
   .member-row .status { grid-column: 2; }
   .toast { top: .5rem; right: .5rem; width: calc(100vw - 1rem); }
+  .competition-layout { width: min(100% - 1rem, 1500px); }
+  .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filters.compact, .roster-filters { grid-template-columns: 1fr; }
+  .candidate { grid-template-columns: 1fr auto; }
+  .candidate span:last-child { grid-column: 2; }
+  .roster-section table, .roster-section tbody, .roster-section tr, .roster-section td { display: block; }
+  .roster-section thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .roster-section tr { border: 1px solid var(--line); border-radius: 10px; margin-bottom: .7rem; padding: .5rem; }
+  .roster-section td { border: 0; padding: .3rem; }
+  .row-actions { min-width: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -169,4 +216,22 @@ footer { border-top: 1px solid var(--line); padding: 2rem 1rem; text-align: cent
   .print-roster thead th { height: 5mm; padding: .5mm; background: #eee; color: black; text-align: center; font-size: 8pt; }
   .print-roster tbody th { padding: .35mm; background: #f5f5f5; color: #444; text-align: center; font-weight: 500; }
   .print-roster td small { display: inline; margin: 0 0 0 .25mm; color: #333; font-size: .78em; }
+  main.competition-layout { display: block !important; width: 100%; margin: 0; padding: 0; }
+  .competition-layout .competition-list, .competition-layout .competition-editor, .competition-layout .no-print { display: none !important; }
+  .competition-layout .competition-workspace, .competition-layout .competition-print { display: block !important; }
+  .competition-print { border: 0; box-shadow: none; padding: 0; }
+  .competition-print .print-only { display: block; }
+  .print-title { border-bottom: .4mm solid #222; margin-bottom: 3mm; }
+  .print-title h1 { margin: 0; font-size: 16pt; }
+  .print-title p { margin: 1mm 0 2mm; }
+  .competition-print .summary-grid { grid-template-columns: repeat(5, 1fr); gap: 2mm; }
+  .competition-print .summary-card { padding: 1.5mm; border-color: #555; }
+  .competition-print .summary-card strong { font-size: 11pt; }
+  .competition-print .roster-section { break-inside: avoid; margin-top: 3mm; }
+  .competition-print .roster-section h3 { font-size: 11pt; padding: 1mm 0; }
+  .competition-print .roster-section table { display: table; font-size: 8pt; }
+  .competition-print .roster-section thead { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  .competition-print .roster-section tbody { display: table-row-group; }
+  .competition-print .roster-section tr { display: table-row; border: 0; margin: 0; padding: 0; }
+  .competition-print .roster-section th, .competition-print .roster-section td { display: table-cell; padding: 1mm 1.5mm; border-bottom: .2mm solid #aaa; }
 }

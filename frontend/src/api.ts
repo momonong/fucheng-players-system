@@ -1,4 +1,15 @@
-import type { AdminMember, AuditEntry, MemberDraft, PublicMember } from './types'
+import type {
+  AdminMember,
+  AuditEntry,
+  Competition,
+  CompetitionDetail,
+  CompetitionDraft,
+  CompetitionRegistration,
+  Diet,
+  MemberDraft,
+  PublicMember,
+  RegistrationMember,
+} from './types'
 
 let csrfToken = ''
 
@@ -57,3 +68,59 @@ export function saveMember(draft: MemberDraft, id?: string): Promise<AdminMember
 }
 
 export const memberHistory = (id: string) => request<AuditEntry[]>(`/api/admin/members/${id}/history`)
+
+export const competitions = () => request<Competition[]>('/api/admin/competitions')
+export const competition = (id: string) => request<CompetitionDetail>(`/api/admin/competitions/${id}`)
+
+export function saveCompetition(draft: CompetitionDraft, id?: string): Promise<Competition> {
+  const payload = {
+    ...draft,
+    notes: draft.notes || null,
+    registration_deadline: `${draft.registration_deadline}:00+08:00`,
+    reason: draft.reason || null,
+  }
+  return request(id ? `/api/admin/competitions/${id}` : '/api/admin/competitions', {
+    method: id ? 'PUT' : 'POST', body: JSON.stringify(payload),
+  })
+}
+
+export function registrationMembers(search = '', level = ''): Promise<RegistrationMember[]> {
+  const params = new URLSearchParams()
+  if (search) params.set('search', search)
+  if (level) params.set('level', level)
+  return request(`/api/admin/registration-members?${params}`)
+}
+
+export function createRegistration(
+  competitionId: string,
+  memberId: string,
+  diet: Diet | null,
+  reason: string,
+  requestId: string,
+): Promise<CompetitionRegistration> {
+  return request(`/api/admin/competitions/${competitionId}/registrations`, {
+    method: 'POST', body: JSON.stringify({ member_id: memberId, diet, reason: reason || null, request_id: requestId }),
+  })
+}
+
+export function mutateRegistration(
+  registration: CompetitionRegistration,
+  action: 'cancel' | 'promote',
+  reason: string,
+  requestId: string,
+): Promise<CompetitionRegistration> {
+  return request(`/api/admin/registrations/${registration.id}/${action}`, {
+    method: 'POST', body: JSON.stringify({ version: registration.version, reason: reason || null, request_id: requestId }),
+  })
+}
+
+export function updateRegistrationDiet(
+  registration: CompetitionRegistration,
+  diet: Diet,
+  reason: string,
+  requestId: string,
+): Promise<CompetitionRegistration> {
+  return request(`/api/admin/registrations/${registration.id}/diet`, {
+    method: 'PUT', body: JSON.stringify({ version: registration.version, diet, reason: reason || null, request_id: requestId }),
+  })
+}

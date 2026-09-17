@@ -2,9 +2,9 @@
 
 ## 範圍與共同約束
 
-- 第一版只做會員管理；比賽、候補、軟分級與發布版本僅記錄於 `docs/architecture.md`。
+- 目前已包含會員管理，以及第二階段的「比賽建立＋管理員維護報名名單」；會員自助報名、軟分級、分隊與發布版本仍不在範圍。
 - 公開 API 必須使用明確回應 schema，不得洩漏會員編號、稽核、帳號或會費欄位。
-- SQLite 每個連線維持 `foreign_keys=ON`、`busy_timeout=10000`、WAL 與 `synchronous=FULL`；會員修改與稽核紀錄必須同一交易。
+- SQLite 每個連線維持 `foreign_keys=ON`、`busy_timeout=10000`、WAL 與 `synchronous=FULL`；會員／比賽／報名修改與各自稽核紀錄必須同一交易。
 - 姓名可重複；`members.id` 才是識別。未知葷素保持 `unset`。停用不等於刪除。
 - 管理寫入需要後端 session 權限與 CSRF；更新必須檢查 `version`，不可靜默覆寫。
 - 合成測試資料不得換成對話圖片或未授權的真實會員資料。

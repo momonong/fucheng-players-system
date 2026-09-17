@@ -163,6 +163,86 @@ def restore(args: argparse.Namespace) -> None:
     print(f"已還原至：{target}")
 
 
+def reconcile_competition_case(args: argparse.Namespace) -> None:
+    """只做逐字精確對照並產生本機報告；不建立會員、不建立比賽、不寫入來源資料庫。"""
+    source = Path(args.csv_file).resolve()
+    output = Path(args.output).resolve()
+    if not source.is_file():
+        raise SystemExit(f"找不到案例 CSV：{source}")
+    if source == output:
+        raise SystemExit("輸出報告不可覆寫來源 CSV")
+    required = {
+        "source_cell", "source_group", "source_column", "name", "diet_source",
+        "recognition_status", "notes",
+    }
+    with source.open(encoding="utf-8-sig", newline="") as input_file:
+        reader = csv.DictReader(input_file)
+        if not reader.fieldnames or not required.issubset(reader.fieldnames):
+            raise SystemExit(f"案例 CSV 必須包含欄位：{', '.join(sorted(required))}")
+        source_rows = list(reader)
+    settings = Settings.from_env()
+    database_path = _sqlite_path(settings.database_url)
+    if not database_path.is_file():
+        raise SystemExit(f"找不到案例資料庫副本：{database_path}")
+    factory = make_session_factory(create_db_engine(settings.database_url))
+    reconciled: list[dict[str, object]] = []
+    counts: dict[str, int] = {}
+    with factory() as db:
+        for row in source_rows:
+            name = row["name"].strip()
+            matches = list(db.scalars(select(Member).where(Member.name == name).order_by(Member.id)))
+            recognition_status = row["recognition_status"].strip() or "clear"
+            if recognition_status != "clear":
+                match_status = "recognition_uncertain"
+            elif len(matches) == 0:
+                match_status = "no_match"
+            elif len(matches) > 1:
+                match_status = "multiple_exact_matches"
+            elif not matches[0].is_active:
+                match_status = "single_inactive_match"
+            else:
+                match_status = "single_active_match"
+            counts[match_status] = counts.get(match_status, 0) + 1
+            reconciled.append({
+                **{key: row[key] for key in required},
+                "name": name,
+                "match_status": match_status,
+                "candidates": [
+                    {
+                        "member_id": member.id,
+                        "name": member.name,
+                        "distinguishing_note": member.distinguishing_note,
+                        "level": member.level,
+                        "default_diet": member.diet,
+                        "is_active": member.is_active,
+                    }
+                    for member in matches
+                ],
+                "proposed_case_diet": (
+                    "vegetarian" if row["diet_source"].strip() == "image_vegetarian"
+                    else (matches[0].diet if len(matches) == 1 else None)
+                ),
+                "diet_provenance": (
+                    "source_image" if row["diet_source"].strip() == "image_vegetarian"
+                    else ("member_default" if len(matches) == 1 else "unresolved")
+                ),
+            })
+    report = {
+        "source_csv": str(source),
+        "source_image": str(Path(args.source_image).resolve()) if args.source_image else None,
+        "database_copy": str(database_path),
+        "matching_rule": "trimmed exact name only; no fuzzy matching and no automatic member creation",
+        "source_row_count": len(reconciled),
+        "summary": counts,
+        "rows": reconciled,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_suffix(output.suffix + ".tmp")
+    temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(output)
+    print(f"案例對照完成：{len(reconciled)} 筆；{counts}；報告：{output}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="fucheng")
     commands = parser.add_subparsers(required=True)
@@ -186,6 +266,11 @@ def main() -> None:
     restore_parser.add_argument("output")
     restore_parser.add_argument("--force", action="store_true")
     restore_parser.set_defaults(func=restore)
+    case_parser = commands.add_parser("reconcile-competition-case", help="精確對照本機比賽圖片轉錄與會員副本")
+    case_parser.add_argument("csv_file")
+    case_parser.add_argument("output")
+    case_parser.add_argument("--source-image")
+    case_parser.set_defaults(func=reconcile_competition_case)
     args = parser.parse_args()
     args.func(args)
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from './api'
 import type { AdminMember, AuditEntry, Diet, MemberDraft, PublicMember } from './types'
+import { CompetitionManager } from './CompetitionManager'
 
 const dietText: Record<Diet, string> = { unset: '未設定', omnivore: '葷食', vegetarian: '素食' }
 const fieldText: Record<string, string> = {
@@ -112,6 +113,7 @@ function AdminPage() {
   useEffect(() => { api.restoreSession().then(setUsername).catch(() => {}).finally(() => setChecking(false)) }, [])
   if (checking) return <main><p>確認登入狀態中…</p></main>
   if (!username) return <Login onLogin={setUsername} />
+  if (location.pathname.startsWith('/admin/competitions')) return <CompetitionManager username={username} onLogout={() => setUsername(null)} />
   return <MemberManager username={username} onLogout={() => setUsername(null)} />
 }
 
@@ -159,7 +161,7 @@ function MemberManager({ username, onLogout }: { username: string; onLogout: () 
   const shown = members.filter(member => `${member.name} ${member.distinguishing_note ?? ''} ${member.legacy_number ?? ''}`.includes(query))
   async function signOut() { try { await api.logout(); onLogout() } catch (e) { setNotice({ kind: 'error', text: (e as Error).message }) } }
   return <>
-    <header className="admin-header"><div><p className="eyebrow">會員管理</p><h1>府城球館</h1></div><div className="header-actions"><span>{username}</span><a href="/">公開名單</a><button className="secondary" onClick={signOut}>登出</button></div></header>
+    <header className="admin-header"><div><p className="eyebrow">會員管理</p><h1>府城球館</h1></div><div className="header-actions"><span>{username}</span><a href="/admin/competitions">比賽管理</a><a href="/">公開名單</a><button className="secondary" onClick={signOut}>登出</button></div></header>
     {notice && <Toast kind={notice.kind} onClose={() => setNotice(null)}>{notice.text}</Toast>}
     <main className="admin-main">
       <section className="member-list panel">

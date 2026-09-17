@@ -1,6 +1,6 @@
 # 部署、更新、備份與還原
 
-以下是 Linux + systemd 的建議配置。第一版沒有 Docker；Node.js 只在開發機或建置階段使用。
+以下是 Linux + systemd 的建議配置。系統沒有 Docker；Node.js 只在開發機或建置階段使用。
 
 ## 目錄與帳號
 
@@ -36,6 +36,8 @@ sudo -u fucheng /opt/fucheng/venv/bin/fucheng create-admin <管理員帳號>
 5. 原子切換 `current` symlink，再啟動服務，檢查 `/api/health`、登入與公開名單。
 
 資料庫遷移後不可假設程式 symlink 回退就等於安全回退；需要還原時使用更新前備份，並保留故障資料庫供調查。
+
+第二階段 migration `0002_competition_registration` 只新增比賽、報名與稽核表，不重建會員表。正式資料套用前仍必須先用 Backup API 備份，再把備份還原到新路徑，在副本執行 `alembic upgrade head`、核對會員／管理員／稽核筆數與 `integrity_check`，最後才安排停機遷移正式庫。本次本機案例副本驗證不等於正式資料庫已遷移。
 
 ## 一致性備份與還原
 

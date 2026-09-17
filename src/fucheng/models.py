@@ -3,7 +3,18 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base, UTCDateTime
@@ -91,3 +102,106 @@ class MemberFeeStatus(Base):
     status: Mapped[str] = mapped_column(String(20))
     recorded_by_admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"))
     recorded_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+
+
+class Competition(Base):
+    __tablename__ = "competitions"
+    __table_args__ = (
+        CheckConstraint("capacity >= 1", name="ck_competitions_capacity"),
+        CheckConstraint(
+            "status IN ('draft', 'open', 'closed', 'ended', 'cancelled')",
+            name="ck_competitions_status",
+        ),
+        CheckConstraint("next_sequence >= 1", name="ck_competitions_next_sequence"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(120), index=True)
+    competition_date: Mapped[date] = mapped_column(Date, index=True)
+    capacity: Mapped[int] = mapped_column(Integer)
+    registration_deadline: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    next_sequence: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+
+
+class CompetitionAudit(Base):
+    __tablename__ = "competition_audits"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    competition_id: Mapped[str] = mapped_column(
+        ForeignKey("competitions.id", ondelete="RESTRICT"), index=True
+    )
+    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"), index=True)
+    action: Mapped[str] = mapped_column(String(30))
+    changes_json: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc, index=True)
+    admin: Mapped[Admin] = relationship()
+
+
+class CompetitionRegistration(Base):
+    __tablename__ = "competition_registrations"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('confirmed', 'waitlisted', 'cancelled')",
+            name="ck_competition_registrations_status",
+        ),
+        CheckConstraint(
+            "diet IN ('unset', 'omnivore', 'vegetarian')",
+            name="ck_competition_registrations_diet",
+        ),
+        CheckConstraint(
+            "hard_level_snapshot BETWEEN 1 AND 10",
+            name="ck_competition_registrations_level",
+        ),
+        CheckConstraint("queue_sequence >= 1", name="ck_competition_registrations_sequence"),
+        UniqueConstraint("competition_id", "queue_sequence", name="uq_registration_sequence"),
+        Index(
+            "uq_active_registration_member",
+            "competition_id",
+            "member_id",
+            unique=True,
+            sqlite_where=text("status != 'cancelled'"),
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    competition_id: Mapped[str] = mapped_column(
+        ForeignKey("competitions.id", ondelete="RESTRICT"), index=True
+    )
+    member_id: Mapped[str] = mapped_column(ForeignKey("members.id", ondelete="RESTRICT"), index=True)
+    status: Mapped[str] = mapped_column(String(20), index=True)
+    diet: Mapped[str] = mapped_column(String(20))
+    hard_level_snapshot: Mapped[int] = mapped_column(Integer, index=True)
+    queue_sequence: Mapped[int] = mapped_column(Integer)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    created_by_admin_id: Mapped[str] = mapped_column(
+        ForeignKey("admins.id", ondelete="RESTRICT"), index=True
+    )
+    updated_by_admin_id: Mapped[str] = mapped_column(
+        ForeignKey("admins.id", ondelete="RESTRICT"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+    member: Mapped[Member] = relationship()
+    created_by: Mapped[Admin] = relationship(foreign_keys=[created_by_admin_id])
+    updated_by: Mapped[Admin] = relationship(foreign_keys=[updated_by_admin_id])
+
+
+class RegistrationAudit(Base):
+    __tablename__ = "registration_audits"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    registration_id: Mapped[str] = mapped_column(
+        ForeignKey("competition_registrations.id", ondelete="RESTRICT"), index=True
+    )
+    competition_id: Mapped[str] = mapped_column(
+        ForeignKey("competitions.id", ondelete="RESTRICT"), index=True
+    )
+    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"), index=True)
+    action: Mapped[str] = mapped_column(String(30))
+    changes_json: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc, index=True)
+    admin: Mapped[Admin] = relationship()
