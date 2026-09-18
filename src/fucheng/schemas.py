@@ -16,7 +16,6 @@ class PublicMember(BaseModel):
     name: str
     distinguishing_note: str | None
     level: int
-    diet: Diet
 
 
 class LoginRequest(BaseModel):
@@ -134,6 +133,7 @@ class CompetitionSummary(BaseModel):
 
 
 class AdminCompetition(CompetitionInput):
+    deleted_at: datetime | None
     id: str
     version: int
     created_at: datetime
@@ -187,3 +187,50 @@ class AdminRegistration(BaseModel):
 class CompetitionDetail(BaseModel):
     competition: AdminCompetition
     registrations: list[AdminRegistration]
+
+
+class StrictInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class PublicRegistrationCreate(StrictInput):
+    member_id: str = Field(min_length=1, max_length=36)
+    diet: Literal["omnivore", "vegetarian"]
+    request_id: str = Field(min_length=8, max_length=64)
+
+
+class PublicCandidate(BaseModel):
+    id: str
+    name: str
+    distinguishing_note: str | None
+
+
+class PublicCompetition(BaseModel):
+    id: str
+    name: str
+    competition_date: date
+    registration_deadline: datetime
+    notes: str | None
+    capacity: int
+    confirmed: int
+    waitlisted: int
+    remaining: int
+
+
+class PublicRegistrationResult(BaseModel):
+    status: RegistrationStatus
+    member_name: str
+    distinguishing_note: str | None
+    diet: Diet
+
+
+class CsrfResponse(BaseModel):
+    csrf_token: str
+
+
+class ActorAuditEntry(BaseModel):
+    id: str
+    action: str
+    actor_kind: Literal["admin", "public", "system"]
+    actor_name: str
+    created_at: datetime

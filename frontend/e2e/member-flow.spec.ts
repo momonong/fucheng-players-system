@@ -36,7 +36,7 @@ test('管理員新增修改，公開名單可搜尋篩選並支援列印', async
   await expect(page.getByLabel('姓名（必填）')).toHaveValue(`衝突時保留-${suffix}`)
   await page.unroute('**/api/admin/members/*')
 
-  await page.getByRole('link', { name: '公開名單' }).click()
+  await page.getByRole('link', { name: '會員分級名單' }).click()
   await expect(page.getByRole('heading', { name: '會員硬實力分級' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '1 級' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '5 級' })).toBeVisible()

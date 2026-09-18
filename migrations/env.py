@@ -44,9 +44,22 @@ def run_migrations_online() -> None:
         # PRAGMA 會在 SQLAlchemy 連線上開啟隱含交易；先結束它，否則
         # SQLite DDL 會留下但 alembic_version INSERT 會在外層離開時回滾。
         connection.commit()
-        context.configure(connection=connection, target_metadata=target_metadata, render_as_batch=True)
-        with context.begin_transaction():
+        # Batch rebuild of a referenced table needs FK enforcement temporarily disabled.
+        # Explicit BEGIN keeps SQLite DDL + version updates atomic; validate before commit.
+        connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        connection.commit()
+        try:
+            connection.exec_driver_sql("BEGIN IMMEDIATE")
+            context.configure(connection=connection, target_metadata=target_metadata, render_as_batch=True)
             context.run_migrations()
+            if connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall():
+                raise RuntimeError("遷移外鍵驗證失敗")
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.exec_driver_sql("PRAGMA foreign_keys=ON")
 
 
 if context.is_offline_mode():

@@ -7,7 +7,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Requ
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, or_, select, text, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from .config import Settings
@@ -41,6 +41,10 @@ from .schemas import (
     RegistrationMember,
     RegistrationMutation,
 )
+from .registrations import (
+    _as_utc, _member_values, _changes, _begin_immediate, _competition_values,
+    _competition_response, _registration_response, _mutate_registration, create_registration_service,
+)
 from .security import new_token, token_hash, verify_password
 
 SESSION_COOKIE = "fucheng_session"
@@ -54,6 +58,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.settings = settings
+    from fastapi.exceptions import RequestValidationError
+    from fastapi.responses import JSONResponse
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_input(_request, _error):
+        return JSONResponse(status_code=422, content={"detail": "輸入格式不正確，請檢查欄位內容"})
+
+    @app.exception_handler(DBAPIError)
+    async def database_error(_request, error):
+        # Do not log SQL parameters containing credentials/hashes or serialize DB exceptions.
+        return JSONResponse(status_code=409 if isinstance(error, IntegrityError) else 503,
+            content={"detail": "資料已變更或服務忙碌，請重新載入後再試"})
+
+    @app.middleware("http")
+    async def private_responses(request, call_next):
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+        return response
 
     async def get_db():
         with session_factory() as db:
@@ -111,10 +136,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return list(db.scalars(statement.order_by(Member.level.asc(), Member.name.asc(), Member.id.asc())))
 
     @app.post("/api/auth/login", response_model=AuthResponse)
-    def login(payload: LoginRequest, response: Response, db: Db) -> AuthResponse:
+    def login(payload: LoginRequest, request: Request, response: Response, db: Db) -> AuthResponse:
+        from .public_registration import rate_limit, DUMMY_HASH
+        from sqlalchemy import delete
+        rate_limit(db, request, "admin-login", payload.username.strip())
+        db.execute(text("BEGIN IMMEDIATE"))
         admin = db.scalar(select(Admin).where(Admin.username == payload.username.strip()))
-        if not admin or not admin.is_active or not verify_password(payload.password, admin.password_hash):
+        valid = verify_password(payload.password, admin.password_hash if admin else DUMMY_HASH)
+        if not admin or not admin.is_active or not valid:
             raise HTTPException(status_code=401, detail="帳號或密碼錯誤")
+        db.execute(delete(LoginSession).where(LoginSession.token_hash == token_hash(request.cookies.get(SESSION_COOKIE, ""))))
         raw_token, csrf_token = new_token(), new_token()
         login_session = LoginSession(
             token_hash=token_hash(raw_token),
@@ -170,6 +201,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.put("/api/admin/members/{member_id}", response_model=AdminMember)
     def update_member(member_id: str, payload: MemberUpdate, db: Db, auth: CsrfAuth) -> Member:
+        _begin_immediate(db, auth)
         existing = db.get(Member, member_id)
         if not existing:
             raise HTTPException(status_code=404, detail="找不到會員")
@@ -238,9 +270,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return list(db.scalars(statement.order_by(Member.level, Member.name, Member.id).limit(100)))
 
     @app.get("/api/admin/competitions", response_model=list[AdminCompetition])
-    def list_competitions(db: Db, _auth: Auth) -> list[AdminCompetition]:
+    def list_competitions(db: Db, _auth: Auth, deleted: bool = False) -> list[AdminCompetition]:
         competitions = db.scalars(
-            select(Competition).order_by(Competition.competition_date.desc(), Competition.created_at.desc())
+            select(Competition).where(Competition.deleted_at.is_not(None) if deleted else Competition.deleted_at.is_(None)).order_by(Competition.competition_date.desc(), Competition.created_at.desc())
         )
         return [_competition_response(db, competition) for competition in competitions]
 
@@ -290,6 +322,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not competition:
             db.rollback()
             raise HTTPException(status_code=404, detail="找不到比賽")
+        if competition.deleted_at:
+            db.rollback()
+            raise HTTPException(409, "比賽已刪除，請先還原")
         if competition.status in {"ended", "cancelled"}:
             db.rollback()
             raise HTTPException(status_code=409, detail="已結束或已取消的比賽為唯讀")
@@ -351,65 +386,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         db: Db,
         auth: CsrfAuth,
     ) -> AdminRegistration:
-        admin_id = _begin_immediate(db, auth)
-        duplicate = _idempotent_registration(db, payload.request_id, "create", competition_id)
-        if duplicate:
-            db.rollback()
-            return _registration_response(duplicate)
-        competition = _mutable_competition(db, competition_id)
-        if competition.status == "draft":
-            db.rollback()
-            raise HTTPException(status_code=409, detail="草稿比賽不接受報名")
-        _require_late_reason(competition, payload.reason)
-        member = db.get(Member, payload.member_id)
-        if not member or not member.is_active:
-            db.rollback()
-            raise HTTPException(status_code=409, detail="只能選取啟用中的會員")
-        existing = db.scalar(select(CompetitionRegistration).where(
-            CompetitionRegistration.competition_id == competition_id,
-            CompetitionRegistration.member_id == member.id,
-            CompetitionRegistration.status != "cancelled",
-        ))
-        if existing:
-            db.rollback()
-            raise HTTPException(status_code=409, detail="此會員已有目前報名紀錄")
-        confirmed = db.scalar(select(func.count(CompetitionRegistration.id)).where(
-            CompetitionRegistration.competition_id == competition_id,
-            CompetitionRegistration.status == "confirmed",
-        )) or 0
-        waiting = db.scalar(select(func.count(CompetitionRegistration.id)).where(
-            CompetitionRegistration.competition_id == competition_id,
-            CompetitionRegistration.status == "waitlisted",
-        )) or 0
-        registration = CompetitionRegistration(
-            competition_id=competition_id,
-            member_id=member.id,
-            status="confirmed" if confirmed < competition.capacity and waiting == 0 else "waitlisted",
-            diet=payload.diet or member.diet,
-            hard_level_snapshot=member.level,
-            queue_sequence=competition.next_sequence,
-            created_by_admin_id=admin_id,
-            updated_by_admin_id=admin_id,
-            created_at=now_utc(),
-            updated_at=now_utc(),
-        )
-        competition.next_sequence += 1
-        db.add(registration)
-        try:
-            db.flush()
-            db.add(_registration_audit(
-                registration,
-                admin_id,
-                "create",
-                {"status": {"before": None, "after": registration.status}},
-                payload.reason,
-                payload.request_id,
-            ))
-            db.commit()
-        except IntegrityError as error:
-            db.rollback()
-            raise HTTPException(status_code=409, detail="報名已存在或同一操作已完成") from error
-        return _registration_response(registration)
+        return create_registration_service(db, auth, competition_id, payload)
 
     @app.post("/api/admin/registrations/{registration_id}/cancel", response_model=AdminRegistration)
     def cancel_registration(
@@ -438,6 +415,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> AdminRegistration:
         return _mutate_registration(db, auth, registration_id, payload, "diet")
 
+    from .public_registration import install_public_routes
+    install_public_routes(app, get_db, current_auth)
+
+    from .website import install_website_routes
+    install_website_routes(app, get_db, current_auth, require_csrf)
+
+    from .competition_deletion import install_competition_deletion_routes
+    install_competition_deletion_routes(app, get_db, require_csrf)
+
+    from .roster_import import install_roster_import_route
+    install_roster_import_route(app, get_db, require_csrf)
+
     static_dir = settings.static_dir
     assets_dir = static_dir / "assets"
     if assets_dir.exists():
@@ -456,242 +445,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return FileResponse(index)
 
     return app
-
-
-def _as_utc(value: datetime) -> datetime:
-    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-
-
-def _member_values(member: Member) -> dict[str, object]:
-    return {
-        "name": member.name,
-        "distinguishing_note": member.distinguishing_note,
-        "legacy_number": member.legacy_number,
-        "level": member.level,
-        "diet": member.diet,
-        "is_active": member.is_active,
-    }
-
-
-def _changes(before: dict[str, object], after: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {
-        key: {"before": before.get(key), "after": value}
-        for key, value in after.items()
-        if before.get(key) != value
-    }
-
-
-def _begin_immediate(db: Session, auth: tuple[Admin, LoginSession]) -> str:
-    """驗證依賴已做過唯讀查詢；先結束該交易，再以 SQLite 寫鎖開始關鍵區段。"""
-    admin_id = auth[0].id
-    db.rollback()
-    db.execute(text("BEGIN IMMEDIATE"))
-    return admin_id
-
-
-def _competition_values(competition: Competition) -> dict[str, object]:
-    return {
-        "name": competition.name,
-        "competition_date": competition.competition_date,
-        "capacity": competition.capacity,
-        "registration_deadline": competition.registration_deadline,
-        "notes": competition.notes,
-        "status": competition.status,
-    }
-
-
-def _competition_response(db: Session, competition: Competition) -> AdminCompetition:
-    rows = db.execute(
-        select(
-            CompetitionRegistration.status,
-            CompetitionRegistration.diet,
-            CompetitionRegistration.hard_level_snapshot,
-            func.count(CompetitionRegistration.id),
-        )
-        .where(CompetitionRegistration.competition_id == competition.id)
-        .group_by(
-            CompetitionRegistration.status,
-            CompetitionRegistration.diet,
-            CompetitionRegistration.hard_level_snapshot,
-        )
-    ).all()
-    status_counts = {"confirmed": 0, "waitlisted": 0, "cancelled": 0}
-    diet_counts = {"unset": 0, "omnivore": 0, "vegetarian": 0}
-    level_counts: dict[int, int] = {}
-    for registration_status, diet, level, count in rows:
-        status_counts[registration_status] += count
-        if registration_status == "confirmed":
-            diet_counts[diet] += count
-            level_counts[level] = level_counts.get(level, 0) + count
-    remaining = max(competition.capacity - status_counts["confirmed"], 0)
-    return AdminCompetition(
-        **_competition_values(competition),
-        id=competition.id,
-        version=competition.version,
-        created_at=competition.created_at,
-        updated_at=competition.updated_at,
-        effective_registration_open=(
-            competition.status == "open" and now_utc() < _as_utc(competition.registration_deadline)
-        ),
-        summary={
-            **status_counts,
-            "remaining": remaining,
-            "pending_promotions": min(remaining, status_counts["waitlisted"]),
-            "diet_counts": diet_counts,
-            "level_counts": level_counts,
-        },
-    )
-
-
-def _registration_response(registration: CompetitionRegistration) -> AdminRegistration:
-    return AdminRegistration(
-        id=registration.id,
-        competition_id=registration.competition_id,
-        member_id=registration.member_id,
-        member_name=registration.member.name,
-        distinguishing_note=registration.member.distinguishing_note,
-        status=registration.status,
-        diet=registration.diet,
-        hard_level_snapshot=registration.hard_level_snapshot,
-        queue_sequence=registration.queue_sequence,
-        version=registration.version,
-        created_by_username=registration.created_by.username,
-        updated_by_username=registration.updated_by.username,
-        created_at=registration.created_at,
-        updated_at=registration.updated_at,
-    )
-
-
-def _mutable_competition(db: Session, competition_id: str) -> Competition:
-    competition = db.get(Competition, competition_id)
-    if not competition:
-        db.rollback()
-        raise HTTPException(status_code=404, detail="找不到比賽")
-    if competition.status in {"ended", "cancelled"}:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="已結束或已取消的比賽為唯讀")
-    return competition
-
-
-def _require_late_reason(competition: Competition, reason: str | None) -> None:
-    late = competition.status == "closed" or now_utc() >= _as_utc(competition.registration_deadline)
-    if late and not (reason and reason.strip()):
-        raise HTTPException(status_code=422, detail="報名截止後的操作必須填寫原因")
-
-
-def _idempotent_registration(
-    db: Session,
-    request_id: str,
-    action: str,
-    competition_id: str | None = None,
-) -> CompetitionRegistration | None:
-    audit = db.scalar(select(RegistrationAudit).where(RegistrationAudit.idempotency_key == request_id))
-    if not audit:
-        return None
-    if audit.action != action or (competition_id and audit.competition_id != competition_id):
-        raise HTTPException(status_code=409, detail="此操作識別碼已用於其他操作")
-    return db.get(CompetitionRegistration, audit.registration_id)
-
-
-def _registration_audit(
-    registration: CompetitionRegistration,
-    admin_id: str,
-    action: str,
-    changes: dict[str, dict[str, object]],
-    reason: str | None,
-    request_id: str,
-) -> RegistrationAudit:
-    return RegistrationAudit(
-        registration_id=registration.id,
-        competition_id=registration.competition_id,
-        admin_id=admin_id,
-        action=action,
-        changes_json=json.dumps(changes, ensure_ascii=False),
-        reason=reason.strip() if reason else None,
-        idempotency_key=request_id,
-    )
-
-
-def _mutate_registration(
-    db: Session,
-    auth: tuple[Admin, LoginSession],
-    registration_id: str,
-    payload: RegistrationMutation | RegistrationDietUpdate,
-    action: str,
-) -> AdminRegistration:
-    admin_id = _begin_immediate(db, auth)
-    duplicate = _idempotent_registration(db, payload.request_id, action)
-    if duplicate:
-        db.rollback()
-        return _registration_response(duplicate)
-    registration = db.get(CompetitionRegistration, registration_id)
-    if not registration:
-        db.rollback()
-        raise HTTPException(status_code=404, detail="找不到報名紀錄")
-    competition = _mutable_competition(db, registration.competition_id)
-    if registration.version != payload.version:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="此報名已被其他管理員更新，請重新載入")
-    before = {"status": registration.status, "diet": registration.diet}
-    if action == "cancel":
-        if registration.status == "cancelled":
-            db.rollback()
-            raise HTTPException(status_code=409, detail="此報名已取消")
-        _require_late_reason(competition, payload.reason)
-        registration.status = "cancelled"
-    elif action == "promote":
-        if registration.status != "waitlisted":
-            db.rollback()
-            raise HTTPException(status_code=409, detail="只有有效候補可以遞補")
-        _require_late_reason(competition, payload.reason)
-        first_waiting = db.scalar(
-            select(CompetitionRegistration)
-            .where(
-                CompetitionRegistration.competition_id == competition.id,
-                CompetitionRegistration.status == "waitlisted",
-            )
-            .order_by(CompetitionRegistration.queue_sequence, CompetitionRegistration.id)
-            .limit(1)
-        )
-        if not first_waiting or first_waiting.id != registration.id:
-            db.rollback()
-            raise HTTPException(status_code=409, detail="只能先處理第一位有效候補")
-        confirmed = db.scalar(select(func.count(CompetitionRegistration.id)).where(
-            CompetitionRegistration.competition_id == competition.id,
-            CompetitionRegistration.status == "confirmed",
-        )) or 0
-        if confirmed >= competition.capacity:
-            db.rollback()
-            raise HTTPException(status_code=409, detail="目前沒有可遞補名額")
-        registration.status = "confirmed"
-    elif action == "diet":
-        if registration.status == "cancelled":
-            db.rollback()
-            raise HTTPException(status_code=409, detail="已取消報名為歷史紀錄，不可修改")
-        _require_late_reason(competition, payload.reason)
-        registration.diet = payload.diet
-    else:
-        db.rollback()
-        raise RuntimeError("未知報名操作")
-    registration.version += 1
-    registration.updated_by_admin_id = admin_id
-    registration.updated_at = now_utc()
-    after = {"status": registration.status, "diet": registration.diet}
-    changes = _changes(before, after)
-    db.add(_registration_audit(
-        registration,
-        admin_id,
-        action,
-        changes,
-        payload.reason,
-        payload.request_id,
-    ))
-    try:
-        db.commit()
-    except IntegrityError as error:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="此操作已完成或資料已變更") from error
-    return _registration_response(registration)
 
 
 app = create_app()

@@ -230,3 +230,8 @@ src/fucheng/static/index.html
 test-results/
 playwright-report/
 .test-tmp*/
+
+frontend/dist-phase3/
+
+frontend/dist-public/
+frontend/dist-delete/

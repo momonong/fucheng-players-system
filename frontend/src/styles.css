@@ -235,3 +235,107 @@ button.danger { background: #8c3026; }
   .competition-print .roster-section tr { display: table-row; border: 0; margin: 0; padding: 0; }
   .competition-print .roster-section th, .competition-print .roster-section td { display: table-cell; padding: 1mm 1.5mm; border-bottom: .2mm solid #aaa; }
 }
+
+/* Large controls for the public name-selection flow. */
+.public-registration { max-width: 900px; font-size: 18px; }
+.registration-intro { font-size: 1.2rem; line-height: 1.7; }
+.public-competitions { display: grid; gap: 1.2rem; }
+.public-competitions h3 { font-size: 1.5rem; margin-top: 0; }
+.public-competition-info, .registration-form { margin-top: 1.2rem; }
+.self-counts { display: flex; flex-wrap: wrap; gap: 1.4rem; background: #f3f6f3; padding: 1rem; border-radius: .5rem; }
+.self-counts span { display: grid; gap: .4rem; }
+.self-counts strong { font-size: 1.4rem; }
+.competition-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.registration-button { display: block; background: #174d43; color: white; text-align: center; padding: 1rem; margin-top: 1rem; border-radius: .6rem; text-decoration: none; font-weight: bold; }
+.public-candidates { display: grid; gap: .75rem; margin-top: 1rem; }
+.public-candidates button { text-align: left; display: grid; gap: .3rem; background: #fff; color: #183d34; border: 2px solid #b6c9c0; min-height: 64px; }
+.public-candidates button[aria-pressed=true] { background: #e7f4e8; border-color: #1e634b; }
+.public-candidates button strong { font-size: 1.3rem; }
+.public-candidates button span { font-weight: normal; }
+.registration-form h2 { margin-top: 1.5rem; }
+.meal-options { border: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 1rem; }
+.meal-options label { display: flex; gap: .5rem; align-items: center; border: 1px solid #b6c9c0; border-radius: .5rem; padding: .75rem; min-height: 48px; }
+.meal-options input { width: 22px; height: 22px; }
+.registration-confirm { border-top: 1px solid #d8dfd8; margin-top: 1.5rem; }
+.registration-submit { width: 100%; min-height: 56px; font-size: 1.2rem; }
+.registration-help { margin-top: 1.5rem; line-height: 1.7; }
+.registration-receipt { border-top: 5px solid #39795c; }
+.receipt-name { font-size: 1.5rem; font-weight: bold; }
+.receipt-status { font-size: 1.8rem; }
+.actor-audits { padding-left: 1.2rem; overflow-wrap: anywhere; }
+.actor-audits li { margin: .65rem 0; }
+.registration-history { margin-top: 1rem; }
+@media (max-width: 600px) {
+  .public-registration { padding: 1rem; }
+  .public-registration .panel { padding: 1.1rem; }
+  .public-registration input { font-size: 18px; }
+}
+
+.admin-header > a { color: #ffffff; }
+.registration-receipt .eyebrow { color: #416655; }
+
+/* Club-wide navigation and public information pages. */
+.site-nav { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem max(1rem, calc((100vw - 1240px) / 2)); background:#fffdf7; border-bottom:1px solid var(--line); }
+.site-brand { font-size:1.4rem; font-weight:900; text-decoration:none; color:var(--green); white-space:nowrap; }
+.site-brand span { display:block; font-size:.8rem; font-weight:500; color:#626d64; }
+.site-nav > div { display:flex; gap:.5rem; flex-wrap:wrap; }
+.site-nav > div a { padding:.65rem .85rem; min-height:48px; display:flex; align-items:center; text-decoration:none; font-weight:700; border-radius:8px; }
+.site-nav a[aria-current=page] { background:var(--green); color:white; }
+.site-nav .nav-admin { font-size:.9rem; color:#5c665f; }
+.club-hero { background:var(--green); color:#fffdf4; padding:3.5rem max(1rem, calc((100vw - 1240px) / 2)); display:grid; grid-template-columns:3fr 2fr; align-items:center; gap:2rem; }
+.club-hero h1 { font-size:clamp(2.4rem,5.2vw,4.7rem); line-height:1.22; margin:1rem 0; letter-spacing:.025em; }
+.club-hero p:not(.eyebrow) { font-size:1.2rem; line-height:1.8; color:#d6e2d8; }
+.hero-action { display:inline-block; padding:.9rem 1.2rem; border-radius:8px; margin-top:.5rem; background:#f4c17d; color:#27291d; font-weight:800; text-decoration:none; }
+.club-hero-note { border-left:1px solid #688579; padding:1.5rem 2.5rem; text-align:center; }
+.court-mark { display:block; font-size:clamp(3rem,8vw,7rem); color:#b7d9c9; font-weight:900; letter-spacing:.16em; }
+.home-shortcuts { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:2rem; }
+.home-shortcuts a { display:block; padding:1.4rem 1.6rem; background:#fffdf7; border:1px solid var(--line); border-radius:14px; text-decoration:none; color:var(--ink); }
+.home-shortcuts a:hover { border-color:var(--teal); background:#edf4ed; }
+.home-shortcuts span,.section-kicker { color:var(--teal); font-size:.85rem; letter-spacing:.1em; font-weight:800; }
+.home-shortcuts h2 { margin:.4rem 0; font-size:1.6rem; }
+.home-shortcuts p { margin:.4rem 0 1rem; }
+.home-shortcuts strong { color:var(--teal); }
+.home-columns { display:grid; grid-template-columns:1.2fr 1fr; gap:2rem; align-items:start; }
+.home-section-title { margin:1rem 0; }
+.home-section-title h2 { font-size:1.9rem; margin:.1rem 0 1rem; }
+.home-section-title p { margin:0; }
+.news-card,.schedule-card { margin-bottom:1rem; overflow-wrap:anywhere; }
+.news-card h3,.schedule-card h3 { font-size:1.4rem; margin:.7rem 0; }
+.news-meta { display:flex; flex-wrap:wrap; align-items:center; gap:.7rem; font-size:.85rem; color:#5c665f; }
+.news-pin,.schedule-status { display:inline-block; font-size:.85rem; font-weight:800; padding:.25rem .65rem; border-radius:5px; background:#ebe9e0; color:#414d45; }
+.news-pin { background:#fae4c6; color:#684418; }
+.schedule-status.open { background:#e1f1e6; color:#185a3d; }
+.schedule-status.cancelled { background:#f7e4dd; color:#843e29; }
+.news-body { white-space:pre-wrap; overflow-wrap:anywhere; }
+.schedule-card p { margin:.45rem 0; }
+.club-help { margin-top:2.5rem; background:#e8ede3; padding:1.5rem; border-left:5px solid var(--teal); border-radius:0 12px 12px 0; }
+.club-help h2 { margin:0; font-size:1.4rem; }
+.announcement-workspace { display:grid; grid-template-columns:1fr 1.4fr; gap:1.5rem; align-items:start; }
+.announcement-row { width:100%; text-align:left; display:grid; gap:.3rem; margin:.7rem 0; background:#edf3ed; color:var(--ink); overflow-wrap:anywhere; }
+.announcement-row:hover { background:#d8e7dc; }
+.announcement-row span { font-size:.85rem; font-weight:500; }
+.history-button { margin-top:1rem; }
+@media(max-width:700px) {
+  .site-nav { flex-direction:column; align-items:stretch; gap:.5rem; padding:.8rem 1rem; }
+  .site-brand span { display:none; }
+  .site-nav > div { gap:.1rem; justify-content:space-between; }
+  .site-nav > div a { padding:.5rem; font-size:.95rem; }
+  .club-hero { grid-template-columns:1fr; padding:2rem 1.25rem; }
+  .club-hero-note { display:none; }
+  .club-hero h1 { font-size:2.6rem; }
+  .home-shortcuts,.home-columns,.announcement-workspace { grid-template-columns:1fr; gap:1rem; }
+  .home-shortcuts a { padding:1.2rem; }
+}
+@media print { .site-nav { display:none !important; } }
+/* Native modal traps focus; the safe action receives initial focus. */
+.competition-confirm-dialog { border: 0; border-radius: 18px; padding: 28px; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; color: #172a2a; box-shadow: 0 20px 80px #0005; }
+.competition-confirm-dialog::backdrop { background: #12252599; }
+.competition-confirm-dialog h2 { margin-top: 0; }
+.competition-confirm-name { font-weight: 800; font-size: 1.25rem; overflow-wrap: anywhere; }
+.competition-confirm-buttons, .competition-view-switch, .competition-delete-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.competition-confirm-buttons { margin-top: 24px; }
+.competition-confirm-buttons button { flex: 1; min-height: 48px; }
+.competition-view-switch { margin-bottom: 18px; }
+.competition-view-switch [aria-pressed="true"] { background: #deeee6; border-color: #36614c; color: #163d29; }
+.competition-delete-actions { justify-content: space-between; }
+.competition-delete-actions p { margin: 0; }

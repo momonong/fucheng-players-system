@@ -13,7 +13,7 @@ import type {
 
 let csrfToken = ''
 
-async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers)
   if (options.body) headers.set('Content-Type', 'application/json')
   if (options.method && !['GET', 'HEAD'].includes(options.method)) headers.set('X-CSRF-Token', csrfToken)
@@ -69,7 +69,10 @@ export function saveMember(draft: MemberDraft, id?: string): Promise<AdminMember
 
 export const memberHistory = (id: string) => request<AuditEntry[]>(`/api/admin/members/${id}/history`)
 
-export const competitions = () => request<Competition[]>('/api/admin/competitions')
+export const competitions = (deleted = false) => request<Competition[]>(`/api/admin/competitions?deleted=${deleted}`)
+export const changeCompetitionDeletion = (item: Competition, restore: boolean) => request<Competition>(`/api/admin/competitions/${item.id}/${restore ? 'restore' : 'delete'}`, {
+  method: 'POST', body: JSON.stringify({ version: item.version, confirmed: true }),
+})
 export const competition = (id: string) => request<CompetitionDetail>(`/api/admin/competitions/${id}`)
 
 export function saveCompetition(draft: CompetitionDraft, id?: string): Promise<Competition> {

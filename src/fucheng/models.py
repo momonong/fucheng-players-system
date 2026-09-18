@@ -28,6 +28,33 @@ def now_utc() -> datetime:
     return datetime.now(UTC)
 
 
+class Announcement(Base):
+    __tablename__ = "announcements"
+    __table_args__ = (CheckConstraint("version >= 1", name="ck_announcements_version"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    title: Mapped[str] = mapped_column(String(120))
+    body: Mapped[str] = mapped_column(Text)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+
+
+class AnnouncementAudit(Base):
+    __tablename__ = "announcement_audits"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    announcement_id: Mapped[str] = mapped_column(ForeignKey("announcements.id", ondelete="RESTRICT"), index=True)
+    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"))
+    action: Mapped[str] = mapped_column(String(20))
+    changes_json: Mapped[str] = mapped_column(Text)
+    request_id: Mapped[str] = mapped_column(String(64), unique=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+    admin: Mapped[Admin] = relationship()
+
+
 class Admin(Base):
     __tablename__ = "admins"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -123,6 +150,7 @@ class Competition(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
     next_sequence: Mapped[int] = mapped_column(Integer, default=1)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
 
@@ -141,9 +169,33 @@ class CompetitionAudit(Base):
     admin: Mapped[Admin] = relationship()
 
 
+class PublicVisit(Base):
+    """Automatic browser context, not a member account or verified identity."""
+    __tablename__ = "public_visits"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    csrf_token: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+
+
+def actor_constraint(prefix: str, admin_column: str | None = None):
+    admin = admin_column or f"{prefix}_admin_id"
+    visit = f"{prefix}_visit_id"
+    kind = f"{prefix}_kind"
+    return CheckConstraint(
+        f"({kind}='admin' AND {admin} IS NOT NULL AND {visit} IS NULL) OR "
+        f"({kind}='public' AND {admin} IS NULL AND {visit} IS NOT NULL) OR "
+        f"({kind}='system' AND {admin} IS NULL AND {visit} IS NULL)",
+        name=f"ck_{prefix}_exclusive_actor",
+    )
+
+
 class CompetitionRegistration(Base):
     __tablename__ = "competition_registrations"
     __table_args__ = (
+        actor_constraint("created_by"),
+        actor_constraint("updated_by"),
         CheckConstraint(
             "status IN ('confirmed', 'waitlisted', 'cancelled')",
             name="ck_competition_registrations_status",
@@ -176,21 +228,29 @@ class CompetitionRegistration(Base):
     hard_level_snapshot: Mapped[int] = mapped_column(Integer, index=True)
     queue_sequence: Mapped[int] = mapped_column(Integer)
     version: Mapped[int] = mapped_column(Integer, default=1)
-    created_by_admin_id: Mapped[str] = mapped_column(
+    created_by_admin_id: Mapped[str | None] = mapped_column(
         ForeignKey("admins.id", ondelete="RESTRICT"), index=True
     )
-    updated_by_admin_id: Mapped[str] = mapped_column(
+    updated_by_admin_id: Mapped[str | None] = mapped_column(
         ForeignKey("admins.id", ondelete="RESTRICT"), index=True
     )
+    created_by_kind: Mapped[str] = mapped_column(String(10), default="admin", server_default="admin")
+    created_by_visit_id: Mapped[str | None] = mapped_column(ForeignKey("public_visits.id", ondelete="RESTRICT"), nullable=True)
+    updated_by_kind: Mapped[str] = mapped_column(String(10), default="admin", server_default="admin")
+    updated_by_visit_id: Mapped[str | None] = mapped_column(ForeignKey("public_visits.id", ondelete="RESTRICT"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
-    member: Mapped[Member] = relationship()
-    created_by: Mapped[Admin] = relationship(foreign_keys=[created_by_admin_id])
-    updated_by: Mapped[Admin] = relationship(foreign_keys=[updated_by_admin_id])
+    member: Mapped[Member] = relationship(foreign_keys=[member_id])
+    created_by: Mapped[Admin | None] = relationship(foreign_keys=[created_by_admin_id])
+    updated_by: Mapped[Admin | None] = relationship(foreign_keys=[updated_by_admin_id])
 
 
 class RegistrationAudit(Base):
     __tablename__ = "registration_audits"
+    __table_args__ = (actor_constraint("actor", admin_column="admin_id"),)
+    actor_kind: Mapped[str] = mapped_column(String(10), default="admin", server_default="admin")
+    actor_visit_id: Mapped[str | None] = mapped_column(ForeignKey("public_visits.id", ondelete="RESTRICT"), nullable=True)
+    request_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     registration_id: Mapped[str] = mapped_column(
         ForeignKey("competition_registrations.id", ondelete="RESTRICT"), index=True
@@ -198,10 +258,17 @@ class RegistrationAudit(Base):
     competition_id: Mapped[str] = mapped_column(
         ForeignKey("competitions.id", ondelete="RESTRICT"), index=True
     )
-    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"), index=True)
+    admin_id: Mapped[str | None] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"), index=True)
     action: Mapped[str] = mapped_column(String(30))
     changes_json: Mapped[str] = mapped_column(Text)
     reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc, index=True)
-    admin: Mapped[Admin] = relationship()
+    admin: Mapped[Admin | None] = relationship()
+
+
+class AuthAttempt(Base):
+    __tablename__ = "auth_attempts"
+    key_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer)
+    window_start: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)

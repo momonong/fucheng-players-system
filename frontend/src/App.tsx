@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import * as api from './api'
 import type { AdminMember, AuditEntry, Diet, MemberDraft, PublicMember } from './types'
 import { CompetitionManager } from './CompetitionManager'
+import { PublicRegistrationPortal } from './PublicRegistrationPortal'
+import { SiteNav, ClubHome, AnnouncementManager } from './ClubWebsite'
 
 const dietText: Record<Diet, string> = { unset: '未設定', omnivore: '葷食', vegetarian: '素食' }
 const fieldText: Record<string, string> = {
@@ -14,7 +16,7 @@ const emptyDraft: MemberDraft = {
 
 export function App() {
   const adminPage = location.pathname.startsWith('/admin')
-  return adminPage ? <AdminPage /> : <PublicPage />
+  return <><SiteNav />{adminPage ? <AdminPage /> : location.pathname === '/members' ? <PublicPage /> : location.pathname === '/' ? <ClubHome /> : <PublicRegistrationPortal />}</>
 }
 
 function PublicPage() {
@@ -113,6 +115,8 @@ function AdminPage() {
   useEffect(() => { api.restoreSession().then(setUsername).catch(() => {}).finally(() => setChecking(false)) }, [])
   if (checking) return <main><p>確認登入狀態中…</p></main>
   if (!username) return <Login onLogin={setUsername} />
+  if (location.pathname === '/admin/announcements') return <AnnouncementManager />
+  if (location.pathname === '/admin/roster') return <PublicPage />
   if (location.pathname.startsWith('/admin/competitions')) return <CompetitionManager username={username} onLogout={() => setUsername(null)} />
   return <MemberManager username={username} onLogout={() => setUsername(null)} />
 }
@@ -126,7 +130,7 @@ function Login({ onLogin }: { onLogin: (name: string) => void }) {
     event.preventDefault(); setBusy(true); setError('')
     try { onLogin(await api.login(username, password)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
-  return <main className="login-shell"><a href="/">← 返回公開名單</a><form className="panel login" onSubmit={submit}>
+  return <main className="login-shell"><a href="/">← 返回首頁</a><form className="panel login" onSubmit={submit}>
     <p className="eyebrow">府城球館</p><h1>管理員登入</h1>
     {error && <Notice kind="error">{error}</Notice>}
     <label>帳號<input autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required /></label>
@@ -161,7 +165,7 @@ function MemberManager({ username, onLogout }: { username: string; onLogout: () 
   const shown = members.filter(member => `${member.name} ${member.distinguishing_note ?? ''} ${member.legacy_number ?? ''}`.includes(query))
   async function signOut() { try { await api.logout(); onLogout() } catch (e) { setNotice({ kind: 'error', text: (e as Error).message }) } }
   return <>
-    <header className="admin-header"><div><p className="eyebrow">會員管理</p><h1>府城球館</h1></div><div className="header-actions"><span>{username}</span><a href="/admin/competitions">比賽管理</a><a href="/">公開名單</a><button className="secondary" onClick={signOut}>登出</button></div></header>
+    <header className="admin-header"><div><p className="eyebrow">會員管理</p><h1>府城球館</h1></div><div className="header-actions"><span>{username}</span><a href="/admin/announcements">公告管理</a><a href="/admin/competitions">比賽管理</a><a href="/admin/roster">會員分級名單</a><button className="secondary" onClick={signOut}>登出</button></div></header>
     {notice && <Toast kind={notice.kind} onClose={() => setNotice(null)}>{notice.text}</Toast>}
     <main className="admin-main">
       <section className="member-list panel">
@@ -211,7 +215,7 @@ function MemberEditor({ member, onSaved, onConflict }: { member?: AdminMember; o
       <label>球館原有會員編號<input value={draft.legacy_number} onChange={e => set('legacy_number', e.target.value)} maxLength={50} /></label>
       <div className="form-row"><label>硬實力級數<select value={draft.level} onChange={e => set('level', Number(e.target.value))}>{range(1, 10).map(n => <option key={n}>{n}</option>)}</select></label>
       <label>預設葷素<select value={draft.diet} onChange={e => set('diet', e.target.value as Diet)}><option value="unset">未設定</option><option value="omnivore">葷食</option><option value="vegetarian">素食</option></select></label></div>
-      <label className="check"><input type="checkbox" checked={draft.is_active} onChange={e => set('is_active', e.target.checked)} />啟用會員（停用後不會出現在公開名單）</label>
+      <label className="check"><input type="checkbox" checked={draft.is_active} onChange={e => set('is_active', e.target.checked)} />啟用會員（停用後無法新增報名）</label>
       <button disabled={state === 'saving'}>{state === 'saving' ? '儲存中…' : '儲存會員'}</button>
     </form>
     {showHistory && <div className="history"><h3>重要修改歷史</h3>{history.length === 0 && <p>尚無紀錄。</p>}{history.map(entry => <article key={entry.id}><strong>{entry.action === 'create' ? '建立會員' : '更新會員'}</strong><span>{entry.admin_username}・{taipei(entry.created_at)}</span><ul>{Object.entries(entry.changes).map(([field, values]) => <li key={field}>{fieldText[field] ?? field}：{formatValue(values.before)} → {formatValue(values.after)}</li>)}</ul></article>)}</div>}

@@ -6,9 +6,12 @@ def test_public_response_is_explicit_and_searchable(client: TestClient, auth, me
     response = client.get("/api/public/members", params={"search": "東區", "level": 3})
     assert response.status_code == 200
     assert response.json() == [{
-        "id": member["id"], "name": "測試會員", "distinguishing_note": "東區", "level": 3, "diet": "unset",
+        "id": member["id"], "name": "測試會員", "distinguishing_note": "東區", "level": 3,
     }]
+    client.cookies.clear()
+    assert client.get("/api/public/members").status_code == 200
     serialized = response.text
+    assert "diet" not in serialized
     assert "legacy_number" not in serialized
     assert "version" not in serialized
     assert "created_at" not in serialized

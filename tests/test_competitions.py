@@ -173,7 +173,7 @@ def test_capacity_waitlist_cancel_promote_requeue_and_snapshots(client, auth) ->
 def test_status_deadline_capacity_conflict_permissions_and_csrf(app, client, auth) -> None:
     with TestClient(app) as anonymous:
         assert anonymous.get("/api/admin/competitions").status_code == 401
-        assert anonymous.get("/api/public/competitions").status_code == 404
+        assert anonymous.get("/api/public/competitions").status_code == 200
     assert client.post("/api/admin/competitions", json=_competition_payload()).status_code == 403
     draft = client.post(
         "/api/admin/competitions", headers=auth, json=_competition_payload(status="draft")

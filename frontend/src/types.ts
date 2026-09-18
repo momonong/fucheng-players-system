@@ -5,10 +5,10 @@ export interface PublicMember {
   name: string
   distinguishing_note: string | null
   level: number
-  diet: Diet
 }
 
 export interface AdminMember extends PublicMember {
+  diet: Diet
   legacy_number: string | null
   is_active: boolean
   version: number
@@ -48,6 +48,7 @@ export interface CompetitionSummary {
 }
 
 export interface Competition {
+  deleted_at: string | null
   id: string
   name: string
   competition_date: string
