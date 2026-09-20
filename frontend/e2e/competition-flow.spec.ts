@@ -8,6 +8,7 @@ test('管理員建立比賽、維護候補與列印名單', async ({ page }, tes
   await page.getByLabel('密碼').fill(password)
   await page.getByRole('button', { name: '登入', exact: true }).click()
   await expect(page.getByRole('heading', { name: '比賽', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '報名與設定', exact: true }).click()
 
   await page.getByRole('button', { name: '建立比賽' }).click()
   const date = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -26,6 +27,7 @@ test('管理員建立比賽、維護候補與列印名單', async ({ page }, tes
   async function addMember(name: string) {
     const picker = page.locator('.candidate-picker')
     if (!(await picker.evaluate(element => (element as HTMLDetailsElement).open))) await picker.locator('summary').click()
+    await page.getByLabel('搜尋姓名／辨識註記', { exact: true }).fill(name)
     await expect(page.getByRole('button', { name: new RegExp(name) })).toBeVisible()
     await page.getByRole('button', { name: new RegExp(name) }).click()
     await expect(page.getByText('名單已更新')).toBeVisible()

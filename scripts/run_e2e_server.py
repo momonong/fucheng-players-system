@@ -13,9 +13,9 @@ from fucheng.security import hash_password
 
 def main() -> None:
     settings = Settings.from_env()
-    allowed = {f"sqlite:///data/{name}" for name in ("public-e2e.db", "levels-e2e.db", "level-drag-e2e.db")}
+    allowed = {f"sqlite:///data/{name}" for name in ("public-e2e.db", "levels-e2e.db", "level-drag-e2e.db", "arrangement-e2e.db")}
     if settings.database_url not in allowed:
-        raise SystemExit("只允許專用 public-e2e.db、levels-e2e.db 或 level-drag-e2e.db 執行 E2E")
+        raise SystemExit("只允許專用 public-e2e.db、levels-e2e.db、level-drag-e2e.db 或 arrangement-e2e.db 執行 E2E")
     admin_password = os.getenv("FUCHENG_E2E_ADMIN_PASSWORD")
     if not admin_password:
         raise SystemExit("缺少動態 E2E 管理員密碼")
@@ -34,6 +34,7 @@ def main() -> None:
         db.add(Admin(username="e2e-admin", password_hash=hash_password(admin_password)))
         db.add(Admin(username="e2e-deletion-admin", password_hash=hash_password(admin_password)))
         db.add(Admin(username="e2e-levels-admin", password_hash=hash_password(admin_password)))
+        db.add(Admin(username="e2e-arrangement-peer", password_hash=hash_password(admin_password)))
         db.add_all([
             Member(name="合成會員一", distinguishing_note="東區", level=1, diet="unset"),
             Member(name="合成會員二", distinguishing_note="西區", level=5, diet="omnivore"),

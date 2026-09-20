@@ -59,10 +59,13 @@ export function useLevelCardDrag(onMove: (id: string, level: number) => void, on
       if (current?.active) {
         if (!latest.current.enabled) clear()
         else {
-          const lane = document.elementFromPoint(current.x, current.y)?.closest<HTMLElement>('.level-zone-cards')
+          const lane = document.elementFromPoint(current.x, current.y)?.closest<HTMLElement>('.arrangement-table-scroll')
           const edgeSpeed = (position: number, start: number, end: number) => position < start + 35 ? -9 : position > end - 35 ? 9 : 0
           const rect = lane?.getBoundingClientRect()
-          if (lane && rect) lane.scrollTop += edgeSpeed(current.y, rect.top, rect.bottom)
+          if (lane && rect) {
+            lane.scrollLeft += edgeSpeed(current.x, rect.left, rect.right)
+            lane.scrollTop += edgeSpeed(current.y, rect.top, rect.bottom)
+          }
           const dy = edgeSpeed(current.y, 0, window.innerHeight)
           if (dy) window.scrollBy(0, dy)
           show(current)

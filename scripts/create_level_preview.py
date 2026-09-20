@@ -14,7 +14,7 @@ from alembic.config import Config
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--variant', choices=['levels', 'level-drag'], default='levels')
+    parser.add_argument('--variant', choices=['levels', 'level-drag', 'arrangement', 'arrangement-native'], default='levels')
     variant = parser.parse_args().variant
     database = Path(f'data/{variant}-preview.db').resolve()
     credentials = Path(f'data/{variant}-preview-admin.json')
@@ -25,7 +25,7 @@ def main():
     database.parent.mkdir(parents=True, exist_ok=True)
     os.environ['FUCHENG_DATABASE_URL'] = f'sqlite:///{database.as_posix()}'
     os.environ['FUCHENG_COOKIE_SECURE'] = 'false'
-    os.environ['FUCHENG_STATIC_DIR'] = f'frontend/dist-{variant}'
+    os.environ['FUCHENG_STATIC_DIR'] = f'frontend/dist-{"arrangement" if variant == "arrangement-native" else variant}'
     command.upgrade(Config('alembic.ini'), 'head')
     command.check(Config('alembic.ini'))
     from fastapi.testclient import TestClient

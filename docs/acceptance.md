@@ -1,6 +1,61 @@
 # 驗收證據與限制
 
-最後更新：2026-09-20。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+最後更新：2026-09-21。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+
+2026-09-21階段A Git交付範圍：緊湊表格、完整安排保存／唯讀歷史、0007、必要測試與部署接續文件，共33項來源變更；從 `0970af2` 整合至main並正常推送，沒有納入後續B需求。整合核對48個應用來源與3個runtime靜態檔仍符合公開驗證身份，沿用下述101項後端、final affected 39項及22項E2E與公開80人證據，不形式重跑。DB、帳密、成品與ignored launcher不進Git；未執行的Docker drill仍僅為準備腳本。以下「未提交」及資源狀態均保留為各次驗證當時紀錄，最新Git身份以交付commit／main／origin/main核對為準。此Git交付不重啟預覽、不改資料／帳密／session，也不是正式部署或Docker hold解除。
+
+## 緊湊級數表格與完整安排版本（2026-09-20，取代下方 A+B 使用方式）
+
+本輪工程驗證完成，等待使用者人工驗收；新功能已提供獨立原生HTTPS合成入口，舊Docker環境尚未更新。排級數以1～10橫向欄、低列高姓名格呈現，正取以外資訊及比賽設定移至「報名與設定」。移動不需要原因，逐次稽核留實際admin／時間／前後值；起始基準只建立一次，大存不可變完整快照、可選版本名稱／顯示編輯者／備註、server秒時間。現在工作對最新保存版、歷史對直接前版，新增／移出依報名ID辨識；不把報名快照當上版。公開資料與其他管理操作原因限制不變。
+
+既有ngrok合成預覽的Docker升級於2026-09-20 14:34台北因共用Docker不可用而hold：ps API500、version兩次unable to start；當時舊公開health404、8448/8450逾時，8039仍200。沒有build／volume操作／migration／舊env變更或重啟共用服務。離線allowlist與指定合成0006備份已核對；`deployment_arrangement_drill.py`只有py_compile／--help通過，**不是遷移或回退已驗證**。證據 `data/deployment-ngrok-r11-evidence-20260920/preflight-blocked.json`；r11 image／Docker演練仍未執行。其後另獲授權建立下列原生入口，不代表解除Docker hold。
+
+原生公開合成驗收（2026-09-20 22:44～22:52台北）：
+
+- [公開新版安排管理](https://f9d0-140-116-158-107.ngrok-free.app/admin/competitions) 正常TLS載入、登入與health JSON200。首次ngrok提示可按Visit Site，未略過TLS驗證。獨立 `data/arrangement-native-preview.db`、0007、83合成會員／3場／85報名，主場80正取；未讀取或複製真實資料／舊volume。初始Backup API備份還原與Alembic metadata check通過。
+- 已驗證48個應用來源及3個靜態檔SHA，從 `frontend/dist-arrangement` 複製到獨立runtime/static，沒有重建舊成品。browser公開驗收沿用已驗證核心程式，不形式重跑既有全套測試。
+- CUA真實瀏覽器桌面1440×900：80人十欄、拖曳不問原因、自動儲存、重載仍為1→4；回基準清色且無淨差不能大存。第一次採預設「版本 1」、登入帳號作顯示編輯者、空備註；保存後清色。再拖4→6按上一保存版顯色。
+- 手機viewport390×844：搜尋圖示展開、按辨識註記縮至1人，表格寬1100px、捲至最右第10級，頁面無水平溢位。手機尺寸完成第二次保存，自訂「公開驗收版本 2」／「合成現場編輯者」／備註；保存後清色。實際操作帳號仍獨立列出levels-preview-admin。這是桌面瀏覽器尺寸模擬；未宣稱實體手機或本次觸控長按已驗證，既有touch E2E證據仍見下方。
+- 歷史第二版相較前版4→6，第一版相較起始基準1→4，皆完整80人、唯讀；回目前安排保持6級及無淨差。時間顯示至秒（基準22:43:31、第一版22:48:26、第二版22:49:45）。三版各80列；基準在首次合法合成調級前實際建立，沒有偽造過去基準。
+- DB只讀核對：歷史瀏覽前後全部16表hash相同；會員全列、hard_level_snapshot及其他非調級報名欄位與初始備份一致。此次瀏覽器新增5筆level audit（含合成選手03的3→1→3往返及同名選手3→1→4→6），原因皆null，保留逐次歷史；integrity=ok、FK錯誤0。
+- 安全：未登入管理401；錯誤Origin／缺CSRF403；錯Host／缺forwarded／HTTP proto／公開偽造forwarded／來源127.0.0.2的forwarded均400；Secure／HttpOnly／SameSite=lax。僅127.0.0.1:8041 listener，信任同機loopback程序，沒有Docker網路隔離保證；inspector／remote-management關閉。沒有公開debug或access body日誌。
+- 保護核對：48來源、3複製成品、當次36個既有檔案及先前439個保護檔案皆未改（大封裝沿原基準只比size／mtime）。8037 PID57548與8039 PID55404保留；Docker／GPU零操作。browser console無error/warn。
+
+完整證據在 `data/arrangement-native-runtime/`：`identity.json`、`security.json`、`browser-evidence.json`、`data-verification.json`、`protection-final.json`、`desktop-current.png`、`mobile-history.png`。登入檔、PID／停止方式見README。原生入口已可人工驗收，但不代表使用者已接受、正式部署完成或r11 Docker升級／回退完成。
+
+功能驗收後另依使用者指定新增合成 `admin`，同庫之外未寫入。過程曾短暫套用短密碼；最新指示已改用既有hash_password的正常12字元規則，取消fixture例外並撤銷所有admin舊sessions。最終新密碼HTTPS登入200、管理讀取200、登出204，舊密碼401；定向session撤銷前200／撤銷後401，Secure／HttpOnly／SameSite仍有效。原管理員及版本actor保留，帳密只存ignored檔，沒有寫入產品預設或更改正式規則；最終證據 `admin-rotation-verification.json`。上述16表不變證據特指歷史瀏覽區間，不包含其後已授權的admin／session修改。
+
+共用owner於22:54:49已恢復Docker並停止舊府城容器至exited，由main／orchestrate轉達；本task未操作或重新探測Docker，hold持續。原生入口未受影響，舊Docker/r11仍不在本次已完成項目內。
+
+23:09入口恢復：8170原生程序後來消失，根因未知；免費agent拒絕指定重用，因此目前入口改為f9d0且app使用精確新Origin。80人完整功能驗收於原8170完成，來源／DB／成品不變；新入口補做最新正常密碼登入及session撤銷驗證。舊8037／8039在恢復查詢時亦無listener，本task未操作它們。新app／ngrok已跨啟動工具shell結束保持運作；不宣稱永久背景執行。
+
+後端與 migration 證據：
+
+- 首輪 `uv run --locked pytest -q tests/test_arrangements.py tests/test_competition_levels.py -p no:cacheprovider --basetemp .test-tmp-arrangements-first`：32 passed（21.25秒）。
+- 完整回歸 `uv run --locked pytest -q -p no:cacheprovider --basetemp .test-tmp-arrangement-all`：**101 passed（50.48秒）**。此為補上state.editable前的本輪完整版本；不是引用上一輪78項。
+- 最後補上同一讀取快照的editable、外部結束後重讀呈現唯讀，以及0006升級前備份還原新目標後，針對受影響範圍 `uv run --locked pytest -q tests/test_arrangements.py tests/test_public_registration.py -p no:cacheprovider --basetemp .test-tmp-arrangement-final`：**39 passed（23.98秒）**。兩輪皆僅2項既有上游棄用警告，沒有形式重跑未變測試。
+- 涵蓋optional原因／原原因規則、無GET隱性baseline寫入、直接level先ensure、並行init只一次、初次level/audit失敗連baseline回滾、版本與保存audit任一步失敗整體回滾、同名／取消重報／候補遞補／更名、snapshot不可變與真actor、跨場404／權限／CSRF／終態限制。完整token過期涵蓋level／取消／遞補／重報／姓名註記／比賽版本／另存；同key並行只一版、不同key並行保存一成一409、save/level並行符合完整序列化切點、舊save重送回原版不倒退latest。GET在讀取途中另一connection寫入level／version時仍回同一讀取快照。
+- 0002／0005／**0006→0007**合成升級保留原所有表原欄位，包含原會員、快照、已改當次級數、version、順位及既有audit。新versions為空，不補造歷史；Alembic check無差異。升級前0006備份Restore新target保留原內容／revision；升級後backup／restore皆integrity=ok、FK=0。故意invalid FK使migration失敗時，DDL及revision回滾。這是SQLite／程式層證據，尚未進行新image/volume部署回退演練。
+
+前端與瀏覽器證據：
+
+- `npm run build -- --outDir ../frontend/dist-arrangement` 通過，包含tsc型別檢查。沒有依賴變更。`git diff --check`通過。
+- 全程使用 `FUCHENG_E2E_DATABASE_URL=sqlite:///data/arrangement-e2e.db`、`FUCHENG_E2E_PORT=8040`、`FUCHENG_E2E_STATIC_DIR=frontend/dist-arrangement`、`PYTHONUTF8=1`，單worker；desktop1440×900、mobile390×844、isMobile／hasTouch。
+- 新功能首輪 `npm run test:e2e -- --grep '緊湊八十人|大存未知|免原因移動|儲存後讀回' --output test-results/arrangement-first`：8 passed（24.9秒）。
+- 加入同名／名單變更、真正另一admin帳號及最後editable修正後，首次全套 `npm run test:e2e -- --output test-results/arrangement-final`：17 passed／5 failed。新10項全過，失敗來自共用合成fixture：新同名資料撞原固定搜尋，以及大量新會員令原測試假設的預設100名候選不含指定會員。
+- 新同名fixture改獨立名稱，原管理測試改為先搜尋指定會員；原功能及安全斷言全部保留。因影響共用DB，重跑整套 `npm run test:e2e -- --output test-results/arrangement-isolated-final`：**22 passed（57.2秒，新10＋既有12）**。不是首次全套全綠；8040測試server已退出。
+- 最終22涵蓋：80人十欄密集版面、原大卡／快捷區／常駐統計不存在、搜尋圖示；真實trusted mouse與CDP touch長按拖曳、普通name橫捲不寫入、拖到邊緣自動橫捲可抵第10欄、Escape／touchCancel；5→4→6有兩audit淨5→6、回5消色；大存清色、再次異動、兩歷史各對前版、唯讀回看不寫DB、回目前不還原；名稱／顯示editor／真actor與可選note、同名／重報／遞補新增移出、更名後舊快照不改。
+- 故障與時序涵蓋：level commit後503、commit前斷線原樣重試；其他卡仍可獨立操作；真409；PUT成功後GET掛起／失敗同卡仍鎖，重讀成功才解鎖；大存commit後503，**另一帳號再改級／另存／再改級**後以原key重試，仍回原receipt且current latest不倒退；大存在途切場晚回應不跳場；409大存保留tag／顯示editor／note，重讀核對後新token再存。
+
+獨立人工預覽：[8039 排級數](http://127.0.0.1:8039/admin/competitions)，`data/arrangement-preview.db`／`frontend/dist-arrangement`。83位合成會員、3場、85報名，主場80人安排。`scripts/create_level_preview.py --variant arrangement`新建，不複製真資料；初始1→3示例先建立baseline再調整。來源及initial backup／restore均integrity=ok、FK=0、0007，見 `data/arrangement-preview-verification.json`。
+
+`data/arrangement-preview-browser-verification.json`記錄最終8039桌面／手機80姓名格／10欄、搜尋1人、可到最遠欄、整表高度約458.5px、無頁面水平溢出、無pageErrors；desktop容器1372px、mobile335px／內容1100px。此次QA只有登入／選場／搜尋／歷史檢視，adminWrites=[]。截圖 `data/arrangement-preview-{desktop,mobile}-{table,search-far,history}.png`及E2E `compact-80.png`／`membership-history.png`已目視核對。orchestrate另以IAB只讀核對80人桌面及手機搜尋／橫捲。手機為Chromium觸控模擬與viewport證據，不替代球館實機與使用者操作驗收。
+
+原6個DB的78表內容hash前後一致；原dist成品及r7～r10共439檔一致（<20MB用SHA256＋stat，大型archive僅size／mtime，不稱全檔hash）。見 `data/arrangement-protected-before.json`／`arrangement-protected-after.json`／`arrangement-protection-verification.json`；source allowlist已核對涵蓋新後端／0007／前端檔，未實際建置image。這是task4當時的歷史檢查：當時8037 PID57548及8448／8450 listener仍在，8032～8035未復活。當前原生／舊Docker狀態以上方收尾紀錄為準，task4當時未動Docker／ngrok／selfhost。
+
+新8039最終listener **55404**、launcher **63776**；PID檔 `data/arrangement-preview.pid`／`arrangement-preview-launcher.pid`，日誌同前綴stdout／stderr，帳密僅 `data/arrangement-preview-admin.json`。本輪曾為載入editable修正只重啟新8039，已告知orchestrate，未停止其他服務。停止前比對netstat8039 PID及Python身分，再依README停該listener。8039留供驗收。
+
+交付：主要目錄 `D:\projects\fucheng-players-system`，分支 `feat/competition-arrangement-versions`，起始及HEAD `0970af21abf4a8761a898f06d8b4d34da8a7d341`。此為task4當時交付：無新增worktree，成果未提交／merge／push，當時尚無新版公開入口。其後task5已交付頁首所列原生公開合成入口；舊Docker由owner停止且維持hold。後續部署task須以新source manifest建新image，明確停寫／備份／migration；回退是舊image＋0006 pre-update備份Restore到新target，保留0007更新後DB，禁止破壞性downgrade。自訂甲乙丙表頭／當次安排列印／編隊／隊長／循環賽未實作。
 
 ## 姓名卡片拖曳與逐次自動儲存（2026-09-20）
 

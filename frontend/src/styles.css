@@ -401,6 +401,78 @@ button.danger { background: #8c3026; }
 .level-drag-ghost span { display: block; margin-top: .4rem; font-size: .85rem; }
 .level-card-board .drop-target-active { outline: 3px solid #335f54; outline-offset: -3px; background: #e5f1ea; }
 .level-card-board.is-dragging { user-select: none; }
+.competition-mode { width: min(1500px, calc(100% - 2rem)); margin: 1rem auto 0; display: flex; gap: .6rem; align-items: center; }
+.competition-mode h2 { margin: 0 .5rem 0 0; font-size: 1.1rem; }
+.competition-mode select { max-width: 440px; flex: 1; min-width: 0; }
+.competition-mode button { white-space: nowrap; }
+.competition-mode button[aria-pressed=true] { background: #dcebe4; }
+.arrangement-main { width: min(1500px, calc(100% - 2rem)); padding-top: 1rem; }
+.arrangement-workspace { background: white; border: 1px solid var(--line); padding: 1rem; border-radius: 8px; min-width: 0; }
+.arrangement-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
+.arrangement-toolbar h2 { margin: 0; font-size: 1.2rem; overflow-wrap: anywhere; }
+.arrangement-toolbar small { color: #627069; }
+.arrangement-tools { display: flex; gap: .4rem; flex-shrink: 0; }
+.arrangement-tools button { padding: .4rem .7rem; min-height: 40px; font-size: .9rem; border-radius: 5px; }
+.arrangement-tools .icon-button { width: 40px; font-size: 1.35rem; padding: 0; }
+.arrangement-search { margin: .6rem 0; max-width: 330px; margin-left: auto; }
+.arrangement-status { min-height: 1.5rem; font-size: .8rem; color: #54635b; margin: .4rem 0; }
+.arrangement-content { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
+.arrangement-content.with-history { grid-template-columns: minmax(0, 1fr) 260px; }
+.arrangement-sheet { min-width: 0; }
+.arrangement-table-scroll { max-width: 100%; overflow: auto; border: 1px solid #788b80; touch-action: pan-x pan-y; }
+.arrangement-table { width: 100%; min-width: 1100px; table-layout: fixed; border-collapse: collapse; }
+.arrangement-table th { padding: .35rem; text-align: center; font-size: .9rem; background: #edf2ee; color: #18382c; border: 1px solid #899a90; height: 32px; }
+.arrangement-table td, .arrangement-table tbody tr:last-child td { padding: 0; border: 1px solid #a6b0a8; height: 46px; vertical-align: middle; }
+.arrangement-cell { display: flex; min-height: 46px; align-items: center; position: relative; }
+.arrangement-cell button { color: var(--ink); background: transparent; min-height: 44px; padding: 0; border: 0; border-radius: 0; }
+.arrangement-cell button:hover { background: #173f3010; }
+.arrangement-cell .cell-grip { width: 18px; flex: 0 0 18px; color: #74897d; cursor: grab; touch-action: none; user-select: none; }
+.arrangement-cell .cell-name { flex: 1; min-width: 0; text-align: center; font-size: .94rem; font-weight: 600; line-height: 1.25; overflow: hidden; }
+.cell-name span, .cell-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+.cell-name small { font-size: .66rem; font-weight: 400; color: #54665d; margin: 0; }
+.cell-change { font-size: .65rem; position: absolute; bottom: 0; right: 2px; background: #ffffffb0; line-height: 1.1; pointer-events: none; }
+.cell-save-state { position: absolute; right: 2px; top: 0; font-size: .7rem; font-weight: 800; pointer-events: none; }
+.net-level { background: #fff0d0; }
+.net-added { background: #e0f1e5; }
+.net-removed { background: #edf0ee; color: #626d67; }
+.cell-pending { box-shadow: inset 0 0 0 2px #777; }
+.just-moved { animation: cell-flash .9s ease-out; }
+@keyframes cell-flash { from { outline: 3px solid #30745d; outline-offset: -3px; } to { outline: 0 solid transparent; } }
+.arrangement-table .drop-target-active { outline: 2px solid #346c58; outline-offset: -2px; background: #d6e9de; }
+.arrangement-table-scroll.is-dragging { user-select: none; }
+.arrangement-help { font-size: .8rem; color: #59685f; margin-top: .65rem; }
+.arrangement-help summary { cursor: pointer; }
+.arrangement-help p { max-width: 650px; }
+.arrangement-history { border-left: 1px solid var(--line); padding-left: 1rem; max-height: 70vh; overflow-y: auto; font-size: .85rem; }
+.arrangement-history h3 { margin: .2rem 0 .5rem; font-size: 1rem; }
+.arrangement-history button { display: block; width: 100%; margin-bottom: .5rem; min-height: 36px; border-radius: 5px; text-align: left; padding: .5rem; }
+.version-item small { display: block; font-weight: 400; }
+.version-item.selected { background: #e1eee6; }
+.version-meta { border-bottom: 1px solid var(--line); margin-bottom: 1rem; }
+.version-meta p { margin: .4rem 0; overflow-wrap: anywhere; }
+.arrangement-changes { list-style: none; margin: 0; padding: 0; }
+.arrangement-changes li { margin-bottom: .4rem; padding: .5rem; }
+.arrangement-changes small, .arrangement-changes span { display: block; }
+.arrangement-recovery { padding: .6rem; border: 1px solid #b18154; background: #fff6eb; margin: .5rem 0; font-size: .9rem; }
+.arrangement-recovery button { font-size: .8rem; min-height: 36px; padding: .3rem .6rem; margin: .2rem; }
+.arrangement-dialog { border: 1px solid var(--line); border-radius: 8px; padding: 1.4rem; width: min(420px, calc(100vw - 24px)); max-height: 90dvh; overflow-y: auto; color: var(--ink); }
+.arrangement-dialog::backdrop { background: #12362966; }
+.arrangement-dialog h3 { margin-top: 0; }
+.arrangement-dialog label { margin: .8rem 0; }
+.arrangement-dialog button { margin-right: .5rem; }
+@media (max-width: 700px) {
+  .competition-mode { flex-wrap: wrap; gap: .4rem; }
+  .competition-mode h2 { width: 2.4rem; }
+  .competition-mode select { flex-basis: calc(100% - 4rem); }
+  .competition-mode button { min-height: 40px; padding: .4rem .75rem; }
+  .arrangement-workspace { padding: .6rem; }
+  .arrangement-toolbar { flex-wrap: wrap; }
+  .arrangement-tools { width: 100%; justify-content: flex-end; }
+  .arrangement-toolbar h2 { font-size: 1rem; }
+  .arrangement-content.with-history { grid-template-columns: minmax(0, 1fr); }
+  .arrangement-history { border-left: 0; border-top: 1px solid var(--line); padding: 1rem 0; max-height: 60vh; }
+  .arrangement-cell .cell-grip { width: 22px; flex-basis: 22px; }
+}
 @media (max-width: 700px) {
   .level-drop-shortcuts > div { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .level-card-groups { grid-template-columns: 1fr; }

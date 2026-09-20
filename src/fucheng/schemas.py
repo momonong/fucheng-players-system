@@ -171,14 +171,10 @@ class RegistrationDietUpdate(RegistrationMutation):
 class RegistrationLevelUpdate(RegistrationMutation):
     model_config = ConfigDict(extra="forbid")
     competition_level: int = Field(ge=1, le=10, strict=True)
-    reason: str = Field(min_length=1, max_length=500)
-
     @field_validator("reason")
     @classmethod
-    def nonblank_reason(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("調整當次級數必須填寫原因")
-        return value.strip()
+    def optional_level_reason(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
 
 
 class AdminRegistration(BaseModel):

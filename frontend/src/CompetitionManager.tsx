@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { RegistrationHistory } from './PublicRegistrationPortal'
 import { CompetitionLevels } from './CompetitionLevels'
-import { useCompetitionLevelMoves } from './useCompetitionLevelMoves'
+import { useArrangementWorkspace } from './useArrangementWorkspace'
 import type {
   Competition,
   CompetitionDetail,
@@ -28,10 +28,10 @@ const emptyDraft: CompetitionDraft = {
 export function CompetitionManager({ username, onLogout }: { username: string; onLogout: () => void }) {
   const [items, setItems] = useState<Competition[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [rawDetail, setDetail] = useState<CompetitionDetail | null>(null)
+  const [detail, setDetail] = useState<CompetitionDetail | null>(null)
   const [creating, setCreating] = useState(false)
-  const levelMoves = useCompetitionLevelMoves()
-  const detail = useMemo(() => rawDetail ? levelMoves.reconcile(rawDetail) : null, [rawDetail, levelMoves.canonical])
+  const arrangements = useArrangementWorkspace()
+  const [view, setView] = useState<'arrangement' | 'management'>('arrangement')
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
   const [deleted, setDeleted] = useState(false)
@@ -71,9 +71,11 @@ export function CompetitionManager({ username, onLogout }: { username: string; o
       <div className="header-actions"><span>{username}</span><a href="/admin">會員管理</a><a href="/admin/announcements">公告管理</a><a href="/admin/roster">會員分級名單</a><button className="secondary" onClick={signOut}>登出</button></div>
     </header>
     {notice && <div className={`toast ${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}><span>{notice.text}</span><button className="toast-close" onClick={() => setNotice(null)}>×</button></div>}
-    <main className="competition-layout">
+    <nav className="competition-mode no-print" aria-label="比賽工作區"><h2>比賽</h2><select aria-label="選擇比賽" value={selectedId ?? ''} onChange={event => loadDetail(event.target.value)}>{!items.length && <option value="">尚無比賽</option>}{items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="secondary" aria-pressed={view === 'arrangement'} onClick={() => { setView('arrangement'); if (selectedId) void loadDetail(selectedId) }}>排級數</button><button className="secondary" aria-pressed={view === 'management'} onClick={() => { setView('management'); if (selectedId) void loadDetail(selectedId) }}>報名與設定</button></nav>
+    {view === 'arrangement' && <main className="arrangement-main">{detail ? <CompetitionLevels key={detail.competition.id} competition={detail.competition} controller={arrangements} username={username} /> : <p>請選擇比賽，或到「報名與設定」建立比賽。</p>}</main>}
+    {view === 'management' && <main className="competition-layout">
       <aside className="panel competition-list no-print">
-        <div className="section-title"><div><h2>比賽</h2><p>共 {items.length} 場</p></div><button disabled={deleted} onClick={() => { requestSequence.current++; setCreating(true); setSelectedId(null); setDetail(null) }}>建立比賽</button></div>
+        <div className="section-title"><div><h2>比賽清單</h2><p>共 {items.length} 場</p></div><button disabled={deleted} onClick={() => { requestSequence.current++; setCreating(true); setSelectedId(null); setDetail(null) }}>建立比賽</button></div>
         <div className="competition-view-switch" aria-label="比賽清單範圍"><button className="secondary" aria-pressed={!deleted} onClick={() => setDeleted(false)}>目前比賽</button><button className="secondary" aria-pressed={deleted} onClick={() => setDeleted(true)}>已刪除</button></div>
         <div className="competition-items">{items.map(item => <button key={item.id} className={`competition-item ${selectedId === item.id ? 'selected' : ''}`} onClick={() => loadDetail(item.id)}>
           <strong>{item.name}</strong><span>{item.competition_date}・{item.deleted_at ? '已刪除' : statusText[item.status]}</span><small>正取 {item.summary.confirmed}/{item.capacity}・候補 {item.summary.waitlisted}</small>
@@ -84,12 +86,11 @@ export function CompetitionManager({ username, onLogout }: { username: string; o
         {detail && <>
           <div className="panel competition-delete-actions no-print"><div>{detail.competition.deleted_at ? <p>已於 {taipei(detail.competition.deleted_at)} 刪除，名單保留且暫停所有操作。</p> : <p>不需要的比賽可移到「已刪除」，日後仍可還原。</p>}</div><button className={detail.competition.deleted_at ? 'secondary' : 'danger'} onClick={() => setConfirmation(detail.competition)}>{detail.competition.deleted_at ? '還原比賽' : '刪除比賽'}</button></div>
           <CompetitionEditor competition={detail.competition} onSaved={competition => { setNotice({ kind: 'success', text: '比賽設定已儲存' }); loadList(competition.id) }} />
-          <CompetitionLevels detail={detail} controller={levelMoves} reload={() => loadList(detail.competition.id)} />
           <CompetitionRoster detail={detail} reload={() => loadList(detail.competition.id)} notify={setNotice} />
         </>}
         {!creating && !detail && <div className="panel empty">請選擇比賽，或建立一場比賽。</div>}
       </section>
-    </main>
+    </main>}
     {confirmation && <DeletionDialog competition={confirmation} onClose={() => setConfirmation(null)} onDone={() => { setConfirmation(null); setNotice({ kind: 'success', text: confirmation.deleted_at ? '比賽已還原，請到「目前比賽」查看' : '比賽已刪除，可到「已刪除」還原' }); loadList() }} />}
   </>
 }

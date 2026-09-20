@@ -105,3 +105,25 @@ export interface CompetitionDetail {
   competition: Competition
   registrations: CompetitionRegistration[]
 }
+
+export interface ArrangementRow {
+  registration_id: string
+  member_id: string
+  member_name: string
+  distinguishing_note: string | null
+  queue_sequence: number
+  competition_level: number
+  version: number
+}
+export interface ArrangementVersionSummary {
+  id: string; competition_id: string; sequence: number; label: string
+  editor_label: string; note: string | null; admin_id: string; actor_name: string; created_at: string
+}
+export interface ArrangementVersion extends ArrangementVersionSummary { rows: ArrangementRow[] }
+export interface ArrangementState {
+  editable: boolean; rows: ArrangementRow[]; state_token: string; latest: ArrangementVersion | null; versions: ArrangementVersionSummary[]
+}
+export interface ArrangementSave {
+  request_id: string; state_token: string; base_version_id: string
+  label: string; editor_label: string; note: string
+}

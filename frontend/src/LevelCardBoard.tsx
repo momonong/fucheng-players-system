@@ -1,85 +1,79 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CompetitionRegistration } from './types'
+import type { ArrangementRow } from './types'
 import { useLevelCardDrag } from './useLevelCardDrag'
-import type { LevelMove } from './useCompetitionLevelMoves'
+import type { PendingMove } from './useArrangementWorkspace'
 
-const levels = Array.from({ length: 10 }, (_, index) => index + 1)
-type Props = {
-  rows: CompetitionRegistration[]; search: string; filter: string; readonly: boolean
-  displayLevel: (row: CompetitionRegistration) => number
-  canMove: (row: CompetitionRegistration) => boolean
-  onMove: (id: string, level: number) => void
-  pending: Record<string, LevelMove>
-  undoLevel: (row: CompetitionRegistration) => number | null
-  onUndo: (row: CompetitionRegistration) => void
+export type ArrangementChange = { kind: 'level' | 'added' | 'removed'; row: ArrangementRow; before?: number; after?: number }
+export function arrangementChanges(rows: ArrangementRow[], baseline: ArrangementRow[]): ArrangementChange[] {
+  const old = new Map(baseline.map(row => [row.registration_id, row]))
+  const current = new Map(rows.map(row => [row.registration_id, row]))
+  const result: ArrangementChange[] = []
+  for (const row of rows) {
+    const before = old.get(row.registration_id)
+    if (!before) result.push({ kind: 'added', row, after: row.competition_level })
+    else if (before.competition_level !== row.competition_level) result.push({ kind: 'level', row, before: before.competition_level, after: row.competition_level })
+  }
+  for (const row of baseline) if (!current.has(row.registration_id)) result.push({ kind: 'removed', row, before: row.competition_level })
+  return result
 }
+export const changeText = (change: ArrangementChange) => change.kind === 'level' ? `${change.before} → ${change.after} 級` : change.kind === 'added' ? `新增至 ${change.after} 級` : `移出（原 ${change.before} 級）`
+const levels = Array.from({ length: 10 }, (_, index) => index + 1)
 
-export function LevelCardBoard({ rows, search, filter, readonly, displayLevel, canMove, onMove, pending, undoLevel, onUndo }: Props) {
-  const [selected, setSelected] = useState<string | null>(null)
-  const [announcement, setAnnouncement] = useState('')
-  const targets = useRef<HTMLDivElement>(null)
-  const picked = rows.find(row => row.id === selected)
+export function LevelCardBoard({ rows, changes, search, readonly, pending, onMove }: {
+  rows: ArrangementRow[]; changes: ArrangementChange[]; search: string; readonly: boolean
+  pending: Record<string, PendingMove>; onMove: (row: ArrangementRow, level: number) => void
+}) {
+  const [selected, setSelected] = useState<ArrangementRow | null>(null)
+  const [target, setTarget] = useState('1')
+  const [recent, setRecent] = useState<string | null>(null)
+  const dialog = useRef<HTMLDialogElement>(null)
+  const changeMap = new Map(changes.map(change => [change.row.registration_id, change]))
+  const picked = selected ? rows.find(row => row.registration_id === selected.registration_id) : null
+  const displayLevel = (row: ArrangementRow) => pending[row.registration_id]?.level ?? row.competition_level
   function pick(id: string) {
-    const row = rows.find(item => item.id === id)
-    if (!row || !canMove(row)) return
-    setSelected(id)
+    const row = rows.find(item => item.registration_id === id)
+    if (row) { setSelected(row); setTarget(String(displayLevel(row))) }
   }
-  useEffect(() => {
-    if (selected) targets.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
-  }, [selected])
   function move(id: string, level: number) {
-    const row = rows.find(item => item.id === id)
-    if (!row || !canMove(row)) return
-    const before = displayLevel(row)
-    onMove(id, level)
+    const row = rows.find(item => item.registration_id === id)
+    if (!row || readonly || pending[id]) return
+    if (row.competition_level !== level) { setRecent(id); onMove(row, level) }
     setSelected(null)
-    setAnnouncement(before === level ? `${row.member_name} 留在 ${level} 級` : `${row.member_name}：${before} → ${level} 級，移動已送出`)
   }
+  useEffect(() => { if (selected) dialog.current?.showModal() }, [selected])
+  useEffect(() => { if (recent) { const timer = setTimeout(() => setRecent(null), 900); return () => clearTimeout(timer) } }, [recent])
   const { drag, holding, start } = useLevelCardDrag(move, pick, !readonly)
-  const counts = (level: number) => rows.filter(row => displayLevel(row) === level).length
-  const matches = (row: CompetitionRegistration) => `${row.member_name} ${row.distinguishing_note ?? ''}`.includes(search.trim()) && (!filter || displayLevel(row) === Number(filter))
-  return <div className={`level-card-board ${drag ? 'is-dragging' : ''}`} onKeyDown={event => { if (event.key === 'Escape') setSelected(null) }}>
-    <p id="level-drag-help">拖住卡片把手移到級數區；手機長按把手後拖曳。卡片其餘位置可正常捲動。也可點「點選移動」，再選目的級數；鍵盤用 Tab、Enter 操作，Escape 取消拖曳。</p>
-    <div className="level-drop-shortcuts" ref={targets} role="group" aria-label="級數移動快捷區">
-      <p>{picked ? `已選取 ${picked.member_name}（${picked.distinguishing_note || '無辨識註記'}），請選目的級數` : drag ? `正在移動 ${drag.card.name}` : '級數快捷區：可放下卡片，或先點選一張卡片'}</p>
-      <div>{levels.map(level => <button key={level} type="button" className={`secondary ${drag?.target === level ? 'drop-target-active' : ''}`}
-        data-drop-level={level} data-drop-enabled={!readonly} aria-label={`移到 ${level} 級`}
-        aria-disabled={readonly || (!picked && !drag)} disabled={readonly}
-        onClick={() => { if (picked) move(picked.id, level) }}>
-        <strong>{level} 級</strong><small>{counts(level)} 人</small>
-      </button>)}</div>
-      {picked && <button type="button" className="secondary" onClick={() => setSelected(null)}>取消選取</button>}
+  const columns = levels.map(level => rows.filter(row => displayLevel(row) === level && `${row.member_name} ${row.distinguishing_note ?? ''}`.includes(search.trim())).sort((a, b) => a.queue_sequence - b.queue_sequence))
+  const height = Math.max(8, ...columns.map(column => column.length))
+  return <>
+    <div className={`arrangement-table-scroll ${drag ? 'is-dragging' : ''}`} tabIndex={0} role="region" aria-label="級數表格，可水平捲動">
+      <table className="arrangement-table" aria-label="當次級數表"><thead><tr>{levels.map(level => <th scope="col" key={level} data-drop-level={level} data-drop-enabled={!readonly}>{level} 級</th>)}</tr></thead>
+        <tbody>{Array.from({ length: height }, (_, index) => <tr key={index}>{levels.map((level, column) => {
+          const row = columns[column][index]
+          const change = row && changeMap.get(row.registration_id)
+          const operation = row && pending[row.registration_id]
+          return <td key={level} data-drop-level={level} data-drop-enabled={!readonly} className={drag?.target === level ? 'drop-target-active' : ''}>
+            {row && <div data-registration-id={row.registration_id} className={`arrangement-cell ${change ? `net-${change.kind}` : ''} ${operation ? 'cell-pending' : ''} ${recent === row.registration_id ? 'just-moved' : ''}`}>
+              {!readonly && <button className="cell-grip" type="button" disabled={!!operation} aria-label={`拖曳 ${row.member_name} ${row.distinguishing_note || ''}`}
+                onPointerDown={event => start(event, { id: row.registration_id, name: row.member_name })}
+                onClick={event => { if (event.detail === 0) pick(row.registration_id) }} onContextMenu={event => event.preventDefault()}>{holding === row.registration_id ? '…' : '⠿'}</button>}
+              <button className="cell-name" type="button" aria-label={`${row.member_name}${row.distinguishing_note ? `・${row.distinguishing_note}` : ''}${change ? `・${changeText(change)}` : ''}，查看或移動`}
+                title={`${row.member_name}${row.distinguishing_note ? `・${row.distinguishing_note}` : ''}${change ? `・${changeText(change)}` : ''}`}
+                onPointerDown={event => { if (event.pointerType === 'mouse' && !readonly && !operation) start(event, { id: row.registration_id, name: row.member_name }) }}
+                onClick={event => { if (event.detail === 0 || readonly || event.nativeEvent instanceof PointerEvent && event.nativeEvent.pointerType === 'touch') pick(row.registration_id) }}>
+                <span>{row.member_name}</span>{row.distinguishing_note && <small>{row.distinguishing_note}</small>}
+              </button>
+              {change && <span className="cell-change" aria-label={changeText(change)}>{change.kind === 'added' ? '+' : `${change.before}→${change.after}`}</span>}
+              {operation && <span className="cell-save-state" aria-label={operation.status === 'saving' ? '儲存中' : '尚未確認儲存'}>{operation.status === 'saving' ? '…' : '!'}</span>}
+            </div>}
+          </td>
+        })}</tr>)}</tbody></table>
     </div>
-    <p role="status" className="level-drag-announcement">{announcement}</p>
-    <div className="level-groups level-card-groups">{levels.map(level => {
-      const visible = rows.filter(row => displayLevel(row) === level && matches(row)).sort((a, b) => a.queue_sequence - b.queue_sequence)
-      const stored = rows.filter(row => row.competition_level === level).length
-      return <section key={level} className={`competition-level-group ${drag?.target === level ? 'drop-target-active' : ''}`}
-        aria-label={`當次 ${level} 級正取`} data-drop-level={level} data-drop-enabled={!readonly}>
-        <h3><strong>{level} 級</strong><span>篩選 {visible.length}／安排 {counts(level)} 人<small>已儲存 {stored} 人</small></span></h3>
-        <div className="level-zone-cards">
-          {!visible.length && <p className="level-empty-drop">{filter || search ? '無符合的卡片，仍可放到此級' : '拖曳卡片到這裡'}</p>}
-          {visible.map(row => {
-            const current = displayLevel(row)
-            const changed = current !== row.competition_level
-            return <article key={row.id} data-registration-id={row.id} className={`level-person level-name-card ${changed ? 'has-local-move' : ''} ${selected === row.id ? 'is-selected' : ''}`}>
-              <div className="level-card-name"><strong>{row.member_name}</strong><small>{row.distinguishing_note || '無辨識註記'}・順位 {row.queue_sequence}</small></div>
-              <div className="level-values"><span>報名快照 <b>{row.hard_level_snapshot} 級</b></span><span>當次級數 <b>{current} 級</b></span></div>
-              {pending[row.id] && <p className="level-card-state">{pending[row.id].status === 'saving' ? '儲存中' : '尚未確認儲存'}：{pending[row.id].base.competition_level} → {current} 級</p>}
-              {!readonly && <div className="level-card-actions">
-                <button type="button" className="secondary level-drag-handle" aria-label={`拖曳 ${row.member_name} 順位 ${row.queue_sequence}`} aria-describedby="level-drag-help"
-                  disabled={!canMove(row)} onPointerDown={event => start(event, { id: row.id, name: row.member_name })}
-                  onClick={event => { if (event.detail === 0) pick(row.id) }} onContextMenu={event => event.preventDefault()}>
-                  {holding === row.id ? '長按中…' : '⠿ 拖曳'}
-                </button>
-                <button type="button" className="secondary" disabled={!canMove(row)} aria-pressed={selected === row.id} onClick={() => pick(row.id)}>點選移動</button>
-                {undoLevel(row) !== null && <button type="button" className="secondary" disabled={!canMove(row)} onClick={() => onUndo(row)}>撤回到 {undoLevel(row)} 級</button>}
-              </div>}
-            </article>
-          })}
-        </div>
-      </section>
-    })}</div>
-    {drag && <div className="level-drag-ghost" aria-hidden="true" style={{ left: Math.min(drag.x + 12, window.innerWidth - 200), top: Math.max(8, Math.min(drag.y + 12, window.innerHeight - 90)) }}><strong>{drag.card.name}</strong><span>{drag.target ? `放到 ${drag.target} 級` : '移到級數區域'}</span></div>}
-  </div>
+    {drag && <div className="level-drag-ghost" aria-hidden="true" style={{ left: Math.min(drag.x + 12, window.innerWidth - 200), top: Math.max(8, Math.min(drag.y + 12, window.innerHeight - 90)) }}><strong>{drag.card.name}</strong><span>{drag.target ? `放到 ${drag.target} 級` : '移到目的欄'}</span></div>}
+    {selected && <dialog ref={dialog} className="arrangement-dialog" aria-labelledby="cell-detail-title" onCancel={() => setSelected(null)}>
+      <h3 id="cell-detail-title">{selected.member_name}</h3><p>{selected.distinguishing_note || '無辨識註記'}</p><p>順位 {selected.queue_sequence}・目前 {picked ? displayLevel(picked) : selected.competition_level} 級</p>
+      {picked && !readonly && !pending[picked.registration_id] && <><label>移到級數<select value={target} onChange={event => setTarget(event.target.value)}>{levels.map(level => <option key={level} value={level}>{level} 級</option>)}</select></label><button onClick={() => move(picked.registration_id, Number(target))}>移動</button></>}
+      <button className="secondary" onClick={() => setSelected(null)}>關閉</button>
+    </dialog>}
+  </>
 }

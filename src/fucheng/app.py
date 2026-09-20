@@ -437,6 +437,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from .roster_import import install_roster_import_route
     install_roster_import_route(app, get_db, require_csrf)
 
+    from .arrangements import install_arrangement_routes
+    install_arrangement_routes(app, get_db, current_auth, require_csrf)
+
     static_dir = settings.static_dir
     assets_dir = static_dir / "assets"
     if assets_dir.exists():

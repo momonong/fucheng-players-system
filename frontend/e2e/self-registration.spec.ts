@@ -8,6 +8,7 @@ test('免登入搜尋同名會員、選餐食報名、管理員取消及重新�
   await page.getByLabel('密碼', { exact:true }).fill(process.env.FUCHENG_E2E_ADMIN_PASSWORD!)
   await page.getByRole('button',{name:'登入',exact:true}).click()
   await page.getByRole('link',{name:'比賽管理'}).click()
+  await page.getByRole('button',{name:'報名與設定',exact:true}).click()
   await page.getByRole('button',{name:'建立比賽'}).click()
   await page.getByLabel('名稱',{exact:true}).fill(name)
   await page.getByLabel('比賽日期').fill(new Date(Date.now()+7*86400000).toISOString().slice(0,10))
@@ -20,6 +21,7 @@ test('免登入搜尋同名會員、選餐食報名、管理員取消及重新�
   for (const member of ['合成會員一','合成會員二']) {
     const picker=page.locator('.candidate-picker')
     if (!(await picker.evaluate(el=>(el as HTMLDetailsElement).open))) await picker.locator('summary').click()
+    await page.getByLabel('搜尋姓名／辨識註記',{exact:true}).fill(member)
     await page.getByRole('button',{name:new RegExp(member)}).click()
     await expect(page.locator('.roster-section').getByText(member,{exact:true})).toBeVisible()
   }
@@ -51,6 +53,7 @@ test('免登入搜尋同名會員、選餐食報名、管理員取消及重新�
   expect(await visitor.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)
   await visitor.screenshot({path:testInfo.outputPath('public-receipt.png'),fullPage:true})
   await page.reload()
+  await page.getByRole('button',{name:'報名與設定',exact:true}).click()
   await page.getByRole('button',{name:new RegExp(name)}).click()
   const row=page.locator('.roster-waitlisted').getByRole('row').filter({hasText:'合成同名'})
   await expect(row).toContainText('西區')
@@ -66,6 +69,7 @@ test('免登入搜尋同名會員、選餐食報名、管理員取消及重新�
   await visitor.getByRole('button',{name:'確認以 合成同名 報名',exact:true}).click()
   await expect(visitor.getByRole('status')).toHaveText('報名完成')
   await page.reload()
+  await page.getByRole('button',{name:'報名與設定',exact:true}).click()
   await page.getByRole('button',{name:new RegExp(name)}).click()
   await expect(page.locator('.roster-waitlisted').getByRole('row').filter({hasText:'合成同名'}).getByRole('cell').first()).toHaveText('4')
   await page.getByText('報名操作稽核',{exact:true}).click()

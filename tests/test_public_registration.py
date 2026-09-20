@@ -203,7 +203,7 @@ def test_visit_expiry_rate_limits_and_secure_cookie(app,client,auth):
     secure_app.state.engine.dispose();c.close()
 
 
-@pytest.mark.parametrize('source_revision', ['0002_competition_registration', '0005_competition_deletion'])
+@pytest.mark.parametrize('source_revision', ['0002_competition_registration', '0005_competition_deletion', '0006_competition_level'])
 def test_upgrade_phase2_preserves_every_original_column_and_backup(tmp_path, monkeypatch, source_revision):
     path=tmp_path/'phase2.db'
     monkeypatch.setenv('FUCHENG_DATABASE_URL',f'sqlite:///{path}')
@@ -225,15 +225,27 @@ def test_upgrade_phase2_preserves_every_original_column_and_backup(tmp_path, mon
     with closing(sqlite3.connect(path)) as db:
         # Current member level differs from the preserved registration snapshot.
         db.execute("UPDATE members SET level=9, version=2 WHERE id='m0'")
-        if source_revision == '0005_competition_deletion':
+        if source_revision in {'0005_competition_deletion', '0006_competition_level'}:
             db.execute("UPDATE competitions SET deleted_at='2099-01-03 12:00:00' WHERE id='comp'")
             db.execute("INSERT INTO public_visits VALUES ('visit','synthetic-token','synthetic-csrf','2099-01-10','2099-01-01')")
             db.execute("UPDATE competition_registrations SET created_by_kind='public',created_by_admin_id=NULL,created_by_visit_id='visit' WHERE id='r1'")
             db.execute("UPDATE registration_audits SET actor_kind='public',admin_id=NULL,actor_visit_id='visit',request_fingerprint='synthetic-fingerprint' WHERE id='ra1'")
+        if source_revision == '0006_competition_level':
+            db.execute("UPDATE competition_registrations SET competition_level=8,version=2 WHERE id='r0'")
         db.commit()
         tables=[r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != 'alembic_version' ORDER BY name")]
         columns={t:[r[1] for r in db.execute(f'PRAGMA table_info({t})')] for t in tables}
         before={t:db.execute(f"SELECT {','.join(columns[t])} FROM {t} ORDER BY 1").fetchall() for t in tables}
+    if source_revision == '0006_competition_level':
+        pre_backup, rollback_target = tmp_path/'pre-0007.db', tmp_path/'rollback-new-target.db'
+        backup(argparse.Namespace(output=str(pre_backup),force=False))
+        restore(argparse.Namespace(input=str(pre_backup),output=str(rollback_target),force=False))
+        with closing(sqlite3.connect(rollback_target)) as db:
+            assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0] == source_revision
+            assert db.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+            assert db.execute('PRAGMA foreign_key_check').fetchall() == []
+            for table in tables:
+                assert db.execute(f"SELECT {','.join(columns[table])} FROM {table} ORDER BY 1").fetchall() == before[table]
     command.upgrade(config,'head')
     command.check(config)
     backup_path,restored=tmp_path/'backup.db',tmp_path/'restored.db'
@@ -246,11 +258,12 @@ def test_upgrade_phase2_preserves_every_original_column_and_backup(tmp_path, mon
             for table in tables:
                 assert db.execute(f"SELECT {','.join(columns[table])} FROM {table} ORDER BY 1").fetchall()==before[table]
             assert db.execute("SELECT id FROM competition_registrations WHERE status='waitlisted' ORDER BY queue_sequence").fetchall()==[('r2',),('r4',)]
-            assert db.execute('SELECT competition_level,hard_level_snapshot FROM competition_registrations').fetchall()==[(3,3)]*5
-            assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0006_competition_level'
+            assert db.execute('SELECT competition_level,hard_level_snapshot FROM competition_registrations').fetchall()==([(8,3)] + [(3,3)]*4 if source_revision == '0006_competition_level' else [(3,3)]*5)
+            assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0007_arrangement_versions'
+            assert db.execute('SELECT count(*) FROM arrangement_versions').fetchone()[0] == 0
 
 
-@pytest.mark.parametrize('source_revision', ['0002_competition_registration', '0005_competition_deletion'])
+@pytest.mark.parametrize('source_revision', ['0002_competition_registration', '0005_competition_deletion', '0006_competition_level'])
 def test_migration_failure_rolls_back_ddl_and_revision(tmp_path, monkeypatch, source_revision):
     path = tmp_path / 'invalid-phase2.db'
     monkeypatch.setenv('FUCHENG_DATABASE_URL', f'sqlite:///{path}')
@@ -264,7 +277,8 @@ def test_migration_failure_rolls_back_ddl_and_revision(tmp_path, monkeypatch, so
         command.upgrade(config, 'head')
     with closing(sqlite3.connect(path)) as db:
         assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0] == source_revision
-        assert 'competition_level' not in [row[1] for row in db.execute('PRAGMA table_info(competition_registrations)')]
+        assert ('competition_level' in [row[1] for row in db.execute('PRAGMA table_info(competition_registrations)')]) == (source_revision == '0006_competition_level')
+        assert db.execute("SELECT name FROM sqlite_master WHERE name='arrangement_versions'").fetchall() == []
         if source_revision == '0002_competition_registration':
             assert db.execute("SELECT name FROM sqlite_master WHERE name='public_visits'").fetchall() == []
             assert 'actor_kind' not in [row[1] for row in db.execute('PRAGMA table_info(registration_audits)')]

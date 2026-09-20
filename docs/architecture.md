@@ -127,20 +127,27 @@ SQLite batch 重建被參照表時，Alembic 專用連線暫關 FK enforcement�
 
 前端使用原生 dialog 限制焦點，初始焦點為保留，Escape 可取消；送出時鎖定操作，錯誤保留對話框並提示。已刪除區有明確的唯讀提示與還原確認。
 
-## 當次比賽級數（0006_competition_level）
+## 當次級數與完整安排（0006／0007）
 
-`competition_registrations.competition_level` 是非空 1～10 級，與 `members.level`、`hard_level_snapshot` 分開。Migration 只從每筆自己的 hard_level_snapshot 回填（包含正取、候補、取消），不從會員目前級數回填，不改舊列的版本、操作者、時間、排序或稽核。先加入 nullable 欄位、回填，再以 batch 建立 NOT NULL／CHECK；沿用 migration 的 BEGIN IMMEDIATE、外鍵檢查及 DDL rollback。不得破壞性 downgrade。
+`competition_registrations.competition_level` 是非空 1～10 級，與 `members.level`、`hard_level_snapshot` 分開。0006 只由各筆快照回填當次級數；新報名以自己快照初始化，取消留歷史，重報新列／新快照，候補遞補不重設。公開端點不回傳當次名單，原 summary.level_counts 與名單列印保持快照語意。
 
-單人管理、公開及批次匯入都由 `_create_registration_in_transaction` 同時初始化快照與當次級數；新報名稽核保存當次級數初值。取消留原列，重報新列用新快照初始化；候補遞補不修改當次級數。Migration 回填屬 schema 初始化，不假造管理員調級稽核。
+`PUT /api/admin/registrations/{id}/level` 輸入 version、competition_level、request_id，可省略 reason（空白正規化為 null）。多餘欄位、非法級數、非整數拒絕。既有 session／CSRF、BEGIN IMMEDIATE 內重驗session、報名version、未刪除open／closed正取限制與同級422不變。只放寬調級原因，其他操作的截止後原因仍必填。更新級數、version、操作者／時間及 RegistrationAudit 同交易，初次調級也須將異動前baseline與初始化audit放在同交易。任何一步失敗全回滾。level request_id 綁定actor／target／payload，重試回目前報名列，因此可能比原成功版本更新。
 
-`PUT /api/admin/registrations/{id}/level` 輸入 version、competition_level、非空 reason、request_id；多餘欄位及非整數級數拒絕。沿用 session／CSRF 與 `_mutate_registration`，在 BEGIN IMMEDIATE 後重驗登入、比賽狀態、正取身分與版本。僅 open／closed 且未刪除場次正取可調整，截止時間不阻擋；同級數回 422，不增 version、不寫空白調級稽核。更新當次級數、報名版本、操作者／時間及 action=level 的 RegistrationAudit 同交易，失敗全回滾。request_id 仍綁 actor／target／payload 指紋；完全相同已完成重送讀目前結果，不重新寫入。
+0007 只新增 `arrangement_versions`，不回填baseline、不修改舊表資料。每場 `(competition_id, sequence)` 唯一；sequence=0 是真正初始化時保存的起始基準，1以上是大存版本，排序不用秒時間。單表rows_json儲存完整正取快照，每列保留registration_id、member_id、當時姓名／辨識、queue_sequence、competition_level及version。另存server秒時間、label、editor_label、真正admin_id及當時actor_name；request_id全域唯一且綁定payload指紋。沒有修改／刪除版本API，不提供還原覆寫。
 
-管理回應新增 competition_level；`summary.competition_level_counts` 只統計正取當次級數，原 `summary.level_counts` 保留正取硬實力快照語意。公開端點 schema 不變，沒有公開參賽名單或當次級數。管理歷史額外回傳 registration_id／姓名註記／queue_sequence／reason／changes；前端顯示每筆調級的前後值及實際 admin／UTC 時間（顯示為台北時間）。讀取失敗清空舊歷史，場次切換取消過期回應。
+管理API：
 
-CompetitionLevels 與原報名名單分區：安排區以當次級數搜尋分區，原名單維持快照篩選及列印。LevelCardBoard 提供十個級數區及 sticky 快捷目的區；桌面 Pointer Events 拖曳、手機把手長按 350ms、點選與鍵盤共用移動入口。只有把手設定 touch-action:none，卡片其餘位置維持原生捲動；放下即呼叫既有 PUT，沒有另設批次儲存端點。
+- `GET /api/admin/competitions/{id}/arrangement`：純讀的工作rows、editable、state_token、最新基準完整內容及版本摘要。auth查詢後明確BEGIN建立SQLite一致讀，名單、會員名稱、基準及token同一快照；不是依賴SQLite legacy SELECT implicit transaction。
+- `POST .../arrangement/initialize`：auth＋CSRF，BEGIN IMMEDIATE、重驗session及場次，只有未初始化時新增sequence0與CompetitionAudit。重開／並行初始化不重設。直接level API在第一筆異動前也ensure同一baseline。
+- `POST .../arrangement/versions`：完整保存，payload含request_id、state_token、base_version_id及可選label／editor_label／note。預設「版本 N」及真正登入username，空備註存null。先查已完成相同key／actor／payload並回原immutable保存版，再核對可寫狀態／token／最新基準。token涵蓋competition id／version／status／deleted_at、所有報名status／version／姓名／辨識／順序／級數及latest id。BEGIN IMMEDIATE內比對，不信任前端disabled。過期409，淨差為空422。新版本與CompetitionAudit原子提交，失敗全部回滾。
+- `GET .../arrangement/versions/{version_id}`：authenticated唯讀完整版，跨場或不存在404。
 
-useCompetitionLevelMoves 位於 CompetitionManager，按 registration_id 保存凍結的 base row／version、目的級數、當下手填原因與 request_id。同一卡片在途或未解決時鎖定，其他卡片獨立；切場不丟失操作。409 保留輸入，核對後可明確放棄；網路或 5xx 結果不確定時，只能重送完全相同 payload／key。已完成重送回目前 canonical row，可能與要求級數或原 version+1 不同；依版本合併回應並明示差異，不假設新稽核已寫入。儲存成功不重新選場或觸發 loadList，避免 A 的晚回應跳回 A；讀取結果與已取得的較高版本列合併，阻擋舊 GET 覆蓋。撤回是以成功回應的最新 version 送出新反向異動，並使用當下原因；讀到更新版本後舊撤回入口失效。
+淨差按registration_id比較前後級數及成員集合，取消後重報是舊ID移出＋新ID新增，候補遞補是新增，更名不偽造級數轉換。僅改version／姓名而級數及成員集合不變，不能另建無淨差版本；後續有安排變化時保存當時完整姓名。首個保存版對sequence0，後續對直接前版，目前工作對最新保存版；hard_level_snapshot不參與基準判斷。
 
-安排區可顯示未完成目的級數，同時另列已儲存人數；原統計保留快照／當次級數各自語意。原因及操作只有頁內記憶體狀態，beforeunload 提醒不等於持久化。大版本保存、跨版本淨差異配色、標題及當次安排列印另待後續階段，未以快照級數充當上一保存版本。
+前端以 `useArrangementWorkspace` 在 CompetitionManager 保存各場工作讀取、level pending、bigsave pending及metadata draft，切場不重定向非同步回應。狀態rows與token來自同一API結果，不混入另一detail GET。每場generation使舊GET失效；bigsave回來只作receipt，必須新GET讀取最新工作及最新baseline，不能把原receipt直接覆寫到current。其後有人再存或調級時顯示核對提示並重算淨差；只在沒有後續異動時清色。原請求payload/key凍結，未確定時禁止再存或本場拖動。
 
-此介面已封入 r10 working-tree snapshot，更新既有 ngrok 合成預覽的 app／backup；仍共用原 0006 schema，無 migration、重新初始化或資料來源切換。ngrok 容器、精確 origin、trusted peer 與原 data／backups volume 保持；來源以凍結 manifest 識別，不能以起始 HEAD 代替未提交前端。具體版本與換版證據見 deployment／acceptance。
+level每格獨立pending：saving→成功但待讀回refresh→fresh state確認version後解除；GET失敗仍鎖該格，僅重GET。未知結果固定原payload/key重PUT；409等明確拒絕可放棄再讀，不能偷換version。其他格可獨立操作，大存須所有格完成且state verified。metadata失敗保留；known拒絕核對後用新token/key保存，unknown只能原樣確認。beforeunload提醒，頁內記憶體不是持久離線佇列。
+
+排級數與報名／設定分開入口。LevelCardBoard是10欄緊湊table，手機容器水平捲動保欄位；只有小把手touch-action:none，其他區域pan-x/pan-y。350ms長按、滑鼠drag、邊缘水平／垂直捲動、點姓名展開選級數／鍵盤替代共用移動入口。橙色附前後值代表改級、綠色附加號代表新增、灰色側欄項代表移出；短暫移動描邊和持續淨差不同。歷史選版後所有格唯讀，回目前只切UI、不寫DB。state.editable隨重新讀取更新，外部結束／刪除後立即呈現唯讀。
+
+目前無自訂表頭、當次安排列印、編隊或比賽引擎。版本和備份不可丟棄，0007 downgrade明確拒絕；維運回退需0006相符image與升級前備份還原至新target，保留更新後資料庫。

@@ -293,6 +293,8 @@ def _mutate_registration(
         if registration.competition_level == payload.competition_level:
             db.rollback()
             raise HTTPException(422, "當次級數沒有變更，請選擇不同級數")
+        from .arrangements import ensure_initial_baseline
+        ensure_initial_baseline(db, competition, admin_id)
         registration.competition_level = payload.competition_level
     else:
         db.rollback()

@@ -1,10 +1,53 @@
 # Windows Docker 部署、搬移與維運
 
-2026-09-20 姓名卡片拖曳／逐次自動儲存版已依授權更新既有 ngrok 合成預覽，使用新建 r10 allowlist snapshot；獨立本機 8037（`data/level-drag-preview.db`／`frontend/dist-level-drag`）保持，操作見 README。8448／8450 Docker 預覽及 r7～r9 套件保持原版本。未將本機 dist 塞入 image；本輪沒有後端或 migration 變更。
+2026-09-20 緊湊級數表格／完整安排保存版，已於本機8039及下列新建原生HTTPS合成入口驗證，schema為0007。舊Docker／ngrok、8448／8450與r7～r10套件未升級，r11仍hold；不能直接把新原始碼接舊schema。
+
+## 原生臨時公開預覽（2026-09-20 22:44 台北啟動）
+
+入口：[新版安排管理](https://f9d0-140-116-158-107.ngrok-free.app/admin/competitions)。新URL由ngrok官方agent分配，與舊 `30a1-140-116-158-107.ngrok-free.app` 不同；沒有踢除其他session或購買方案。公開HTTPS只提供全新合成庫，不讀取／複製真實資料或舊volume。帳密檔 `data/arrangement-native-preview-admin.json`，不可貼入聊天、Git或日誌。
+
+執行身份：`feat/competition-arrangement-versions`／HEAD `0970af21abf4a8761a898f06d8b4d34da8a7d341` 加未提交變更。48個應用來源SHA與已驗證task4版本相符，3個靜態檔逐檔核對後複製到 `data/arrangement-native-runtime/static`，沒有重建原成品。身份記錄 `identity.json`，**沒有新image或r11包**。資料 `data/arrangement-native-preview.db` 是以 `scripts/create_level_preview.py --variant arrangement-native` 新建的0007；建立腳本拒絕覆寫已有DB／帳密／備份／還原檔。基準在合成首次合法1→3前同交易建立，實際時間22:43:31；不是遷移補造歷史。初始Backup API備份及新目的地還原檢查通過。
+
+ngrok可攜版3.39.11取自[官方Windows下載頁](https://ngrok.com/download/windows)，Authenticode為Valid、簽署者ngrok Inc.；exe SHA256為 `d339bcbd0713233337e860163f5249eea679cf26750a5700510dbc241d201748`。只置於ignored `data/arrangement-native-runtime`，沒有全域安裝。私有ngrok.yml僅讀取既有本機token建立，web inspector、流量檢查、remote management與update check關閉；設定／日誌目錄及admin檔ACL限目前使用者與SYSTEM。
+
+邊界：uvicorn `--host 127.0.0.1 --port 8041 --no-proxy-headers --no-access-log`；`FUCHENG_PUBLIC_ORIGIN=https://f9d0-140-116-158-107.ngrok-free.app`、`FUCHENG_TRUSTED_PROXY=127.0.0.1`、`FUCHENG_PROXY_KIND=ngrok`、`FUCHENG_COOKIE_SECURE=true`、`FUCHENG_LOCAL_HTTP_PREVIEW=false`。app要求精確Host／寫入Origin及CSRF，僅解析ngrok所附XFF／XFP。此為**本機程序信任邊界**：同機127.0.0.1程序可扮演代理，不具Docker private ingress network隔離；未開LAN listener或public debug。正常公開TLS與瀏覽器驗收通過，沒有略過憑證驗證。
+
+執行／停止身份由 `data/arrangement-native-runtime/runtime.json` 記錄：ngrok PID50144、app listener64348、launcher60996。程序均隱藏啟動；目前日誌為同目錄 `ngrok-assigned.stdout.log`／`ngrok-assigned.stderr.log`、`app-final.stdout.log`／`app-final.stderr.log`；初次及恢復嘗試日誌保留。使用README的 `stop-preview.ps1 -CheckOnly` 核對，再執行同腳本停止；不殺全部Python/ngrok、不動8037／8039、不刪DB。這是臨時程序，關機／程序退出／ngrok限制會使入口不可用，沒有自動重啟或排程。再次啟動前須重新核對來源、port、ngrok URL及精確Origin；不可盲目重放舊PID或恢復舊Docker容器。
+
+公開API安全證據 `security.json`、兩次保存及歷史證據 `browser-evidence.json`／`data-verification.json`、資源保護核對 `protection-final.json` 均在同runtime目錄。這次只改README／驗收／部署文件及合成建立腳本variant；沒有stage、commit、merge、push、worktree、正式部署或共用Docker/GPU操作。r11遷移及image/volume回退演練仍未執行，下節接續命令受hold約束。
+
+收尾依使用者最新指定，僅更新上述合成庫的 `admin`，最終使用既有hash_password的正常12字元規則與隨機salt，並撤銷該admin所有舊sessions。過程曾套用短密碼，該例外已取消；舊密碼401，定向session測試在撤銷前200／撤銷後401，新登入200、管理讀取200、登出204，Secure／HttpOnly／SameSite不變。原管理員與歷史actor保留，ignored帳密檔已更新；最終證據 `admin-rotation-verification.json`，先前fixture證據已標示superseded。
+
+22:54:49台北的共用owner狀態由main／orchestrate轉達：Docker Desktop已恢復，舊府城ngrok app／backup／ngrok及portable app／backup已由owner依其他授權停止至exited；原生8037／8039／8041／ngrok未動。本task沒有再probe或操作Docker；此回報不解除Docker hold，舊容器暫不重開。下方14:34不可用記錄是歷史阻礙。
+
+23:09恢復紀錄：初次8170入口的三個原生程序在後續回合已不存在，根因尚未確認，main與shared owner均表示未停止。免費ngrok拒絕指定重用8170（ERR_NGROK_313），因此重新分配目前f9d0入口，app精確Origin同步更新。僅恢復本task程序；舊8037／8039亦未觀察到listener，但本task未重啟或停止它們。背景程序已跨啟動shell結束存活，沒有建立排程／開機服務。原80人功能驗收在8170完成；來源／DB／static沿用，新入口只補正常TLS登入與舊session失效驗證，不重跑功能。
+
+### 0006 → 0007 接續升級及回退
+
+0007僅新增不可變arrangement_versions結構，不回填歷史基準。首次合法編輯POST或第一筆直接調級才保存實際當下名單；migration不捏造時間、編輯者或舊安排。合成0006全舊表逐欄保留、DDL失敗回滾、升級前／後backup與新目標restore、integrity／FK已由本輪Python測試驗證，未套用到舊服務。
+
+部署方須依既有runtime契約停寫→備份→明確migration→以匹配新schema的image啟動；啟動不自動migration，maintenance/writer鎖不得繞過。更新前保存原image身份及0006備份。若要回退，停止新writer，使用舊image＋pre-update備份Restore到**新target**，保留原0007故障／更新後DB及版本歷史，不執行downgrade或直接覆寫volume。回退不會把更新後的新版本搬回0006，應將其保留供核對。
+
+source_files allowlist的`src/fucheng/*.py`、`migrations/versions/*.py`、`frontend/src/**/*.ts(x)`涵蓋新arrangements.py、0007及前端controller／表格。要重新build fresh staging／manifest與image，不沿用r10來源hash或把本機dist塞入image。不得包含data／帳密／備份／參考圖片。`scripts/deployment_drill.py`舊0005情境是歷史演練，不能當成本輪0006→0007 image/volume回退證據；部署task需以實際舊image和新image做本輪隔離演練。
+
+2026-09-20 14:34（台北）部署接續暫停：Docker Linux Engine 查詢先回 API 500，兩次後續 version 查詢均回 `Docker Desktop is unable to start`。正常 TLS 公開 health 為404、8448連線逾時、8450讀取逾時；8039原生預覽health200。沒有執行build、停服務、migration或改私有env，不自行重啟共用Docker／WSL；由main協調恢復。來源48檔allowlist已核對新檔存在／刪除hook排除，尚未建立r11 image。只讀核對既有ngrok合成0006 checkpoint的SHA256、integrity、FK及3會員／1場／2報名通過，不能冒充目前線上資料快照。
+
+新 `scripts/deployment_arrangement_drill.py` 已備妥，**僅通過語法與CLI help檢查，尚未執行Docker演練**。它拒絕既有演練資源，在network none／無host port的獨立volume以r10還原合成checkpoint，驗證服務中migration拒絕、新舊schema不匹配拒啟動、0007遷移全舊表保留／版本表為空，透過容器loopback API寫baseline／調級／保存，再以r10還原0006 pre-update至新target並核對原0007與後續寫入保留。此loopback API不是公開TLS證據。成功停止僅自己建立的演練server，保留volume及容器；失敗保留證據，不能盲目重跑。
+
+以下為保留的Docker接續命令；**目前禁止執行**。須由main明確解除共用Docker hold，再核對原服務／空閒名稱及當時授權後才能依序接續：
+
+```powershell
+$env:PYTHONUTF8='1'
+uv run --locked python scripts/deployment_package.py build data/deployment-release-20260920-r11
+uv run --locked python scripts/deployment_package.py export data/deployment-release-20260920-r11
+uv run --locked python scripts/deployment_arrangement_drill.py --new-release data/deployment-release-20260920-r11/release.json --synthetic-checkpoint data/deployment-ngrok-r10-evidence-20260920/manual-20260920T030501454562Z-2de5c494.db --synthetic-credentials data/deployment-ngrok-evidence-20260920/synthetic-admin.json --evidence data/deployment-arrangement-drill-20260920-r11
+```
+
+預定新演練project為`fucheng-arrangement-drill-20260920-r11`；截至暫停尚未查得可用daemon確認此名稱，腳本執行前會重新檢查，不能宣稱已建立資源。演練通過後才為原ngrok project做**新的**正常備份、停app／backup、new ops migration（自動pre-update checkpoint／maintenance guard）、舊表及新schema驗證，再啟new app／backup。不得因已有離線checkpoint而略過真正升級前的備份。最後另做公開TLS桌面／手機尺寸與兩次大存歷史驗收，更新文件與證據；以上仍未執行。
 
 本階段交付是**本機已驗證、可搬至球館的部署套件**。正式架構是一個 app image，內含 React 靜態成品及 FastAPI，SQLite 存獨立 named volume；備份與維護復用 app image。Cloudflare named tunnel 直接連 app；nginx 僅供本機 HTTPS 測試，不是正式必要層。不增加 PostgreSQL、Redis 或常駐 Node，不更換 Windows。
 
-本機合成驗證不等於球館實機、正式資料或人類驗收已完成。2026-09-20另獲使用者授權的ngrok公開合成預覽見下節。先前級數／部署成果已提交合併推送至 `289be6c`；本輪拖曳／r10 交付仍未提交、合併或推送，未搬移正式資料或發布 registry。
+本機合成驗證不等於球館實機、正式資料或人類驗收已完成。下節記錄先前ngrok合成預覽。當時級數／部署成果已推送至 `289be6c`，r10為未提交snapshot；其後r10前階段成果已整合至目前main／本工作分支起點 `0970af2`。目前33個dirty paths屬緊湊表格／安排保存及部署接續，仍未提交、合併或推送，未搬移正式資料或發布registry。
 
 ## 已授權的 ngrok 公開合成預覽（2026-09-20）
 

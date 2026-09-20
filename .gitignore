@@ -237,6 +237,7 @@ frontend/dist-public/
 frontend/dist-delete/
 frontend/dist-levels/
 frontend/dist-level-drag/
+frontend/dist-arrangement/
 
 # Deployment outputs and credentials (never part of source/build context)
 deploy/docker/source-manifest.json

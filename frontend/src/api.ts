@@ -9,6 +9,7 @@ import type {
   MemberDraft,
   PublicMember,
   RegistrationMember,
+  ArrangementState, ArrangementVersion, ArrangementSave,
 } from './types'
 
 let csrfToken = ''
@@ -128,8 +129,13 @@ export function updateRegistrationDiet(
   })
 }
 
-export function updateRegistrationLevel(registration: CompetitionRegistration, competitionLevel: number, reason: string, requestId: string): Promise<CompetitionRegistration> {
+export function updateRegistrationLevel(registration: Pick<CompetitionRegistration, 'id' | 'version'>, competitionLevel: number, reason: string | null, requestId: string): Promise<CompetitionRegistration> {
   return request(`/api/admin/registrations/${registration.id}/level`, {
     method: 'PUT', body: JSON.stringify({ version: registration.version, competition_level: competitionLevel, reason, request_id: requestId }),
   })
 }
+
+export const arrangement = (id: string) => request<ArrangementState>(`/api/admin/competitions/${id}/arrangement`)
+export const initializeArrangement = (id: string) => request<ArrangementState>(`/api/admin/competitions/${id}/arrangement/initialize`, { method: 'POST' })
+export const saveArrangement = (id: string, payload: ArrangementSave) => request<ArrangementVersion>(`/api/admin/competitions/${id}/arrangement/versions`, { method: 'POST', body: JSON.stringify(payload) })
+export const arrangementVersion = (id: string, versionId: string) => request<ArrangementVersion>(`/api/admin/competitions/${id}/arrangement/versions/${versionId}`)

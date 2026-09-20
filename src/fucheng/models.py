@@ -169,6 +169,27 @@ class CompetitionAudit(Base):
     admin: Mapped[Admin] = relationship()
 
 
+class ArrangementVersion(Base):
+    """Append-only full snapshots; sequence zero is the explicit initial baseline."""
+    __tablename__ = "arrangement_versions"
+    __table_args__ = (
+        UniqueConstraint("competition_id", "sequence", name="uq_arrangement_sequence"),
+        CheckConstraint("sequence >= 0", name="ck_arrangement_sequence"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    competition_id: Mapped[str] = mapped_column(ForeignKey("competitions.id", ondelete="RESTRICT"), index=True)
+    sequence: Mapped[int] = mapped_column(Integer)
+    label: Mapped[str] = mapped_column(String(100))
+    editor_label: Mapped[str] = mapped_column(String(100))
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"))
+    actor_name: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    rows_json: Mapped[str] = mapped_column(Text)
+    request_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
 class PublicVisit(Base):
     """Automatic browser context, not a member account or verified identity."""
     __tablename__ = "public_visits"

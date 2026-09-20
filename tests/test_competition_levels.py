@@ -67,8 +67,6 @@ def test_permissions_validation_and_actor_binding(app, client, auth, admin_passw
     assert client.put(url(reg), json=payload(reg)).status_code == 403
     for level in (0, 11, 1.5, True, '3'):
         assert client.put(url(reg), headers=auth, json=payload(reg, level)).status_code == 422
-    for reason in ('', '   ', None):
-        assert client.put(url(reg), headers=auth, json=payload(reg, reason=reason)).status_code == 422
     assert client.put(url(reg), headers=auth, json=payload(reg, member_id='forbidden')).status_code == 422
     from fucheng.models import Admin
     from fucheng.security import hash_password
