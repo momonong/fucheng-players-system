@@ -2,6 +2,40 @@
 
 最後更新：2026-09-20。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
 
+## 姓名卡片拖曳與逐次自動儲存（2026-09-20）
+
+本輪 A+B 工程驗證完成，等待人工操作驗收。滑鼠拖曳、手機長按把手拖曳、點選／鍵盤移動共用逐次自動儲存；管理員先手填本次原因，每次移動固定當下原因、版本及 request_id。同一卡片完成後才能再移動，其他卡片獨立。已儲存撤回是有原因的新反向異動；結果不確定保留原操作重試，409 不替換版本或自動覆寫。會員長期級數、報名快照、當次級數與既有名單／列印語意保持獨立。
+
+驗證使用 `FUCHENG_E2E_STATIC_DIR=frontend/dist-level-drag`、`FUCHENG_E2E_DATABASE_URL=sqlite:///data/level-drag-e2e.db`、`FUCHENG_E2E_PORT=8038`、`PYTHONUTF8=1`，單 worker。desktop 1440×900；mobile 390×844，isMobile／hasTouch 開啟。
+
+- `npm run typecheck`、`npm run build -- --outDir ../frontend/dist-level-drag` 通過，未更新依賴。
+- `npm run test:e2e -- --grep '姓名卡片|自動保存未知|真實409' --output test-results/level-drag-first`：6 passed（17.7 秒）。真實 Chromium 滑鼠／CDP touch 事件均 isTrusted，含長按前移動取消、touchCancel／Escape、卡片非把手原生捲動；自動儲存、連續移動、反向撤回與逐次原因／稽核；commit 後 503 且後續另改級再原 key 重試回最新紀錄；未 commit 斷線重試；另一卡片獨立；真實 409、切場保留原因／未完成操作、遲回應不跳場、較新版本不被舊回應取代、終態唯讀。
+- `npm run test:e2e -- --grep-invert '姓名卡片|自動保存未知|真實409' --output test-results/level-drag-regression`：8 passed／4 failed。失敗是既有測試使用全頁 status 或模糊比賽按鈕姓名，與新卡片提示／把手撞名；已縮至通知 `.toast[role="status"]` 及 `.competition-item` 精確名稱，未刪除斷言或改業務行為。
+- `npm run test:e2e -- --grep '刪除需確認|整批八十人' --output test-results/level-drag-regression-fixed`：80 人匯入桌面／手機 2 passed，刪除案例在還原後另一處同名定位 2 failed。補齊該檔比賽列表定位後，`npm run test:e2e -- --grep '刪除需確認' --output test-results/level-drag-deletion-final`：2 passed（6.7 秒）。合計 **18 個不同 E2E 通過（新 6＋原 12）**，不是首次全套全綠。
+- 本輪未修改後端或 migration，未重跑先前 78 項 Python 測試；下節 78 passed 是既有 HTTP 部署階段證據。8038 測試服務已退出。
+
+人工預覽 [8037 比賽管理](http://127.0.0.1:8037/admin/competitions) 使用新建 `data/level-drag-preview.db`／`frontend/dist-level-drag`。83 位合成會員、3 場比賽、85 筆報名，主場 80 正取／2 候補／1 取消；沒有複製真實資料。`scripts/create_level_preview.py --variant level-drag` 保留原預設 variant 與拒絕覆寫行為。初始備份 `backups/level-drag-preview-initial.db` 與還原 `data/level-drag-preview-restore-check.db` 均 integrity=ok、foreign_key_errors=0、revision=0006，見 `data/level-drag-preview-verification.json`。
+
+80 人預覽另以真實 Chromium 驗證兩種尺寸：80 張姓名卡、十區、3 級篩選 9 張、篩選仍保留十個區域及十個快捷目的、區內可捲動、無水平溢位與 pageErrors。這次視覺 QA 沒有送出調級修改；結果 `data/level-drag-preview-browser-verification.json`，overview／board 截圖 `data/level-drag-preview-*-*.png` 已目視檢查。長姓名及未知結果提示由新 E2E 截圖核對。觸控是 Chromium 模擬，未取代球館實體手機操作驗收。
+
+保護前後比對 `data/level-drag-protected-before.json`／`level-drag-protected-after.json`／`level-drag-protection-verification.json`：原 dist-public／dist-delete／dist-levels、r7／r8／r9 共 321 檔無差異（小於 20MB 以 SHA256＋大小／時間，大型 archive 僅大小／時間）；原 5 個 DB 的 63 張表內容 hash 一致。8448／8450 listener 持續存在；8032～8035 在本輪開始／完成檢查皆無 listener，沒有重啟或停止它們。既有 ngrok／Docker、真實資料及舊交付包未更新。
+
+8037 實際 listener PID **57548**、啟動父程序 **54164**，分存 `data/level-drag-preview.pid`／`level-drag-preview-launcher.pid`；帳密只存 `data/level-drag-preview-admin.json`。停止時先比對 netstat 的 127.0.0.1:8037 PID 與 Get-Process Python 身分，才依 README 停止該 listener，不能拿其他預覽 PID 操作。8037 留供驗收。
+
+交付位於主要目錄 `D:\projects\fucheng-players-system`，起始 main `289be6ca9692f2ed701a86f16a444b8e7151475c`，工作分支 `feat/competition-level-drag`；無新 worktree，變更未提交，未 merge／push。task4 本機驗證後，task5 另依授權更新公開預覽，見下節；上段保護結果是 task4 換版前的歷史證據。大版本快照、版本名稱／備註、與上一保存版本的淨差異顏色、自訂標題與當次安排列印另待後續階段，並未以報名快照代替上一保存版本。
+
+### r10 公開預覽更新與操作驗證
+
+沿用 `https://30a1-140-116-158-107.ngrok-free.app/`／`fucheng-ngrok-preview-20260920`，只替換 app／backup。r10 `local/fucheng:snapshot-b7a6f33e2b8e4777` 由 allowlist 的 47 檔 build context 建置，三個新前端模組均在 manifest；Docker 內 typecheck／build 通過。完整 image、source、archive SHA256 見部署手冊。後端、schema、runtime 與 r9 文字一致；部分檔案只有 Git 換行正規化造成 bytes 不同，未作應用修正。
+
+- 換版前正常手動備份，正常停止 app／backup 後再建立 checkpoint `manual-20260920T030501454562Z-2de5c494.db`，SHA256 `473c6316a7d826541ffa797d58d78ff0dd01f47a5a72566c1e1862af0dbc9db3`；integrity=ok、foreign_key_errors=0、revision=0006。原 image／env／checkpoint 保留，無 migration／reseed。換版前後 15 張資料表筆數與內容 hash 完全相同，3 會員／1 場／2 報名保留。
+- 真實公開 **CUA IAB**：正常 TLS 登入、先填原因、滑鼠把手拖曳合成甲 3→6、自動儲存、重開仍為 6、歷史顯示操作者／時間／原因成功；沒有儲存按鈕介入、TLS bypass 或 ngrok skip header。390×844 手機尺寸實操點選 6→3，再使用已儲存撤回 3→6，反向紀錄存在，無水平溢位；最後登出。長按主路徑沿用上節 trusted CDP touch E2E，未在此次 IAB 重演長按或宣稱實體手機驗收。
+- 驗收只新增三筆有原因的 `level` 稽核；合成甲當次級數最終 6、version +3、報名快照仍 3。所有會員欄位／級數、比賽、兩筆報名身分／餐食／快照／順位／狀態與既有稽核保留。登入相關表有預期 session／attempt 變動。
+- 正常 TLS API：health 200、未登入管理 401、錯 Origin 403、缺 CSRF 403、偽造 forwarding 400、拒絕後合法 session 仍 200、登出 204；cookie 仍 Secure／HttpOnly／SameSite=Lax。
+- 原本機 DB／dist／帳密指紋一致；r7～r9 原包完整 SHA256SUMS 驗證通過。換版後即時快照中其他容器 ID／StartedAt 全保持；收尾時發現三個 KaChing portable api／mcp-read-api／mcp 容器其後另有變化（03:05:27～03:05:42 UTC），本 task 未操作它們，未調查或回復外部工作。ngrok、8448／8450、selfhost 容器保持，8037 PID57548 保留。8032～8035 在此次起始就無 listener，沒有重啟。無新 worktree／Git 提交／推送／資源清理。
+
+本次證據集中於 ignored `data/deployment-ngrok-r10-evidence-20260920/`：`updated.json`、`backup-stopped.json`、`data-preservation.json`、`source-package-verification.json`、`public-api-security.json`、`iab-evidence.json`／截圖與 AX 紀錄、`final.json`。既有 18 distinct E2E 與 78 backend 證據沿用，不形式重跑。公開工程操作驗收通過，使用者接受成果與球館實機驗收仍是獨立狀態。
+
 ## ngrok 公開 HTTPS 合成預覽（2026-09-20，另行授權）
 
 URL `https://30a1-140-116-158-107.ngrok-free.app/`。使用全新 `fucheng-ngrok-preview-20260920` project/data/backups、精確HTTPS origin與ngrok trusted peer，復用r9 image（沒有程式/image變更，也未更新舊交付包）。local-http模式未接Tunnel；既有8032～8035、8448、8450保持運作。只初始化3位合成會員與1個2099年合成場次。

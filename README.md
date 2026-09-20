@@ -181,13 +181,52 @@ Stop-Process -Id (Get-Content data/club-delete-preview.pid)
 
 從「比賽管理」選擇場次，在「級數與人員安排」搜尋姓名／辨識註記、篩選當次級數。正取依 1～10 級分區，固定全場人數與篩選人數並列；候補與取消另列，不計入正取安排。數字升冪不代表強弱方向。
 
-三種級數各自獨立：會員 `level` 是長期資料；`hard_level_snapshot` 保存報名當下級數；`competition_level` 初始等於該筆快照，只供該場安排。按「調整級數」、選不同級數並填原因後儲存。重開可讀回，下面「報名操作稽核」可查該筆順位、操作者、時間、前後值與原因。原「報名名單」的硬實力快照篩選、全場快照統計及管理列印維持原意，沒有改成當次級數列印。
+三種級數各自獨立：會員 `level` 是長期資料；`hard_level_snapshot` 保存報名當下級數；`competition_level` 初始等於該筆快照，只供該場安排。先填「本次調整原因」，再拖曳姓名卡片至級數區或上方快捷區；每次放下自動儲存，不需要再按儲存。手機長按把手約 350ms 後拖曳，卡片其他位置仍可捲動；也可「點選移動」再選級數，支援 Tab／Enter，Escape 取消未送出的拖曳。重開可讀回，下面「報名操作稽核」可查該筆順位、操作者、時間、前後值與原因。原「報名名單」的硬實力快照篩選、全場快照統計及管理列印維持原意，沒有改成當次級數列印。
 
 只允許正取調級；候補待遞補後才能安排，同筆遞補保留當次級數。取消保留舊列及歷史，不能修改；重新報名建立新列及新順位，按新快照初始化，不繼承之前人工安排，需重新確認。報名截止或實際過截止時間仍可有原因調級；草稿、已刪除、已結束、已取消場次唯讀。
 
-儲存失敗保留級數、原因與原始 version；網路重試沿用同一操作識別碼。409 後停止送出，先讀取最新名單核對，再明確放棄本筆草稿、重新開啟調整；不自動替換 version。頁內刷新名單、切換場次不清除草稿；草稿只在當前頁面記憶體，重新整理／離開有未儲存提醒，沒有跨瀏覽器或重開頁面草稿保存。
+每次移動固定當下原因、目的級數、原始 version 及操作識別碼；同一卡片確認完成後才能繼續，其他卡片可獨立儲存。畫面安排包含未完成移動，各區另列已儲存人數。網路中斷或伺服器錯誤可能已寫入，只能「確認結果／原樣重試」；不得改原因、級數或直接撤回。重試可能回傳後續更新過的最新紀錄，畫面以回傳值為準。409 保留移動，先讀取最新名單，再明確放棄未完成操作、重新安排；不自動替換 version。已成功的「撤回到 N 級」是另一筆有原因的反向異動，保留兩次稽核；已有其他更新時不沿用舊撤回基準。
 
-### 獨立合成預覽（8035）
+頁內刷新名單、切換場次保留原因與未完成操作；它們只存在目前頁面記憶體，重新整理／離開時提醒不等於持久保存。大版本快照、版本名稱／備註、與上一保存版本的淨差異顏色、自訂標題及當次安排列印尚未實作。
+
+### 拖曳版獨立合成預覽（8037）
+
+[拖曳姓名卡片預覽](http://127.0.0.1:8037/admin/competitions)：選「合成 80 人級數安排（已截止）」。資料 `data/level-drag-preview.db`、成品 `frontend/dist-level-drag`，帳密僅存本機 `data/level-drag-preview-admin.json`。83 位合成會員、主場 80 正取／2 候補／1 取消，另有另一場及唯讀草稿；未複製真實資料。revision 仍為 0006，本輪沒有後端或 migration 變更。
+
+另已依授權更新[公開 HTTPS 拖曳預覽](https://30a1-140-116-158-107.ngrok-free.app/admin/competitions)，選「NGROK公開HTTPS合成驗收」。使用 r10 snapshot，保留原 3 位合成會員、1 場比賽與 2 筆報名；先填「本次調整原因」，再拖曳即自動儲存。公開 IAB 已驗證拖曳、重開讀回、歷史及手機尺寸點選／反向撤回；長按觸控沿用本輪既有 E2E，仍待實體手機驗收。帳密仍在 `data/deployment-ngrok-evidence-20260920/synthetic-admin.json`；8448／8450 與 r7～r9 原包未更新。來源、備份及停止／回退方式見 [部署手冊](docs/deployment.md)。
+
+```powershell
+# 僅首次建立；已有 DB／帳密／備份／還原檔會拒絕覆寫
+uv run --locked python scripts/create_level_preview.py --variant level-drag
+Push-Location frontend
+npm run build -- --outDir ../frontend/dist-level-drag
+Pop-Location
+# 已有 8037 運作時不重複啟動；建置也勿覆寫使用中的成品
+$env:FUCHENG_DATABASE_URL='sqlite:///data/level-drag-preview.db'
+$env:FUCHENG_COOKIE_SECURE='false'
+$env:FUCHENG_STATIC_DIR='frontend/dist-level-drag'
+uv run --locked uvicorn fucheng.app:app --host 127.0.0.1 --port 8037 --no-access-log
+```
+
+實際 listener 與啟動父程序分別記錄於 `data/level-drag-preview.pid`、`data/level-drag-preview-launcher.pid`，日誌同前綴 `.stdout.log`／`.stderr.log`。停止前先核對 `netstat -ano` 中 127.0.0.1:8037 的 PID 與 PID 檔一致，再用 `Get-Process` 核對 Python 程序，才執行 `Stop-Process -Id (Get-Content data/level-drag-preview.pid)`；不得使用其他預覽的 PID。
+
+E2E 使用獨立 8038 合成庫，不能指向人工預覽：
+
+```powershell
+Push-Location frontend
+$env:FUCHENG_E2E_STATIC_DIR='frontend/dist-level-drag'
+$env:FUCHENG_E2E_DATABASE_URL='sqlite:///data/level-drag-e2e.db'
+$env:FUCHENG_E2E_PORT='8038'
+$env:PYTHONUTF8='1'
+npm run test:e2e -- --output test-results/level-drag
+Pop-Location
+```
+
+來源及備份還原檢查：`data/level-drag-preview-verification.json`；80 人桌面／手機檢查與截圖：`data/level-drag-preview-browser-verification.json`、`data/level-drag-preview-*-*.png`。手機證據為 Chromium 觸控模擬，球館實機與人工操作驗收仍待進行。
+
+### 先前表單版合成預覽（8035，歷史紀錄）
+
+下節為先前版本的操作紀錄。2026-09-20 拖曳版交付檢查時，8032～8035 無 listener，本輪未重啟；保留原 DB 與成品，不可用新版原始碼覆寫它們。
 
 [當次比賽級數管理](http://127.0.0.1:8035/admin/competitions)：選「合成 80 人級數安排（已截止）」。有 80 正取、2 候補、1 取消，含同名註記與一筆 1 → 3 級示例；另有另一場比賽及唯讀草稿。所有資料由腳本新建，不複製真實資料庫。
 

@@ -1,18 +1,32 @@
 # Windows Docker 部署、搬移與維運
 
+2026-09-20 姓名卡片拖曳／逐次自動儲存版已依授權更新既有 ngrok 合成預覽，使用新建 r10 allowlist snapshot；獨立本機 8037（`data/level-drag-preview.db`／`frontend/dist-level-drag`）保持，操作見 README。8448／8450 Docker 預覽及 r7～r9 套件保持原版本。未將本機 dist 塞入 image；本輪沒有後端或 migration 變更。
+
 本階段交付是**本機已驗證、可搬至球館的部署套件**。正式架構是一個 app image，內含 React 靜態成品及 FastAPI，SQLite 存獨立 named volume；備份與維護復用 app image。Cloudflare named tunnel 直接連 app；nginx 僅供本機 HTTPS 測試，不是正式必要層。不增加 PostgreSQL、Redis 或常駐 Node，不更換 Windows。
 
-本機合成驗證不等於球館實機、正式資料或人類驗收已完成。原r7～r9交付未啟公開Tunnel；2026-09-20另獲使用者授權的ngrok公開合成預覽見下節。未搬移正式資料、commit／merge／push或發布registry。
+本機合成驗證不等於球館實機、正式資料或人類驗收已完成。2026-09-20另獲使用者授權的ngrok公開合成預覽見下節。先前級數／部署成果已提交合併推送至 `289be6c`；本輪拖曳／r10 交付仍未提交、合併或推送，未搬移正式資料或發布 registry。
 
 ## 已授權的 ngrok 公開合成預覽（2026-09-20）
 
-遠端筆電的localhost不是服務主機，因此另建立 **https://30a1-140-116-158-107.ngrok-free.app/**。這是公開合成驗收環境，沒有真實會員資料；不是將8450 local-http模式接上Tunnel。復用r9正式ngrok Compose與image，全新project `fucheng-ngrok-preview-20260920`、volumes `_data`／`_backups`，獨立origin `172.30.106.0/24`與egress網路。app不發布host port、Secure cookie與精確Host/Origin/CSRF/session維持，trusted ngrok peer為`172.30.106.3`。
+遠端筆電的localhost不是服務主機，因此另建立 **https://30a1-140-116-158-107.ngrok-free.app/**。這是公開合成驗收環境，沒有真實會員資料；不是將8450 local-http模式接上Tunnel。最初以r9建立project `fucheng-ngrok-preview-20260920`、volumes `_data`／`_backups`，本輪只更新app／backup至r10，沿用原資料與網路。獨立origin `172.30.106.0/24`與egress網路、ngrok容器均保持；app不發布host port、Secure cookie與精確Host/Origin/CSRF/session維持，trusted ngrok peer為`172.30.106.3`。
 
 原本機ngrok配置含可用authtoken，只讀取並複製到ignored的本次secret檔，沒有修改原設定。沒有發現本機既有ngrok process/container；帳號其他主機session未枚舉，沒有停止其他session。設定關閉agent web UI、request inspection、remote management與update check。未購買方案、保留付費網域或修改帳號付費設定。
 
 私有運行設定：`data/deployment-ngrok-evidence-20260920/release.env`、`ngrok-secret.yml`；合成帳密：同目錄`synthetic-admin.json`。以上不加入Git/image/離線包，勿將token或密碼貼到聊天。只初始化3位合成會員與1個2099年合成場次，未從其他資料庫複製。
 
 CUA IAB已實測首頁、管理登入、儲存合成會員及登出；main與orchestrate亦核對首頁可見合成比賽。首次可能有ngrok自己的Visit Site提示（orchestrate實見ERR_NGROK_6024），這不是瀏覽器TLS警告；本task沒有使用skip header或略過TLS驗證。公開API使用正常TLS驗證，HTTP入口307導向同域HTTPS。
+
+r10 公開 IAB 另驗證先填原因、滑鼠拖曳、自動儲存、重開讀回與操作歷史；手機 390×844 尺寸點選移動／已儲存撤回成功，長按沿用既有 trusted touch E2E，未取代實體手機驗收。保留 3 會員／1 場／2 報名，僅新增三筆驗收調級稽核；會員及快照不變，合成甲當次級數最終為 6。換版前後所有資料表 hash 相同，無 migration／reseed；驗收後逐欄比對亦只包含預期調級與登入紀錄。
+
+本輪套件 `data/deployment-release-20260920-r10/` 身分：
+
+- image：`local/fucheng:snapshot-b7a6f33e2b8e4777`；ID `sha256:66c085ef0d95f42d7f63007290d741961bb4b75e824c12e36cafe9cd8e726bf9`。
+- source manifest SHA256：`b7a6f33e2b8e477732cc0265094557c51852670798541146bf2a79ccd3df3602`；47 個允許的 context 檔案，含三個新前端模組與 manifest。
+- `fucheng-images.tar` SHA256：`51ac531570d655d0f3f535bd79c55e2475c05b5c537b2eede957712316d47964`。起始 HEAD `289be6c` 不代表全部未提交來源；原包 r7～r9 保留且 checksum 通過。
+
+更新前先以 r9 runtime 正常 Backup，正常停止本 project 的 app／backup，再 Backup 留下停寫 checkpoint `manual-20260920T030501454562Z-2de5c494.db`（SHA256 `473c6316a7d826541ffa797d58d78ff0dd01f47a5a72566c1e1862af0dbc9db3`，revision 0006、integrity ok）。它在原 backups volume，另複製至 ignored `data/deployment-ngrok-r10-evidence-20260920/`；舊 env 為同目錄 `release-r9.env`。正常 compose up 只替換 app／backup，serve 仍經 writer.lock 與 schema guard，未觸碰 ngrok／其他服務。
+
+若需回退，另依授權停止此 project 的 app／backup，先用 runtime Backup 保存後續寫入，再將目前 release.env 的 image 改回保留的 r9 tag，使用 r9 套件 `up -d --no-deps --wait app backup`；schema 相同可沿用原資料，不能直接覆蓋 DB。只有確需資料回復時，才走 runtime Restore 指定 checkpoint 至新目標並保留故障庫／後續寫入。此次未執行回退。完整更新及瀏覽器證據在 `data/deployment-ngrok-r10-evidence-20260920/final.json`。
 
 服務主機、Docker daemon、app與ngrok容器必須持續運作且可連網；關機、休眠、斷網、帳號限制或停止容器都會令網址不可用。網址已寫入本次ngrok配置與精確public origin，但不保證永久保留或未登入冷開機自動恢復。若ngrok拒絕重啟或改配網址，先停止該preview並重新核對origin，不放寬Host。
 
@@ -25,14 +39,14 @@ docker stop fucheng-ngrok-preview-20260920-ngrok-1
 停止整組本次環境，保留volumes，不影響8032～8035、8448、8450：
 
 ```powershell
-powershell.exe -NoProfile -File D:\projects\fucheng-players-system\data\deployment-release-20260920-r9\operate.ps1 Stop -EnvFile D:\projects\fucheng-players-system\data\deployment-ngrok-evidence-20260920\release.env
+powershell.exe -NoProfile -File D:\projects\fucheng-players-system\data\deployment-release-20260920-r10\operate.ps1 Stop -EnvFile D:\projects\fucheng-players-system\data\deployment-ngrok-evidence-20260920\release.env
 ```
 
-來源契約：[ngrok v3設定](https://ngrok.com/docs/gateway/agent/config/v3)、[upstream headers](https://ngrok.com/docs/gateway/endpoints/http#upstream-headers)。實際帳號連線結果與瀏覽器證據以`data/deployment-ngrok-evidence-20260920/ngrok-final.json`為準。
+來源契約：[ngrok v3設定](https://ngrok.com/docs/gateway/agent/config/v3)、[upstream headers](https://ngrok.com/docs/gateway/endpoints/http#upstream-headers)。首次建置證據為`data/deployment-ngrok-evidence-20260920/ngrok-final.json`；本輪更新以`data/deployment-ngrok-r10-evidence-20260920/final.json`為準。
 
 ## 套件與現場最短步驟
 
-本輪套件位於 `data/deployment-release-20260920-r9/`：`fucheng-images.tar`、`release.json`、`SHA256SUMS.txt`、逐檔 source manifest／snapshot ZIP、Compose、PowerShell helpers及本手冊。它包含既有未提交的級數功能，是 **working-tree snapshot**；HEAD 並不代表全部來源，應以 image ID 和 manifest SHA256 識別。套件不含會員資料、帳密、Tunnel token、TLS私鑰或備份。
+本輪套件位於 `data/deployment-release-20260920-r10/`：`fucheng-images.tar`、`release.json`、`SHA256SUMS.txt`、逐檔 source manifest／snapshot ZIP、Compose、PowerShell helpers及本手冊。它包含未提交的拖曳與自動儲存前端，是 **working-tree snapshot**；HEAD 並不代表全部來源，應以 image ID 和 manifest SHA256 識別。套件不含會員資料、帳密、Tunnel token、TLS私鑰或備份。
 
 將整個套件搬到球館本機，例如 `C:\Fucheng\releases\<snapshot>`；不要放 OneDrive／網路磁碟。Docker Desktop／WSL 是主機前置需求，不含在 image 包，也沒有自動安裝、重啟或更改登入策略。先只驗空白／合成安裝：
 

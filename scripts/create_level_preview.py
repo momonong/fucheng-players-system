@@ -13,16 +13,19 @@ from alembic.config import Config
 
 
 def main():
-    database = Path('data/levels-preview.db').resolve()
-    credentials = Path('data/levels-preview-admin.json')
-    backup_path = Path('backups/levels-preview-initial.db')
-    restored = Path('data/levels-preview-restore-check.db')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--variant', choices=['levels', 'level-drag'], default='levels')
+    variant = parser.parse_args().variant
+    database = Path(f'data/{variant}-preview.db').resolve()
+    credentials = Path(f'data/{variant}-preview-admin.json')
+    backup_path = Path(f'backups/{variant}-preview-initial.db')
+    restored = Path(f'data/{variant}-preview-restore-check.db')
     if any(p.exists() for p in (database, credentials, backup_path, restored)):
         raise SystemExit('合成預覽或驗證檔已存在，拒絕覆寫')
     database.parent.mkdir(parents=True, exist_ok=True)
     os.environ['FUCHENG_DATABASE_URL'] = f'sqlite:///{database.as_posix()}'
     os.environ['FUCHENG_COOKIE_SECURE'] = 'false'
-    os.environ['FUCHENG_STATIC_DIR'] = 'frontend/dist-levels'
+    os.environ['FUCHENG_STATIC_DIR'] = f'frontend/dist-{variant}'
     command.upgrade(Config('alembic.ini'), 'head')
     command.check(Config('alembic.ini'))
     from fastapi.testclient import TestClient
@@ -89,8 +92,8 @@ def main():
                 'members': db.execute('SELECT COUNT(*) FROM members').fetchone()[0],
                 'registrations': db.execute('SELECT COUNT(*) FROM competition_registrations').fetchone()[0]})
     assert checks[0] == checks[1] and checks[0]['integrity'] == 'ok' and checks[0]['foreign_key_errors'] == 0
-    Path('data/levels-preview-verification.json').write_text(json.dumps(checks, indent=2), encoding='utf-8')
-    print('獨立合成預覽已建立；帳密只存於 data/levels-preview-admin.json')
+    Path(f'data/{variant}-preview-verification.json').write_text(json.dumps(checks, indent=2), encoding='utf-8')
+    print(f'獨立合成預覽已建立；帳密只存於 data/{variant}-preview-admin.json')
 
 
 if __name__ == '__main__':

@@ -137,4 +137,10 @@ SQLite batch 重建被參照表時，Alembic 專用連線暫關 FK enforcement�
 
 管理回應新增 competition_level；`summary.competition_level_counts` 只統計正取當次級數，原 `summary.level_counts` 保留正取硬實力快照語意。公開端點 schema 不變，沒有公開參賽名單或當次級數。管理歷史額外回傳 registration_id／姓名註記／queue_sequence／reason／changes；前端顯示每筆調級的前後值及實際 admin／UTC 時間（顯示為台北時間）。讀取失敗清空舊歷史，場次切換取消過期回應。
 
-CompetitionLevels 與原報名名單分區：安排區以當次級數搜尋分區，原名單維持快照篩選及列印。草稿按 registration_id 保存在 CompetitionManager 外層，固定編輯時 base version；篩選、重新讀取及頁內場次切換不覆蓋草稿。409 停止送出並保留輸入，由管理員核對後明確放棄草稿、重新開啟；其他失敗以原 key 重試。草稿是頁內記憶體狀態，beforeunload 提醒不等於持久化。
+CompetitionLevels 與原報名名單分區：安排區以當次級數搜尋分區，原名單維持快照篩選及列印。LevelCardBoard 提供十個級數區及 sticky 快捷目的區；桌面 Pointer Events 拖曳、手機把手長按 350ms、點選與鍵盤共用移動入口。只有把手設定 touch-action:none，卡片其餘位置維持原生捲動；放下即呼叫既有 PUT，沒有另設批次儲存端點。
+
+useCompetitionLevelMoves 位於 CompetitionManager，按 registration_id 保存凍結的 base row／version、目的級數、當下手填原因與 request_id。同一卡片在途或未解決時鎖定，其他卡片獨立；切場不丟失操作。409 保留輸入，核對後可明確放棄；網路或 5xx 結果不確定時，只能重送完全相同 payload／key。已完成重送回目前 canonical row，可能與要求級數或原 version+1 不同；依版本合併回應並明示差異，不假設新稽核已寫入。儲存成功不重新選場或觸發 loadList，避免 A 的晚回應跳回 A；讀取結果與已取得的較高版本列合併，阻擋舊 GET 覆蓋。撤回是以成功回應的最新 version 送出新反向異動，並使用當下原因；讀到更新版本後舊撤回入口失效。
+
+安排區可顯示未完成目的級數，同時另列已儲存人數；原統計保留快照／當次級數各自語意。原因及操作只有頁內記憶體狀態，beforeunload 提醒不等於持久化。大版本保存、跨版本淨差異配色、標題及當次安排列印另待後續階段，未以快照級數充當上一保存版本。
+
+此介面已封入 r10 working-tree snapshot，更新既有 ngrok 合成預覽的 app／backup；仍共用原 0006 schema，無 migration、重新初始化或資料來源切換。ngrok 容器、精確 origin、trusted peer 與原 data／backups volume 保持；來源以凍結 manifest 識別，不能以起始 HEAD 代替未提交前端。具體版本與換版證據見 deployment／acceptance。

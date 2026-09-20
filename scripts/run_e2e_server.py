@@ -13,9 +13,9 @@ from fucheng.security import hash_password
 
 def main() -> None:
     settings = Settings.from_env()
-    allowed = {f"sqlite:///data/{name}" for name in ("public-e2e.db", "levels-e2e.db")}
+    allowed = {f"sqlite:///data/{name}" for name in ("public-e2e.db", "levels-e2e.db", "level-drag-e2e.db")}
     if settings.database_url not in allowed:
-        raise SystemExit("只允許專用 public-e2e.db 或 levels-e2e.db 執行 E2E")
+        raise SystemExit("只允許專用 public-e2e.db、levels-e2e.db 或 level-drag-e2e.db 執行 E2E")
     admin_password = os.getenv("FUCHENG_E2E_ADMIN_PASSWORD")
     if not admin_password:
         raise SystemExit("缺少動態 E2E 管理員密碼")

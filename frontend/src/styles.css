@@ -363,3 +363,48 @@ button.danger { background: #8c3026; }
   .competition-levels .section-title { flex-wrap: wrap; }
   .level-edit .header-actions { flex-wrap: wrap; }
 }
+/* Compact pointer-driven level lanes; no business change-color semantics yet. */
+.level-session-reason { padding: 1rem; border: 1px solid var(--line); border-radius: 12px; }
+.level-session-reason p { margin-bottom: 0; font-size: .9rem; }
+.level-pending { border: 2px dashed #767b75; padding: 1rem; margin: 1rem 0; border-radius: 12px; background: #fafaf7; }
+.level-pending h3 { margin-top: 0; }
+.level-pending-item { border-top: 1px solid var(--line); padding: .5rem 0 1rem; overflow-wrap: anywhere; }
+.level-pending-item button { margin: .25rem .5rem .25rem 0; }
+.level-drop-shortcuts { position: sticky; top: 0; z-index: 4; background: #fffef9; border: 1px solid #9aaba2; padding: .65rem; border-radius: 10px; box-shadow: 0 3px 9px #24392c12; }
+.level-drop-shortcuts > p { font-size: .85rem; margin: 0 0 .5rem; }
+.level-drop-shortcuts > div { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .35rem; }
+.level-drop-shortcuts button { min-width: 0; padding: .45rem .15rem; min-height: 44px; }
+.level-drop-shortcuts small { display: block; font-size: .75rem; }
+.level-drop-shortcuts button[aria-disabled=true] { cursor: default; }
+.level-card-groups { grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); gap: .75rem; align-items: start; }
+.level-card-groups .competition-level-group { min-width: 0; background: #f5f5f0; }
+.level-card-groups h3 { padding: .7rem; justify-content: space-between; }
+.level-card-groups h3 span { text-align: right; }
+.level-card-groups h3 small { display: block; margin-top: .25rem; color: #5b625c; }
+.level-zone-cards { max-height: 360px; min-height: 120px; padding: .55rem; overflow-y: auto; overscroll-behavior-y: auto; }
+.level-name-card { display: block; background: white; border: 1px solid #b8c0b8; border-radius: 9px; padding: .7rem; margin-bottom: .65rem; box-shadow: 0 2px 2px #1c301c08; }
+.level-name-card:last-child { margin-bottom: 0; }
+.level-name-card .level-card-name { margin-bottom: .6rem; }
+.level-name-card .level-card-name strong { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.level-name-card .level-values { justify-content: space-between; gap: .5rem; }
+.level-name-card .level-values b { font-size: 1.05rem; }
+.level-card-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .65rem; }
+.level-card-actions button { min-height: 44px; padding: .5rem; flex: 1; font-size: .85rem; }
+.level-drag-handle { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.level-drag-handle:active { cursor: grabbing; }
+.level-name-card.has-local-move { border-style: dashed; border-width: 2px; }
+.level-card-state { font-size: .85rem; font-weight: 650; margin: .6rem 0 0; }
+.level-name-card.is-selected { outline: 3px solid #335f54; outline-offset: -3px; }
+.level-empty-drop { text-align: center; font-size: .9rem; color: #63695f; padding: .8rem; }
+.level-drag-announcement { min-height: 1.4em; font-size: .9rem; }
+.level-drag-ghost { position: fixed; z-index: 100; width: 190px; padding: .8rem; background: white; border: 2px solid #335f54; border-radius: 10px; box-shadow: 0 10px 35px #0003; pointer-events: none; overflow-wrap: anywhere; }
+.level-drag-ghost span { display: block; margin-top: .4rem; font-size: .85rem; }
+.level-card-board .drop-target-active { outline: 3px solid #335f54; outline-offset: -3px; background: #e5f1ea; }
+.level-card-board.is-dragging { user-select: none; }
+@media (max-width: 700px) {
+  .level-drop-shortcuts > div { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .level-card-groups { grid-template-columns: 1fr; }
+  .level-zone-cards { max-height: 340px; }
+  .level-card-actions button { width: auto; }
+  .level-pending-item button { width: 100%; margin: .25rem 0; }
+}

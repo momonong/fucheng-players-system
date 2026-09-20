@@ -19,7 +19,7 @@ test('整批八十人匯入後管理名單、級數篩選與列印', async ({ pa
   expect((await page.request.post(url, { headers, data: payload })).status()).toBe(200)
   expect((await page.request.post(url, { headers, data: payload })).status()).toBe(200)
   await page.reload()
-  await page.getByRole('button', { name: new RegExp(name) }).click()
+  await page.locator('.competition-item').filter({ has: page.getByText(name, { exact: true }) }).click()
   await expect(page.locator('.summary-grid')).toContainText('80/80')
   await expect(page.locator('.summary-grid')).toContainText('79/1/0')
   await expect(page.locator('.roster-confirmed tbody tr')).toHaveCount(80)
