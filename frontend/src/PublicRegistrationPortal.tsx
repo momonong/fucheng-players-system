@@ -5,7 +5,7 @@ import type { Diet } from './types'
 type Competition = { id: string; name: string; competition_date: string; registration_deadline: string; notes: string | null; capacity: number; confirmed: number; waitlisted: number; remaining: number }
 type Candidate = { id: string; name: string; distinguishing_note: string | null }
 type Result = { status: string; member_name: string; distinguishing_note: string | null; diet: Diet }
-type Audit = { id: string; action: string; actor_kind: string; actor_name: string; created_at: string }
+type Audit = { id: string; action: string; actor_kind: string; actor_name: string; created_at: string; registration_id: string; member_name: string; distinguishing_note: string | null; queue_sequence: number; reason: string | null; changes: Record<string, {before: unknown; after: unknown}> }
 const diets: Record<Diet, string> = { omnivore: '葷食', vegetarian: '素食', unset: '未設定' }
 const mealOptions = ['omnivore', 'vegetarian'] as const
 const states: Record<string, string> = { confirmed: '正取', waitlisted: '候補', cancelled: '已取消' }
@@ -42,7 +42,7 @@ export function PublicRegistrationPortal() {
         if (match) setSelected(match)
         else setError('這場比賽目前未開放報名，請選擇其他比賽或洽管理員。')
       }
-    }).catch(e => { if (active) setError(e.message) }).finally(() => { if (active) setLoading(false) })
+    }).catch(e => { if (active) { setError(e.message); setLoading(false) } }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [retry, routeId])
   return <>
@@ -143,8 +143,9 @@ function RegistrationForm({ competition: c, csrf }: { competition: Competition; 
 
 export function RegistrationHistory({ competitionId, registrations }: { competitionId: string; registrations: unknown }) {
   const [entries, setEntries] = useState<Audit[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  useEffect(() => { request<Audit[]>(`/api/admin/competitions/${competitionId}/history`).then(setEntries).catch(e => setError(e.message)) }, [competitionId, registrations])
-  const actions: Record<string,string> = { create:'報名', cancel:'取消報名', promote:'確認遞補', diet:'修改餐食' }
-  return <details className="no-print registration-history"><summary>報名操作稽核</summary>{error && <p role="alert">{error}</p>}<ul className="actor-audits">{entries.map(row => <li key={row.id}>{row.actor_kind === 'public' ? '免登入報名' : row.actor_kind === 'admin' ? '管理員' : '系統'}：{row.actor_name}・{actions[row.action] ?? row.action}・{time(row.created_at)}</li>)}</ul></details>
+  useEffect(() => { let active = true; setEntries([]); setLoading(true); setError(''); request<Audit[]>(`/api/admin/competitions/${competitionId}/history`).then(rows => { if (active) { setEntries(rows); setLoading(false) } }).catch(e => { if (active) { setError(e.message); setLoading(false) } }); return () => { active = false } }, [competitionId, registrations])
+  const actions: Record<string,string> = { create:'報名', cancel:'取消報名', promote:'確認遞補', diet:'修改餐食', level:'調整當次級數' }
+  return <details className="no-print registration-history"><summary>報名操作稽核</summary>{loading && <p role="status">載入本場歷史中…</p>}{error && <p role="alert">{error}</p>}<ul className="actor-audits">{entries.map(row => <li key={row.id}><strong>{row.member_name}{row.distinguishing_note && `（${row.distinguishing_note}）`}・順位 {row.queue_sequence}</strong><br />{row.actor_kind === 'public' ? '免登入報名' : row.actor_kind === 'admin' ? '管理員' : '系統'}：{row.actor_name}・{actions[row.action] ?? row.action}・{time(row.created_at)}{row.changes.competition_level && <p>當次級數：{String(row.changes.competition_level.before ?? '未建立')} → {String(row.changes.competition_level.after)} 級</p>}{row.reason && <p>原因：{row.reason}</p>}</li>)}</ul></details>
 }

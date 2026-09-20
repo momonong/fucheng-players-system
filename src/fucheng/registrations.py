@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from .models import (Admin, LoginSession, Member, PublicVisit, Competition,
                      CompetitionRegistration, RegistrationAudit, now_utc)
-from .schemas import AdminCompetition, AdminRegistration, RegistrationMutation, RegistrationDietUpdate
+from .schemas import AdminCompetition, AdminRegistration, RegistrationMutation, RegistrationDietUpdate, RegistrationLevelUpdate
 from .security import token_hash
 
 @dataclass(frozen=True)
@@ -104,6 +104,7 @@ def _competition_response(db: Session, competition: Competition) -> AdminCompeti
             CompetitionRegistration.status,
             CompetitionRegistration.diet,
             CompetitionRegistration.hard_level_snapshot,
+            CompetitionRegistration.competition_level,
             func.count(CompetitionRegistration.id),
         )
         .where(CompetitionRegistration.competition_id == competition.id)
@@ -111,16 +112,19 @@ def _competition_response(db: Session, competition: Competition) -> AdminCompeti
             CompetitionRegistration.status,
             CompetitionRegistration.diet,
             CompetitionRegistration.hard_level_snapshot,
+            CompetitionRegistration.competition_level,
         )
     ).all()
     status_counts = {"confirmed": 0, "waitlisted": 0, "cancelled": 0}
     diet_counts = {"unset": 0, "omnivore": 0, "vegetarian": 0}
     level_counts: dict[int, int] = {}
-    for registration_status, diet, level, count in rows:
+    competition_level_counts: dict[int, int] = {}
+    for registration_status, diet, level, competition_level, count in rows:
         status_counts[registration_status] += count
         if registration_status == "confirmed":
             diet_counts[diet] += count
             level_counts[level] = level_counts.get(level, 0) + count
+            competition_level_counts[competition_level] = competition_level_counts.get(competition_level, 0) + count
     remaining = max(competition.capacity - status_counts["confirmed"], 0)
     return AdminCompetition(
         **_competition_values(competition),
@@ -138,6 +142,7 @@ def _competition_response(db: Session, competition: Competition) -> AdminCompeti
             "pending_promotions": min(remaining, status_counts["waitlisted"]),
             "diet_counts": diet_counts,
             "level_counts": level_counts,
+            "competition_level_counts": competition_level_counts,
         },
     )
 
@@ -152,6 +157,7 @@ def _registration_response(registration: CompetitionRegistration) -> AdminRegist
         status=registration.status,
         diet=registration.diet,
         hard_level_snapshot=registration.hard_level_snapshot,
+        competition_level=registration.competition_level,
         queue_sequence=registration.queue_sequence,
         version=registration.version,
         created_by_username=actor_label(registration, "created_by"),
@@ -220,7 +226,7 @@ def _mutate_registration(
     db: Session,
     auth: tuple[Admin, LoginSession] | PublicVisit,
     registration_id: str,
-    payload: RegistrationMutation | RegistrationDietUpdate,
+    payload: RegistrationMutation | RegistrationDietUpdate | RegistrationLevelUpdate,
     action: str,
 ) -> AdminRegistration:
     admin_id = _begin_immediate(db, auth)
@@ -242,7 +248,7 @@ def _mutate_registration(
     if registration.version != payload.version:
         db.rollback()
         raise HTTPException(status_code=409, detail="此報名已被其他管理員更新，請重新載入")
-    before = {"status": registration.status, "diet": registration.diet}
+    before = {"status": registration.status, "diet": registration.diet, "competition_level": registration.competition_level}
     if action == "cancel":
         if registration.status == "cancelled":
             db.rollback()
@@ -280,6 +286,14 @@ def _mutate_registration(
             raise HTTPException(status_code=409, detail="已取消報名為歷史紀錄，不可修改")
         _require_late_reason(competition, payload.reason)
         registration.diet = payload.diet
+    elif action == "level":
+        if competition.status == "draft" or registration.status != "confirmed":
+            db.rollback()
+            raise HTTPException(409, "只有開放或截止場次的正取可調整當次級數；候補請先遞補，取消紀錄唯讀")
+        if registration.competition_level == payload.competition_level:
+            db.rollback()
+            raise HTTPException(422, "當次級數沒有變更，請選擇不同級數")
+        registration.competition_level = payload.competition_level
     else:
         db.rollback()
         raise RuntimeError("未知報名操作")
@@ -288,7 +302,7 @@ def _mutate_registration(
     registration.updated_by_visit_id = actor.visit_id
     registration.updated_by_kind = actor.kind
     registration.updated_at = now_utc()
-    after = {"status": registration.status, "diet": registration.diet}
+    after = {"status": registration.status, "diet": registration.diet, "competition_level": registration.competition_level}
     changes = _changes(before, after)
     db.add(_registration_audit(
         registration,
@@ -361,6 +375,7 @@ def _create_registration_in_transaction(db, competition, member, payload, actor,
         status="confirmed" if confirmed < competition.capacity and waiting == 0 else "waitlisted",
         diet=payload.diet or member.diet,
         hard_level_snapshot=member.level,
+        competition_level=member.level,
         queue_sequence=competition.next_sequence,
         created_by_admin_id=admin_id,
         updated_by_admin_id=admin_id,
@@ -376,7 +391,8 @@ def _create_registration_in_transaction(db, competition, member, payload, actor,
     db.flush()
     db.add(_registration_audit(
         registration, admin_id, "create",
-        {"status": {"before": None, "after": registration.status}},
+        {"status": {"before": None, "after": registration.status},
+         "competition_level": {"before": None, "after": registration.competition_level}},
         payload.reason, payload.request_id, actor, fingerprint,
     ))
     return registration

@@ -45,6 +45,7 @@ export interface CompetitionSummary {
   pending_promotions: number
   diet_counts: Record<Diet, number>
   level_counts: Record<string, number>
+  competition_level_counts: Record<string, number>
 }
 
 export interface Competition {
@@ -91,6 +92,7 @@ export interface CompetitionRegistration {
   status: RegistrationStatus
   diet: Diet
   hard_level_snapshot: number
+  competition_level: number
   queue_sequence: number
   version: number
   created_by_username: string

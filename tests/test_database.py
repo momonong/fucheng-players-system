@@ -32,7 +32,7 @@ def test_empty_database_migrates_and_fee_tables_have_constraints(tmp_path: Path,
     with sqlite3.connect(database) as db:
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert {"members", "member_audits", "fee_periods", "member_fee_statuses"} <= tables
-        assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0005_competition_deletion"
+        assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0006_competition_level"
         assert {
             "competitions",
             "competition_audits",
@@ -84,4 +84,4 @@ def test_upgrade_from_v1_preserves_members_admins_and_audits(tmp_path: Path, mon
         assert db.execute("SELECT name,level,diet FROM members").fetchall() == [("合成舊會員", 3, "unset")]
         assert db.execute("SELECT action FROM member_audits").fetchall() == [("create",)]
         assert db.execute("SELECT COUNT(*) FROM competitions").fetchone()[0] == 0
-        assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0005_competition_deletion"
+        assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0006_competition_level"

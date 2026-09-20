@@ -1,6 +1,77 @@
 # 驗收證據與限制
 
-最後更新：2026-09-18。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+最後更新：2026-09-20。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+
+## ngrok 公開 HTTPS 合成預覽（2026-09-20，另行授權）
+
+URL `https://30a1-140-116-158-107.ngrok-free.app/`。使用全新 `fucheng-ngrok-preview-20260920` project/data/backups、精確HTTPS origin與ngrok trusted peer，復用r9 image（沒有程式/image變更，也未更新舊交付包）。local-http模式未接Tunnel；既有8032～8035、8448、8450保持運作。只初始化3位合成會員與1個2099年合成場次。
+
+- 正常TLS外部HTTP client驗首頁200、health200、Secure/HttpOnly/SameSite=Lax、登入及登出；Origin403、CSRF403、未登入管理401、偽造forwarding400。原負向測試一度預期代理會清洗偽造header後200，實際安全拒絕400，已更正測試期望，未放寬應用防護或重複seed。來源 `public-api-evidence.json`。
+- app內網錯Host400、不受信peer偽造proxy400；公開HTTP307轉同域HTTPS，`host-peer-evidence.json`。未修改已過78項測試的程式，所以沿用既有全套結果，未為形式重跑。
+- 真實CUA IAB首頁、登入、儲存合成會員辨識註記、登出通過；`iab-evidence.json`、`iab-admin.png`、`iab-member-saved.png`、`iab-logout.txt`。orchestrate首訪經ngrok Visit Site提示後成功，main亦看到合成賽事；沒有TLS警告繞過或skip header。
+- 本次證據、private env/token與合成帳密均位於ignored `data/deployment-ngrok-evidence-20260920/`；總索引`ngrok-final.json`。Token/密碼未輸出、未入套件、未更改原ngrok設定。準確停止與存續条件見部署手冊。工程可訪問性通過，仍不宣稱使用者已接受成果、正式資料部署或球館實機驗收。
+
+## 本機 HTTP 合成預覽（2026-09-20，另行授權）
+
+r9 `data/deployment-release-20260920-r9/` 加入明確 opt-in、獨立 project/volume/cookie 的本機 HTTP 預覽。app `local/fucheng:snapshot-1076c3922cbd1465`，image ID `sha256:387861452a77d4e34c66f9ba6c7e6d30136cd3779076ee4c01b86992afe39858`，source SHA256 `1076c3922cbd1465441071ed2da39be500f41f673a322bf9858fc18e41d74c00`，image archive SHA256 `da919750dee95e164b4e678c05b8d171617fde1eac8aa8d4df6cc1e2f637ba38`。r7/r8原交付保留；8448沿用r7/r8映像未重建，HTTPS工程證據不冒充IAB憑證通過。
+
+- `uv run --locked pytest -q -p no:cacheprovider --basetemp .test-tmp-http-all`：78 passed，2項既有上游warnings。包括HTTP非法設定13組fail-closed、HTTP Host/Origin/CSRF/管理session與cookie名稱、原HTTPS Secure cookie及代理語義回歸。前端未變，build重用已驗成品cache。
+- 新HTTP容器由空白volume初始化，3個合成會員／1個合成場次；禁止復用未標記庫、HTTP restore/import/migrate、HTTPS啟用HTTP標記庫。首次internal-only bridge雖配置port卻不發布host listener，已改獨立普通bridge、雙loopback發布；沒有Tunnel服務，拒forwarding headers。此網路不提供出站隔離，不得宣稱具有此能力。
+- 真正 **CUA Codex IAB** 訪問 `http://localhost:8450/`：首頁、管理登入、儲存會員辨識註記、比賽管理與登出均成功，沒有ignoreHTTPSErrors或略過TLS警告。證據 `data/deployment-http-evidence-20260920/iab-evidence.json` 與 `iab-*.png`／首頁及登出AX紀錄。另由orchestrate自己的IAB核對首頁可用。
+- API共用cookie jar登入HTTP/HTTPS各自合成帳號，雙session共存；HTTP登出後HTTPS仍200，雙向替換token皆401，HTTPS cookie維持Secure、HTTP專用cookie無Secure。證據 `cookie-isolation.json`，此項是API測試context，並非瀏覽器跨站jar實測。
+- 帳密僅本機ignored `data/deployment-http-evidence-20260920/synthetic-admin.json`；停止方式、來源與資源清單見該目錄 `http-final.json` 及部署手冊。保留本機預覽供人檢視，仍待人類接受；沒有公網、正式資料或編隊/循環賽功能授權。
+
+## Windows Docker可搬移套件（本機工程驗證，待階段核對／人工驗收）
+
+正式拓撲為單一app image（React成品＋FastAPI）與SQLite named volume，備份／維護复用app image；Cloudflare named tunnel直連app，nginx只供本機HTTPS測試。沒有啟動公開Tunnel、球館遠端、真實資料遷移或正式上線。
+
+最終套件：`data/deployment-release-20260920-r8/`。app tag `local/fucheng:snapshot-16baa6405474f861`，image ID `sha256:9c9debe226d721af860a96a11de90eb0128f54f9d9965f69c28712773e665d3d`，source manifest SHA256 `16baa6405474f861217fc92668d91bb5ae0b7fa3556154d9e807fcfec51647bb`。離線 `fucheng-images.tar` SHA256 `5d775963ee9aecc9c001cf9328b99cf3317733b8bcc27dd7c63809125d2f6580`。這是含未提交級數與部署變更的working-tree snapshot；HEAD `1ba5c68809866150f9d4e8a5c5e38c393dec2aca`只表示起始提交，不能代表全部image來源。r8只更新雙loopback Compose與手冊，沿用r7相同image、source與archive。r7已按原交付hash還原保留；r1～r6為過程材料，不能交付替代r8。
+
+### 已完成證據
+
+- 人工預覽後續修正：原Compose只綁IPv4，實测IPv6連線拒絕；現僅為https-test加上`[::1]`映射，兩種loopback路徑均200，IP網址仍400、錯誤Origin仍403。只重建nginx測試容器，app image／來源manifest／image archive未變，套件Compose、手冊與SHA256SUMS已刷新。**Codex IAB在本task修正前後均回ERR_CERT_AUTHORITY_INVALID，未進入頁面或登入；不能把main先前ERR_CONNECTION_REFUSED全部歸因於IPv6，也不能把自動Chromium測試當成人工IAB成功。** 自簽憑證例外須由人員處理，未安裝信任、未關閉驗證或放寬Host/Origin。證據`preview-loopback-20260920.json`；此項人工驗收仍未通過。
+- `uv run --locked pytest -q -p no:cacheprovider --basetemp .test-tmp-deploy-all`：**63 passed**，2則既有上游warning；包含4項部署Origin/Host/Secure cookie及Cloudflare/ngrok受信peer/IP語義測試。後續只修改容器runtime／helpers，未重跑未變的應用測試。`npm --prefix frontend audit --audit-level=high`：0 vulnerabilities。Docker多階段build內npm ci/typecheck/build及uv locked依賴安裝成功，不覆寫本機dist。
+- 真實build context export精確比對44個允許檔案；source ZIP與凍結build-context逐檔一致，image內manifest與label一致；裸image沒有DB、Node runtime或會員資料，UID10001。app無host port、唯讀rootfs；實際連線pragma為FK=1、busy_timeout=10000、journal=wal、synchronous=2(FULL)。外部非受信容器偽造Forwarded/XFF/XFP/CF-Connecting-IP均400。
+- 本機HTTPS Chromium桌面1440×1000／手機390×844：登入、Secure/HttpOnly/SameSite cookie、公開首頁／分級／選名報名、管理當次級數3→7且快照仍3、Origin/Host/CSRF拒絕、登出與無水平溢位。最終r7獨立還原庫結果 `data/deployment-evidence-20260919/https-browser-results-8448.json`；截圖 `https-8448-*.png`。屬手機viewport測試，未取代球館實體手機與外網驗收。
+- fresh init／無預設密碼CLI建立管理員／未初始化拒啟動／重複Init拒絕／第二writer与服務中migration拒絕／force-recreate持久化均通過。0005舊程式fixture→0006→舊image＋0005 pre-update備份回退通過；正取／候補／取消快照逐列回填，更新後寫入保留於舊DB。舊image是**HEAD 0005程式與前端＋本輪deployment guard**的合成回退fixture，並非曾正式部署的版本。證據 `drill-upgrade-1789816812824004800.json`、`drill-persistence-1789816762625716400.json`。
+- 新runtime另補受影響恢復測試：migration失敗留下maintenance且拒啟動；損毀／缺失active DB由有效備份還原至新檔、保留故障檔與操作證據；interrupted init獨立volume救援。完整命令及結果見最新 `drill-recovery-*.json`，最終索引見 `deployment-final.json`。一次重跑曾因測試fixture重用舊volume而被guard正確拒絕，修正測試volume唯一名稱後通過，不列為產品成功證據。
+- 備份失敗stderr/backup-health可見、手動checkpoint不受自動retention刪除。**長時短週期測試發現舊版備份留下3760組partial-WAL/SHM，先前僅檢查DB數量不足以證明保留政策。** r7將BackupAPI目的副本轉為DELETE journal，來源live DB仍WAL；Legacy WAL匯入先hash再複製可寫暫存驗證，不用immutable或掛可寫來源；Restore在鎖內驗metadata/hash並回收已匯入備份空白sidecars，完成後來源bytes不變。8次備份後只有2個scheduled DB／metadata、0個partial/importing sidecars；舊累積檔保留盤點，不廣泛刪除。證據 `backup-standalone-retention.json` 與 `deployment-final.json`。
+- 完整可攜包另複製到 `data/deployment-portable-test-20260920-r7/`，**僅用Windows內建PowerShell5.1＋Docker**執行load（逐檔SHA及全部image ID）、Legacy WAL備份Import、新volume Restore（不先Init）、StartTest、Status、ExportBackups；重複匯入、既有匯出目錄、錯誤hash、服務中Migrate均拒絕。腳本補顯式Utility module載入、在body解析套件路徑，以消除PS5.1與PS7差異。精確命令／exit/stdout/stderr：`portable-final-operations.json`。
+- 新版ExportBackups封存持backup.lock，Windows驗tar及解開後每檔hash；匯出的單檔備份再經ImportBackup還原到第二個全新project/volume，所有資料表筆數及內容hash相同：`portable-roundtrip.json`。這是合成、同主機的離機交接流程演練，不聲稱已擁有真實異地備份。
+- Cloudflare image實查2026.9.1，ngrok3.39.8且config check通過；兩者均只在network none執行版本／配置命令，未啟動Tunnel。官方來源與未驗項見部署手冊。
+
+### 保護與交付狀態
+
+主要目錄 `D:\projects\fucheng-players-system`、分支 `feat/competition-level-management`、HEAD未變，無新worktree、未commit/merge/push/registry/正式部署。起始26個級數差異完整保留；原前端與級數業務碼未回復。部署新增Docker/Compose/runtime/PowerShell helpers、封裝與演練腳本、proxy邊界與測試，並更新既有文件；src/app.py僅增加可選部署middleware，config新增對應環境欄位。起始manifest／diff存 `baseline-files.json`／`baseline.patch`；本輪檔案範圍由 `preservation-final.json`及最終索引列明。
+
+原各DB全表hash／筆數、dist-public/dist-delete/dist-levels及帳密檔hash前後一致：`protected-before.json`、`protected-after.json`。原8032～8035及共用selfhost-models／KaChing服務沒有被停止或修改。所有Docker演練只碰fucheng專屬合成project／volume；保留容器、volumes、網路及過程包清單與停止方式見 `deployment-final.json`，沒有prune／down -v或未授權清理。
+
+仍待：orchestrate階段核對與人類接受、球館虛擬化/WSL/Docker/電源/重啟實查、無人登入恢復責任、domain/account及真正named tunnel、外網手機、唯一正式資料來源與搬移授權、真正離機備份保管。以上不阻止本機套件完成，但不能描述為正式上線完成。
+
+## 當次比賽級數與人員管理（2026-09-19）
+
+第一階段工程驗收完成：會員長期級數、報名快照及當次比賽級數獨立；管理員只調正取且原因必填，支援姓名／註記搜尋、當次級數篩選、升冪分區、固定全場與篩選人數、取消歷史與候補分開。沒有編隊、隊長、A/B 分組、抽籤、對戰或公開參賽名單功能。
+
+- 後端原有全套：`uv run --locked pytest -q -p no:cacheprovider --basetemp .test-tmp-levels`，45 passed（24.48 秒）。新增案例及相關 public／migration 最終驗證：`uv run --locked pytest -q tests/test_public_registration.py tests/test_competition_levels.py -p no:cacheprovider --basetemp .test-tmp-level-final`，28 passed（15.98 秒）。兩者部分重疊，共 **59 個不同後端案例有通過證據**；`--collect-only` 確認目前共 59 項，不把它說成一次全套 59 passed。2 項既有上游 deprecation warning 保留，無依賴變更。
+- 新案例驗證管理／公開／批次新列初始化、同會員別場不變、會員與快照不變、重讀歷史含 actor／時間／前後級數／原因；非法級數／多餘欄位／空原因／未登入／缺 CSRF／舊版本拒絕；同級數回 422 且沒有空白調級稽核。相同 key 重送不增版本，跨 actor／payload key 重用拒絕。
+- 故障注入在 registration_audits INSERT 觸發 ABORT，報名當次級數、version、操作者／時間及稽核全部回滾。並行兩筆調級、調級與取消都是一筆成功、一筆 409。已取消列不可修改；重報新列用新會員快照初始化；候補遞補保留原列級數。closed／實際過截止仍允調級，deleted／ended／cancelled／draft 阻擋；刪除還原不重設級數。
+- 最後將刪除／還原案例強化為「先人工調級，再經真正 delete／restore API」確認當次級數及整筆報名保留；只重驗 `tests/test_competition_levels.py -k lifecycle --basetemp .test-tmp-level-lifecycle`，6 passed（3.54 秒），沒有因此重跑其他未變案例。
+- Migration **0006_competition_level**：合成 0002 及 0005 升級、全原表原欄位逐欄保留、候補序、取消紀錄、公開 actor、已刪除狀態皆通過；故意令會員目前級數不同於快照，確認回填來自快照。備份還原、integrity_check／foreign_key_check、Alembic check 及兩個起始版本的故障 DDL／revision rollback 通過。原會員及正式庫未套用。
+- `npm run typecheck` 通過；最終 `npm run build -- --outDir ../frontend/dist-levels` 通過（JS gzip 74.18 kB）。Vite 暫存與 Playwright cache／結果目錄的 sandbox 權限已依授權建置／測試範圍取得，未改套件或覆寫既有成品。
+- E2E 全程使用 **8036／data/levels-e2e.db／frontend/dist-levels**、單 worker、desktop 1440×900 與 mobile 390×844。首次全套 12 passed／2 個既有刪除測試因 role=status 多個元素而失敗；定位縮至 `.toast[role="status"]` 後 `--grep '刪除需確認' --output test-results/levels-deletion` 為 2 passed（6.7 秒）。新增表單聚焦與歷史失敗情境後，受影響的 `--grep '當次級數安排' --output test-results/levels-final` 再次 2 passed（7.8 秒）。共 **14 個不同 E2E 案例通過**，不稱首次全套全綠。
+- 新安排瀏覽器案例包含保存重開、分區與搜尋統計、實際另一筆 API 競寫造成 409（不是只 mock 409）、保留輸入及原 version、切換場次再返回保留草稿、503 模擬故障後以原 key 重試、歷史前後值、讀錯場歷史防護，以及手機無水平溢位。503 為前端失敗情境，資料庫交易故障由後端 trigger 測試驗證。桌面／手機截圖已目視檢查：`frontend/test-results/levels-final/competition-levels-*/levels-failed-input.png` 及 `levels-saved.png`。
+
+### 可操作合成預覽與原環境保護
+
+[8035 比賽管理](http://127.0.0.1:8035/admin/competitions) 使用全新合成 `data/levels-preview.db`，83 位合成會員、3 場比賽、共 85 筆報名。其中主場 80 正取／2 候補／1 取消；另一場用相同會員驗證級數獨立。沒有複製真實資料庫。初始 Backup API 備份 `backups/levels-preview-initial.db`、還原 `data/levels-preview-restore-check.db`，檢查報告 `data/levels-preview-verification.json` 的來源／還原皆 integrity=ok、FK errors=0、0006。
+
+在這個 80 人預覽另外啟動真實 Chromium 檢查 desktop 1440×900／mobile 390×844：全場正取 80、3 級篩選 9、無水平溢位、調級表單可聚焦及輸入；未送出新的報名／調級修改。結果 `data/levels-preview-browser-verification.json`，兩平台 overview／group／form PNG 在 `data/levels-preview-*-*.png`，均已目視檢查。這是模擬手機 viewport，未取代球館實機驗收。
+
+實際 8035 listener PID **20008**，啟動父程序 **53140**；分別保存在 levels-preview.pid／levels-preview-launcher.pid。帳密只存 `data/levels-preview-admin.json`，未輸出。啟停及重建防覆寫行為見 README。8036 測試服務已退出，8035 依預覽交付保留。
+
+受保護的 8032／8033／8034 listener PID 仍為 59376／35904／59116。運作中兩份預覽 DB 主檔直接 hash 被 Windows 檔鎖阻止，改用 read-only SQLite 各表完整列指紋前後比對：club-preview.db（0004）與 club-delete-preview.db（0005）全表一致，證據 `data/levels-protected-db-before.json`／`after.json`。原 fucheng.db／competition-case.db 與 dist-public／dist-delete 成品共 8 檔 SHA-256 一致，證據 `data/levels-protected-before.json`／`after.json`。沒有停止既有服務或升級其庫。
+
+交付位於主要目錄 `D:\projects\fucheng-players-system`，分支 `feat/competition-level-management`，起點／HEAD 仍為 `1ba5c68809866150f9d4e8a5c5e38c393dec2aca`，所有本階段變更未提交；未建立 worktree、未 commit／merge／push／deploy。正式資料遷移、Linux／HTTPS／球館實機，以及第二階段人工編隊與隊長管理均未執行。
 
 ## 9/20 已確認 80 人名單匯入（2026-09-18）
 

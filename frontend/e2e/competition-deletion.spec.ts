@@ -53,7 +53,7 @@ test('刪除需確認、可取消，名單保留並能還原', async ({ page }, 
   await page.getByRole('button', { name: '還原比賽', exact: true }).click()
   await expect(page.getByRole('dialog')).toContainText('重新開放報名')
   await page.getByRole('button', { name: '確認還原', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText('比賽已還原')
+  await expect(page.locator('.toast[role="status"]')).toContainText('比賽已還原')
   await page.getByRole('button', { name: '目前比賽', exact: true }).click()
   await page.getByRole('button', { name: new RegExp(name) }).click()
   await expect(page.getByLabel('名稱', { exact: true })).toBeEnabled()

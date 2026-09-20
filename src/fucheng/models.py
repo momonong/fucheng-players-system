@@ -209,6 +209,7 @@ class CompetitionRegistration(Base):
             name="ck_competition_registrations_level",
         ),
         CheckConstraint("queue_sequence >= 1", name="ck_competition_registrations_sequence"),
+        CheckConstraint("competition_level BETWEEN 1 AND 10", name="ck_registration_competition_level"),
         UniqueConstraint("competition_id", "queue_sequence", name="uq_registration_sequence"),
         Index(
             "uq_active_registration_member",
@@ -226,6 +227,7 @@ class CompetitionRegistration(Base):
     status: Mapped[str] = mapped_column(String(20), index=True)
     diet: Mapped[str] = mapped_column(String(20))
     hard_level_snapshot: Mapped[int] = mapped_column(Integer, index=True)
+    competition_level: Mapped[int] = mapped_column(Integer)
     queue_sequence: Mapped[int] = mapped_column(Integer)
     version: Mapped[int] = mapped_column(Integer, default=1)
     created_by_admin_id: Mapped[str | None] = mapped_column(

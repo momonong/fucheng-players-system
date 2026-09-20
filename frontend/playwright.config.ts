@@ -21,7 +21,7 @@ export default defineConfig({
     url: `http://127.0.0.1:${e2ePort}/api/health`,
     reuseExistingServer: false,
     env: {
-      FUCHENG_DATABASE_URL: 'sqlite:///data/public-e2e.db',
+      FUCHENG_DATABASE_URL: process.env.FUCHENG_E2E_DATABASE_URL ?? 'sqlite:///data/public-e2e.db',
       FUCHENG_COOKIE_SECURE: 'false',
       FUCHENG_E2E_PORT: e2ePort,
       FUCHENG_E2E_ADMIN_PASSWORD: e2ePassword,

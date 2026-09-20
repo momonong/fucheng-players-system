@@ -1,0 +1,11 @@
+version: 3
+agent:
+  authtoken: REPLACE_LOCALLY_IN_SECRET_FILE
+  web_addr: false
+  remote_management: false
+  update_check: false
+endpoints:
+  - name: fucheng
+    url: https://REPLACE_WITH_ASSIGNED_DOMAIN
+    upstream:
+      url: http://app:8000

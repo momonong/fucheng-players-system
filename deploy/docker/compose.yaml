@@ -1,0 +1,108 @@
+name: ${COMPOSE_PROJECT_NAME:-fucheng}
+x-app: &app
+  image: ${FUCHENG_IMAGE:?Set FUCHENG_IMAGE from the release manifest}
+  pull_policy: never
+  platform: linux/amd64
+  user: "10001:10001"
+  read_only: true
+  tmpfs: ["/tmp:size=16m,mode=1777"]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  environment:
+    FUCHENG_PUBLIC_ORIGIN: ${FUCHENG_PUBLIC_ORIGIN:?Set HTTPS origin without trailing slash}
+    FUCHENG_COOKIE_SECURE: "true"
+    FUCHENG_TRUSTED_PROXY: ${FUCHENG_PROXY_IP:-172.30.98.3}
+    FUCHENG_PROXY_KIND: ${FUCHENG_PROXY_KIND:-cloudflare}
+    FUCHENG_BACKUP_INTERVAL: ${FUCHENG_BACKUP_INTERVAL:-86400}
+    FUCHENG_BACKUP_KEEP: ${FUCHENG_BACKUP_KEEP:-14}
+  volumes:
+    - data:/data
+    - backups:/backups
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "3"}
+services:
+  app:
+    <<: *app
+    command: [serve]
+    restart: unless-stopped
+    stop_grace_period: 45s
+    networks:
+      origin: {ipv4_address: "${FUCHENG_APP_IP:-172.30.98.2}"}
+  backup:
+    <<: *app
+    command: [backup-loop]
+    restart: unless-stopped
+    network_mode: none
+    depends_on:
+      app: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, /app/runtime.py, backup-health]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 2
+  ops:
+    <<: *app
+    profiles: [ops]
+    restart: "no"
+    network_mode: none
+    healthcheck: {disable: true}
+  cloudflared:
+    image: cloudflare/cloudflared@sha256:b269e8abd07a5bf6f3f4be65d5050b2174eca89c56a0241a8ff32a16aec454e4
+    pull_policy: never
+    platform: linux/amd64
+    profiles: [cloudflare]
+    command: [tunnel, --no-autoupdate, run, --token-file, /run/secrets/cloudflare_token]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    secrets: [cloudflare_token]
+    networks:
+      origin: {ipv4_address: "${FUCHENG_PROXY_IP:-172.30.98.3}"}
+      egress: {}
+    depends_on:
+      app: {condition: service_healthy}
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  https-test:
+    image: nginx@sha256:ef8676b33d681f272ba429b27658bdd7e640963279714c96bddf1dc76307f7b6
+    pull_policy: never
+    platform: linux/amd64
+    profiles: [https-test]
+    user: "10001:10001"
+    entrypoint: [nginx]
+    command: [-c, /etc/nginx/fucheng.conf, -g, "daemon off;"]
+    restart: "no"
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - "127.0.0.1:${FUCHENG_HTTPS_PORT:-8447}:8443"
+      - "[::1]:${FUCHENG_HTTPS_PORT:-8447}:8443"
+    volumes:
+      - ./nginx-test.conf:/etc/nginx/fucheng.conf:ro
+      - ${FUCHENG_TEST_CERT_DIR:-./secrets/test-tls}:/certs:ro
+    networks:
+      origin: {ipv4_address: "${FUCHENG_PROXY_IP:-172.30.98.3}"}
+      egress: {}
+    depends_on:
+      app: {condition: service_healthy}
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+volumes:
+  data:
+  backups:
+networks:
+  origin:
+    internal: true
+    ipam:
+      config: [{subnet: "${FUCHENG_SUBNET:-172.30.98.0/24}"}]
+  egress:
+secrets:
+  cloudflare_token:
+    file: ${FUCHENG_CLOUDFLARE_TOKEN_FILE:-./secrets/cloudflare-token.txt}

@@ -1,0 +1,26 @@
+services:
+  ngrok:
+    image: ngrok/ngrok@sha256:14d80d083e5b53145f416bbbd36238336c9de4016c43fd950eb2eb845670583b
+    pull_policy: never
+    platform: linux/amd64
+    profiles: [ngrok]
+    command: [start, fucheng, --config, /run/secrets/ngrok.yml]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    secrets:
+      - source: ngrok_config
+        target: ngrok.yml
+    networks:
+      origin: {ipv4_address: "${FUCHENG_PROXY_IP:-172.30.98.3}"}
+      egress: {}
+    depends_on:
+      app: {condition: service_healthy}
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+secrets:
+  ngrok_config:
+    file: ${FUCHENG_NGROK_CONFIG_FILE:-./secrets/ngrok.yml}

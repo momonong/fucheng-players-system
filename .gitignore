@@ -235,3 +235,12 @@ frontend/dist-phase3/
 
 frontend/dist-public/
 frontend/dist-delete/
+frontend/dist-levels/
+
+# Deployment outputs and credentials (never part of source/build context)
+deploy/docker/source-manifest.json
+deploy/docker/release.env
+deploy/docker/local-http.env
+deploy/docker/secrets/
+deploy/docker/*.tar
+deploy/docker/*.zip

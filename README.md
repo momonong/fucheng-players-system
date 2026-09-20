@@ -1,6 +1,8 @@
 # 府城球館會員管理系統
 
-目前提供會員／比賽管理，以及第三階段「免登入選名報名」。使用者選比賽、搜尋並確認自己的名字、選當次葷素就能報名；取消、更正及遞補由管理員處理。沒有會員帳號、密碼或啟用連結。
+部署準備採 **Windows Docker Desktop／WSL2：單一app image＋SQLite named volume**，備份／維護共用image，正式HTTPS主方案為Cloudflare named tunnel。離線包、source manifest、PowerShell工具與現場清單見[部署手冊](docs/deployment.md)。本機容器證據不代表球館實機、公開入口、正式資料或人工驗收已完成；以下開發／預覽命令保留原用途。
+
+目前提供會員／比賽管理、免登入選名報名，以及管理員的當次比賽級數安排。使用者選比賽、搜尋並確認自己的名字、選當次葷素就能報名；取消、更正及遞補由管理員處理。沒有會員帳號、密碼或啟用連結。
 
 這是公告欄手寫報名的線上形式，選名字不代表驗證本人，可能由他人代報；管理端會標記「免登入報名（身分未驗證）」。
 
@@ -175,6 +177,50 @@ Stop-Process -Id (Get-Content data/club-delete-preview.pid)
 
 驗證報告在 `data/club-delete-preview-verification.json`，備份在 `backups/club-delete-preview-migrated.db`。正式資料庫尚未套用，也未部署。現有 8032／8033 舊程式不支援 deleted_at，不可直接與新版共用升級後的可寫資料庫；後續整合需統一版本及資料入口。
 
-### 下一段對話的接手範圍
+## 當次比賽級數與人員安排
 
-建議另開「比賽級數與人員管理介面」。接手目錄 `D:\projects\fucheng-players-system`，從整合後的 `main` 與 AGENTS.md 接手，新實作再建立對應功能分支，先核對 Git、服務、資料庫；目前新版預覽為 8034。以已確認的 9/20、80 人全正取場次理解使用需求，所有自動測試用合成資料。先釐清「會員長期硬實力級數」、「目前報名保存的硬實力快照」與「可調整的當次比賽級數」三者關係，再設計人員搜尋、級數分區／調整與名單管理，避免調整一場比賽就改動會員原級數。分隊、軟分級與自訂表頭的範圍需另外確認，不自動擴大。保留兩場現有比賽及會員資料，不自行提交、合併、推送、部署或停止既有服務。
+從「比賽管理」選擇場次，在「級數與人員安排」搜尋姓名／辨識註記、篩選當次級數。正取依 1～10 級分區，固定全場人數與篩選人數並列；候補與取消另列，不計入正取安排。數字升冪不代表強弱方向。
+
+三種級數各自獨立：會員 `level` 是長期資料；`hard_level_snapshot` 保存報名當下級數；`competition_level` 初始等於該筆快照，只供該場安排。按「調整級數」、選不同級數並填原因後儲存。重開可讀回，下面「報名操作稽核」可查該筆順位、操作者、時間、前後值與原因。原「報名名單」的硬實力快照篩選、全場快照統計及管理列印維持原意，沒有改成當次級數列印。
+
+只允許正取調級；候補待遞補後才能安排，同筆遞補保留當次級數。取消保留舊列及歷史，不能修改；重新報名建立新列及新順位，按新快照初始化，不繼承之前人工安排，需重新確認。報名截止或實際過截止時間仍可有原因調級；草稿、已刪除、已結束、已取消場次唯讀。
+
+儲存失敗保留級數、原因與原始 version；網路重試沿用同一操作識別碼。409 後停止送出，先讀取最新名單核對，再明確放棄本筆草稿、重新開啟調整；不自動替換 version。頁內刷新名單、切換場次不清除草稿；草稿只在當前頁面記憶體，重新整理／離開有未儲存提醒，沒有跨瀏覽器或重開頁面草稿保存。
+
+### 獨立合成預覽（8035）
+
+[當次比賽級數管理](http://127.0.0.1:8035/admin/competitions)：選「合成 80 人級數安排（已截止）」。有 80 正取、2 候補、1 取消，含同名註記與一筆 1 → 3 級示例；另有另一場比賽及唯讀草稿。所有資料由腳本新建，不複製真實資料庫。
+
+資料 `data/levels-preview.db`、成品 `frontend/dist-levels`、revision `0006_competition_level`；帳密只在本機 `data/levels-preview-admin.json`。不與 8032／8033／8034 同步，原預覽與正式資料未升級。
+
+```powershell
+# 僅首次建立；已有檔案會拒絕覆寫
+uv run --locked python scripts/create_level_preview.py
+# 另建前端，不能覆寫既有服務的 dist-public / dist-delete
+Push-Location frontend
+npm run build -- --outDir ../frontend/dist-levels
+Pop-Location
+# 已有 8035 運作時不重複啟動
+$env:FUCHENG_DATABASE_URL='sqlite:///data/levels-preview.db'
+$env:FUCHENG_COOKIE_SECURE='false'
+$env:FUCHENG_STATIC_DIR='frontend/dist-levels'
+uv run --locked uvicorn fucheng.app:app --host 127.0.0.1 --port 8035 --no-access-log
+```
+
+本次背景服務的實際 listener PID 在 `data/levels-preview.pid`，啟動父程序在 `data/levels-preview-launcher.pid`；日誌 `data/levels-preview.stdout.log`、`data/levels-preview.stderr.log`。停止前用 `netstat -ano` 核對 127.0.0.1:8035 的 PID，再用 `Get-Process -Id (Get-Content data/levels-preview.pid)` 核對 Python 程序，才執行 `Stop-Process -Id (Get-Content data/levels-preview.pid)`；之後確認該 port 已釋放及父程序退出。不要使用其他預覽 PID 檔。本階段沒有停止任何既有服務。
+
+專用 E2E（不使用人工預覽庫）：
+
+```powershell
+Push-Location frontend
+$env:FUCHENG_E2E_STATIC_DIR='frontend/dist-levels'
+$env:FUCHENG_E2E_DATABASE_URL='sqlite:///data/levels-e2e.db'
+$env:FUCHENG_E2E_PORT='8036'
+$env:PYTHONUTF8='1'
+npm run test:e2e -- --output test-results/levels
+Pop-Location
+```
+
+備份還原報告 `data/levels-preview-verification.json`；80 人桌面／手機檢查與截圖 `data/levels-preview-browser-verification.json`、`data/levels-preview-*-*.png`。正式資料 migration、Linux／HTTPS、球館實機尚未驗收。
+
+下一階段人工編隊與隊長管理尚未授權啟動；須先確認每隊人數／不等額隊伍處理、隊長是否必須為該隊正取成員，以及取消／重報／改級後既有隊伍安排的處理方式。A/B 分組、抽籤、對戰與列印規則另行確認，本版沒有隊伍或對戰資料表。

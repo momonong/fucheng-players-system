@@ -1,5 +1,6 @@
 """Public registration accepts a selected member, never asserts a verified member identity."""
 import hmac
+import json
 from datetime import timedelta
 from typing import Annotated
 
@@ -7,7 +8,7 @@ from fastapi import Depends, Header, HTTPException, Query, Request, Response
 from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
-from .models import AuthAttempt, Competition, Member, PublicVisit, RegistrationAudit, now_utc
+from .models import AuthAttempt, Competition, CompetitionRegistration, Member, PublicVisit, RegistrationAudit, now_utc
 from .registrations import _competition_response, create_registration_service
 from .schemas import (ActorAuditEntry, CsrfResponse, PublicCandidate, PublicCompetition,
                       PublicRegistrationCreate, PublicRegistrationResult, RegistrationCreate)
@@ -49,10 +50,11 @@ def install_public_routes(app, get_db, current_admin):
     Db = Annotated[Session, Depends(get_db)]
     AdminAuth = Annotated[tuple, Depends(current_admin)]
     settings = app.state.settings
+    visit_cookie = "fucheng_http_preview_visit" if settings.local_http_preview else VISIT_COOKIE
 
     def current_visit(request: Request, db: Db):
         row = db.scalar(select(PublicVisit).where(
-            PublicVisit.token_hash == token_hash(request.cookies.get(VISIT_COOKIE, ''))))
+            PublicVisit.token_hash == token_hash(request.cookies.get(visit_cookie, ''))))
         if not row or row.expires_at <= now_utc():
             raise HTTPException(401, '頁面已逾時，請重新整理後再試')
         return row
@@ -75,7 +77,7 @@ def install_public_routes(app, get_db, current_admin):
         rate_limit(db, request, 'public-session', request.client.host if request.client else 'unknown',
             identity_limit=600, ip_limit=600, global_limit=1800)
         db.execute(text('BEGIN IMMEDIATE'))
-        row = db.scalar(select(PublicVisit).where(PublicVisit.token_hash == token_hash(request.cookies.get(VISIT_COOKIE,''))))
+        row = db.scalar(select(PublicVisit).where(PublicVisit.token_hash == token_hash(request.cookies.get(visit_cookie,''))))
         if not row or row.expires_at <= now_utc():
             # Expired visits referenced by audits are intentionally retained for provenance.
             referenced = select(RegistrationAudit.actor_visit_id).where(RegistrationAudit.actor_visit_id.is_not(None))
@@ -83,7 +85,7 @@ def install_public_routes(app, get_db, current_admin):
             raw, csrf = new_token(), new_token()
             row = PublicVisit(token_hash=token_hash(raw), csrf_token=csrf, expires_at=now_utc()+timedelta(hours=12))
             db.add(row)
-            response.set_cookie(VISIT_COOKIE, raw, max_age=43200, httponly=True,
+            response.set_cookie(visit_cookie, raw, max_age=43200, httponly=True,
                 secure=settings.session_cookie_secure, samesite='lax', path='/')
         db.commit()
         return CsrfResponse(csrf_token=row.csrf_token)
@@ -124,8 +126,13 @@ def install_public_routes(app, get_db, current_admin):
 
     @app.get('/api/admin/competitions/{competition_id}/history', response_model=list[ActorAuditEntry])
     def history(competition_id: str, db: Db, _auth: AdminAuth):
-        rows = db.scalars(select(RegistrationAudit).where(RegistrationAudit.competition_id==competition_id)
-            .order_by(RegistrationAudit.created_at.desc()))
+        rows = db.execute(select(RegistrationAudit, CompetitionRegistration, Member)
+            .join(CompetitionRegistration, RegistrationAudit.registration_id == CompetitionRegistration.id)
+            .join(Member, CompetitionRegistration.member_id == Member.id)
+            .where(RegistrationAudit.competition_id==competition_id)
+            .order_by(RegistrationAudit.created_at.desc(), RegistrationAudit.id))
         return [ActorAuditEntry(id=row.id, action=row.action, actor_kind=row.actor_kind,
             actor_name=row.admin.username if row.admin else '免登入訪客（身分未驗證）' if row.actor_kind=='public' else '系統',
-            created_at=row.created_at) for row in rows]
+            created_at=row.created_at, registration_id=registration.id, member_name=member.name,
+            distinguishing_note=member.distinguishing_note, queue_sequence=registration.queue_sequence,
+            reason=row.reason, changes=json.loads(row.changes_json)) for row, registration, member in rows]

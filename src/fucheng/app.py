@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, or_, select, text, update
@@ -38,6 +38,7 @@ from .schemas import (
     PublicMember,
     RegistrationCreate,
     RegistrationDietUpdate,
+    RegistrationLevelUpdate,
     RegistrationMember,
     RegistrationMutation,
 )
@@ -52,12 +53,16 @@ SESSION_COOKIE = "fucheng_session"
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
+    session_cookie = "fucheng_http_preview_session" if settings.local_http_preview else SESSION_COOKIE
     engine = create_db_engine(settings.database_url)
     session_factory = make_session_factory(engine)
     app = FastAPI(title="府城球館會員管理系統", docs_url=None, redoc_url=None)
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.settings = settings
+    if settings.public_origin:
+        from .proxy import DeploymentBoundary
+        app.add_middleware(DeploymentBoundary, settings=settings)
     from fastapi.exceptions import RequestValidationError
     from fastapi.responses import JSONResponse
 
@@ -88,8 +93,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def current_auth(
         db: Db,
-        fucheng_session: Annotated[str | None, Cookie()] = None,
+        request: Request,
     ) -> tuple[Admin, LoginSession]:
+        fucheng_session = request.cookies.get(session_cookie)
         if not fucheng_session:
             raise HTTPException(status_code=401, detail="請先登入")
         session = db.scalar(
@@ -145,7 +151,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         valid = verify_password(payload.password, admin.password_hash if admin else DUMMY_HASH)
         if not admin or not admin.is_active or not valid:
             raise HTTPException(status_code=401, detail="帳號或密碼錯誤")
-        db.execute(delete(LoginSession).where(LoginSession.token_hash == token_hash(request.cookies.get(SESSION_COOKIE, ""))))
+        db.execute(delete(LoginSession).where(LoginSession.token_hash == token_hash(request.cookies.get(session_cookie, ""))))
         raw_token, csrf_token = new_token(), new_token()
         login_session = LoginSession(
             token_hash=token_hash(raw_token),
@@ -156,7 +162,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         db.add(login_session)
         db.commit()
         response.set_cookie(
-            SESSION_COOKIE,
+            session_cookie,
             raw_token,
             httponly=True,
             secure=settings.session_cookie_secure,
@@ -174,7 +180,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def logout(response: Response, db: Db, auth: CsrfAuth) -> None:
         db.delete(auth[1])
         db.commit()
-        response.delete_cookie(SESSION_COOKIE, path="/")
+        response.delete_cookie(session_cookie, path="/")
 
     @app.get("/api/admin/members", response_model=list[AdminMember])
     def admin_members(db: Db, _auth: Auth) -> list[Member]:
@@ -414,6 +420,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         auth: CsrfAuth,
     ) -> AdminRegistration:
         return _mutate_registration(db, auth, registration_id, payload, "diet")
+
+    @app.put("/api/admin/registrations/{registration_id}/level", response_model=AdminRegistration)
+    def update_registration_level(registration_id: str, payload: RegistrationLevelUpdate, db: Db, auth: CsrfAuth):
+        return _mutate_registration(db, auth, registration_id, payload, "level")
 
     from .public_registration import install_public_routes
     install_public_routes(app, get_db, current_auth)

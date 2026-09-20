@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { RegistrationHistory } from './PublicRegistrationPortal'
+import { CompetitionLevels, type LevelDrafts } from './CompetitionLevels'
 import type {
   Competition,
   CompetitionDetail,
@@ -28,6 +29,7 @@ export function CompetitionManager({ username, onLogout }: { username: string; o
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<CompetitionDetail | null>(null)
   const [creating, setCreating] = useState(false)
+  const [levelDrafts, setLevelDrafts] = useState<LevelDrafts>({})
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
   const [deleted, setDeleted] = useState(false)
@@ -80,6 +82,7 @@ export function CompetitionManager({ username, onLogout }: { username: string; o
         {detail && <>
           <div className="panel competition-delete-actions no-print"><div>{detail.competition.deleted_at ? <p>已於 {taipei(detail.competition.deleted_at)} 刪除，名單保留且暫停所有操作。</p> : <p>不需要的比賽可移到「已刪除」，日後仍可還原。</p>}</div><button className={detail.competition.deleted_at ? 'secondary' : 'danger'} onClick={() => setConfirmation(detail.competition)}>{detail.competition.deleted_at ? '還原比賽' : '刪除比賽'}</button></div>
           <CompetitionEditor competition={detail.competition} onSaved={competition => { setNotice({ kind: 'success', text: '比賽設定已儲存' }); loadList(competition.id) }} />
+          <CompetitionLevels detail={detail} drafts={levelDrafts} setDrafts={setLevelDrafts} reload={() => loadList(detail.competition.id)} />
           <CompetitionRoster detail={detail} reload={() => loadList(detail.competition.id)} notify={setNotice} />
         </>}
         {!creating && !detail && <div className="panel empty">請選擇比賽，或建立一場比賽。</div>}
@@ -187,7 +190,7 @@ function CompetitionRoster({ detail, reload, notify }: {
     await act(`diet-${registration.id}`, () => api.updateRegistrationDiet(registration, diet, reason, crypto.randomUUID()))
   }
 
-  return <section className="panel roster-panel competition-print">
+  return <section id="registration-roster" className="panel roster-panel competition-print">
     <div className="section-title no-print"><div><h2>報名名單</h2><p>摘要固定顯示全場總數，不隨下方篩選改變</p></div><button className="secondary" onClick={() => window.print()}>列印管理名單</button></div>
     <div className="print-only print-title"><h1>{competition.name}</h1><p>{competition.competition_date}・管理用名單</p></div>
     <div className="summary-grid" aria-label="全場總數">

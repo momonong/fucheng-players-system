@@ -2,7 +2,11 @@
 
 ## 系統結構
 
-瀏覽器與 FastAPI 使用同一 origin。React/Vite 只在開發或發布前建置；正式服務由 Uvicorn/FastAPI 提供 `src/fucheng/static` 成品與 `/api`。單一服務使用 SQLite，符合小型球館的可維護性與 2 GB RAM 驗證目標；沒有 Docker、Redis、Celery 或微服務。
+瀏覽器與 FastAPI 使用同一 origin。React/Vite 只在開發或image建置階段使用，正式由單一app runtime image的Uvicorn/FastAPI提供靜態成品與/api。SQLite存獨立Linux named volume；維護／備份復用app image，正式Cloudflare named tunnel直連app。nginx僅本機HTTPS test profile，不是正式依賴；沒有Redis、Celery或額外資料庫服務。Windows Docker Desktop/WSL2現場步驟見docs/deployment.md；本機驗證不代表球館實機與24小時可用性。
+
+容器入口持有writer.lock至服務終止，ops遷移/還原需相同獨占鎖，backup.lock保護備份/retention/export及維護；active.json選DB，maintenance.json讓失敗維護持續拒絕啟動。image schema必須與DB revision一致，start不升級；回退還原新DB並保留原DB/WAL/SHM及operations證據。來源以逐檔snapshot manifest辨識，不把HEAD當未提交內容的完整版本。
+
+部署設定public origin時啟用DeploymentBoundary，Uvicorn --no-proxy-headers：只信任指定socket peer，Cloudflare取CF-Connecting-IP、ngrok取XFF/XFP最後值，Host固定且所有寫入要求同源Origin，再經既有session/CSRF。開發/歷史loopback預覽未設定public origin時維持原行為。
 
 首頁是球館公告與比賽時程入口，公開候選搜尋僅含姓名、辨識註記與選取 ID，不提供級數、預設餐食、原會員編號或報名名單。分級完整名單在 `/members` 免登入公開，`/api/public/members` 僅提供 id／name／distinguishing_note／level。公開與管理 API 使用不同且明確的回應 schema。
 
@@ -122,3 +126,15 @@ SQLite batch 重建被參照表時，Alembic 專用連線暫關 FK enforcement�
 管理列表預設 deleted=false，deleted=true 專供已刪除區；管理詳情可唯讀檢視。公開時程、可報名列表／詳情皆排除已刪除場次。管理更新、單人新增／取消／遞補／餐食及整批匯入均在鎖內阻擋 deleted_at。已完成 idempotency 請求可讀原結果，但不重新寫入。還原恢復原 status，是否接受公開報名仍由截止時間判斷。
 
 前端使用原生 dialog 限制焦點，初始焦點為保留，Escape 可取消；送出時鎖定操作，錯誤保留對話框並提示。已刪除區有明確的唯讀提示與還原確認。
+
+## 當次比賽級數（0006_competition_level）
+
+`competition_registrations.competition_level` 是非空 1～10 級，與 `members.level`、`hard_level_snapshot` 分開。Migration 只從每筆自己的 hard_level_snapshot 回填（包含正取、候補、取消），不從會員目前級數回填，不改舊列的版本、操作者、時間、排序或稽核。先加入 nullable 欄位、回填，再以 batch 建立 NOT NULL／CHECK；沿用 migration 的 BEGIN IMMEDIATE、外鍵檢查及 DDL rollback。不得破壞性 downgrade。
+
+單人管理、公開及批次匯入都由 `_create_registration_in_transaction` 同時初始化快照與當次級數；新報名稽核保存當次級數初值。取消留原列，重報新列用新快照初始化；候補遞補不修改當次級數。Migration 回填屬 schema 初始化，不假造管理員調級稽核。
+
+`PUT /api/admin/registrations/{id}/level` 輸入 version、competition_level、非空 reason、request_id；多餘欄位及非整數級數拒絕。沿用 session／CSRF 與 `_mutate_registration`，在 BEGIN IMMEDIATE 後重驗登入、比賽狀態、正取身分與版本。僅 open／closed 且未刪除場次正取可調整，截止時間不阻擋；同級數回 422，不增 version、不寫空白調級稽核。更新當次級數、報名版本、操作者／時間及 action=level 的 RegistrationAudit 同交易，失敗全回滾。request_id 仍綁 actor／target／payload 指紋；完全相同已完成重送讀目前結果，不重新寫入。
+
+管理回應新增 competition_level；`summary.competition_level_counts` 只統計正取當次級數，原 `summary.level_counts` 保留正取硬實力快照語意。公開端點 schema 不變，沒有公開參賽名單或當次級數。管理歷史額外回傳 registration_id／姓名註記／queue_sequence／reason／changes；前端顯示每筆調級的前後值及實際 admin／UTC 時間（顯示為台北時間）。讀取失敗清空舊歷史，場次切換取消過期回應。
+
+CompetitionLevels 與原報名名單分區：安排區以當次級數搜尋分區，原名單維持快照篩選及列印。草稿按 registration_id 保存在 CompetitionManager 外層，固定編輯時 base version；篩選、重新讀取及頁內場次切換不覆蓋草稿。409 停止送出並保留輸入，由管理員核對後明確放棄草稿、重新開啟；其他失敗以原 key 重試。草稿是頁內記憶體狀態，beforeunload 提醒不等於持久化。

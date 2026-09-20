@@ -1,0 +1,48 @@
+# Standalone opt-in synthetic preview; never combine with deployment Compose files.
+name: ${FUCHENG_HTTP_PROJECT:?Set a unique synthetic preview project}
+x-preview: &preview
+  image: ${FUCHENG_IMAGE:?Set the verified release image}
+  pull_policy: never
+  platform: linux/amd64
+  user: "10001:10001"
+  read_only: true
+  tmpfs: ["/tmp:size=16m,mode=1777"]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  environment:
+    FUCHENG_LOCAL_HTTP_PREVIEW: "true"
+    FUCHENG_PUBLIC_ORIGIN: "http://localhost:${FUCHENG_HTTP_PORT:?Set an unused loopback port}"
+    FUCHENG_COOKIE_SECURE: "false"
+    FUCHENG_PROXY_KIND: local
+    FUCHENG_TRUSTED_PROXY: ""
+  volumes:
+    - synthetic_data:/data
+    - synthetic_backups:/backups
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "3"}
+services:
+  app:
+    <<: *preview
+    profiles: [local-http]
+    command: [serve]
+    restart: "no"
+    stop_grace_period: 45s
+    ports:
+      - "127.0.0.1:${FUCHENG_HTTP_PORT}:8000"
+      - "[::1]:${FUCHENG_HTTP_PORT}:8000"
+    networks: [local_preview]
+  ops:
+    <<: *preview
+    profiles: [local-http]
+    restart: "no"
+    network_mode: none
+    healthcheck: {disable: true}
+volumes:
+  synthetic_data:
+  synthetic_backups:
+networks:
+  local_preview:
+    # Docker Desktop does not publish host ports on an internal-only bridge.
+    # This standalone bridge has no Tunnel service; host publishing is loopback only.
+    driver: bridge

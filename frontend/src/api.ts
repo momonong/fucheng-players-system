@@ -127,3 +127,9 @@ export function updateRegistrationDiet(
     method: 'PUT', body: JSON.stringify({ version: registration.version, diet, reason: reason || null, request_id: requestId }),
   })
 }
+
+export function updateRegistrationLevel(registration: CompetitionRegistration, competitionLevel: number, reason: string, requestId: string): Promise<CompetitionRegistration> {
+  return request(`/api/admin/registrations/${registration.id}/level`, {
+    method: 'PUT', body: JSON.stringify({ version: registration.version, competition_level: competitionLevel, reason, request_id: requestId }),
+  })
+}

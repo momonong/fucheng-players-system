@@ -130,6 +130,7 @@ class CompetitionSummary(BaseModel):
     pending_promotions: int
     diet_counts: dict[Diet, int]
     level_counts: dict[int, int]
+    competition_level_counts: dict[int, int]
 
 
 class AdminCompetition(CompetitionInput):
@@ -167,6 +168,19 @@ class RegistrationDietUpdate(RegistrationMutation):
     diet: Diet
 
 
+class RegistrationLevelUpdate(RegistrationMutation):
+    model_config = ConfigDict(extra="forbid")
+    competition_level: int = Field(ge=1, le=10, strict=True)
+    reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def nonblank_reason(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("調整當次級數必須填寫原因")
+        return value.strip()
+
+
 class AdminRegistration(BaseModel):
     id: str
     competition_id: str
@@ -176,6 +190,7 @@ class AdminRegistration(BaseModel):
     status: RegistrationStatus
     diet: Diet
     hard_level_snapshot: int
+    competition_level: int
     queue_sequence: int
     version: int
     created_by_username: str
@@ -234,3 +249,9 @@ class ActorAuditEntry(BaseModel):
     actor_kind: Literal["admin", "public", "system"]
     actor_name: str
     created_at: datetime
+    registration_id: str
+    member_name: str
+    distinguishing_note: str | None
+    queue_sequence: int
+    reason: str | None
+    changes: dict[str, dict[str, object]]
