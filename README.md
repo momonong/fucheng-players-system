@@ -8,6 +8,33 @@
 
 ## 快速啟動
 
+### B 精確格位公開合成預覽（2026-09-22）
+
+**目前公開版本：右側變動／版本雙欄與選手單擊選格、雙擊詳情。** [B 管理入口](https://b021-140-116-158-107.ngrok-free.app/admin/competitions) 沿用原帳密及全部安排；release `data/grid-public-runtime/releases/grid-panels-20260922-164146`，57 檔來源摘要 `988a05d8bc620ec8bfe4909ccf88d8a96e460e0fee08c4db6d6d6c82b9c93cc0`。app／launcher **12780／6996**，ngrok **22148** 不變。公開資產、WMI 與唯讀互動檢查通過，換版及 smoke 前後 18 表一致。完整身份見 `data/grid-public-runtime/grid-panels-update.json`；等待人工驗收，未提交／合併／推送。原未知操作未重送或清除；既有頁面若仍待確認，依原請求核對。以下舊網址與 PID 僅為歷史紀錄。
+
+前次灰階／雙區拖曳／歷次級數版：eb24 當時更新至 `grid-interaction-20260921-120352`，app／launcher **45560／41228**，ngrok **57728**。56 檔來源摘要 `c00f5937c00291c58819e2630387d965a0bf3951f0ae9cb1a73c631ae30f83c2`；歷史證據見 `data/grid-public-runtime/grid-interaction-update.json`。
+
+前次 axis 三項功能版發布紀錄：安全刪除布局排／文字欄、明顯的素食開啟狀態、歷史由舊到新且首次開啟定位最新。現用 listener **45612**／launcher **47980**，ngrok **57728** 不變；身份見 `data/grid-public-runtime/grid-axis-update.json`。54 檔來源及 dist-grid-axis 已凍結發布，原 DB、session、未大存安排保留；公開驗證僅查看限制／預覽取消，未實際刪除。下方版本與 PID 為歷次紀錄。
+
+前次 grid-edit 五項表格功能版發布紀錄：邊界插入、文字／級數顯示標題編輯、矩形／手機二點選取、素食柔和標記、完整安排列印。新來源 53 檔身份見 `data/grid-edit-delivery-identity.json`，實際公開交付見 `data/grid-public-runtime/grid-edit-update.json`。B app 已受控更新為 listener **32752**／launcher **36224**，原 ngrok **57728**、網址、DB、admin 與 session 保留；下方舊 PID／身份為前次交付紀錄。重新整理可載入新前端；如原頁有未確定請求，先依原 request_id 確認結果，不重建操作。此版本仍未 commit／merge／push，等待人工驗收。
+
+2026-09-21 拖曳修正已更新至同一 eb24 入口，重新整理即可載入。此次只切換前端 static，保留既有登入、未完整保存的安排與 app／ngrok 程序；當時前端身份見 `data/grid-public-runtime/frontend-drag-update.json`，原 `identity.json` 保留為凍結來源及初次部署紀錄。
+
+歷史入口（eb24，已停用；現行請使用上方 b021），當時選「合成 80 人級數安排（已截止）」。沿用使用者指定的現用 admin 帳密，僅保存在 B 的 `data/grid-public-runtime/admin.json`，不在文件或 Git 公開。上方甲／乙／丙合併表頭、左側隊名與 80 人安排均可查看；「公開 B 格位驗收」版本保留指定格位拖曳結果，仍待使用者人工驗收。
+
+B 工作目錄為 `D:\projects\fucheng-players-system-worktrees\arrangement-grid`，分支 `feat/competition-arrangement-grid`，起點 `89cae09754eaefa4dba6c3dce308482526f33ff2` 加未提交 B。公開服務使用獨立 `.venv`、凍結的 `data/grid-public-runtime/source/src`／`static`、新合成副本 `data/grid-public-preview.db`（0008），綁定 `127.0.0.1:8044`。50 個來源檔及 3 個成品檔身份見 runtime 的 `identity.json`；未提交成果不能僅用 HEAD 辨識。
+
+本次 app listener **44424**／launcher **63012**／ngrok **57728**。在 B 工作目錄執行下列腳本，先核對 PID 建立時間、命令列、B 專用 config 及 8044 歸屬；目前只執行過 CheckOnly，服務仍保留供驗收。
+
+```powershell
+powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1 -CheckOnly
+powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1
+```
+
+此公開合成入口未 commit／merge／push，沒有 B Docker image、正式資料遷移或實機觸控驗收。A 的 f9d0／8041、B 原人工預覽 8042、既有帳密及 session 保留；兩個 ngrok agent 已並行運作。詳細證據、啟停與限制見[部署手冊](docs/deployment.md#b-0008-公開合成預覽2026-09-21)及[驗收紀錄](docs/acceptance.md#b-公開入口增量驗收2026-09-21)。
+
+### A 公開合成預覽（保留）
+
 目前另有[新版安排公開合成預覽](https://f9d0-140-116-158-107.ngrok-free.app/admin/competitions)（2026-09-20）。首次訪問可能出現ngrok的Visit Site提示。管理員帳密只存本機 `data/arrangement-native-preview-admin.json`；選「合成 80 人級數安排（已截止）」。全新合成資料為83會員、3場、85報名，主場80正取；已保留兩個保存版供查看，人工驗收仍待使用者確認。
 
 此為官方Windows ngrok＋原生FastAPI臨時入口，僅綁 `127.0.0.1:8041`；資料為 `data/arrangement-native-preview.db`（0007），成品為 `data/arrangement-native-runtime/static`，逐檔hash複製自已驗證的 `frontend/dist-arrangement`。沒有新Docker image。48個來源與3個成品檔身份見同runtime目錄 `identity.json`，未提交版本不能只用HEAD辨識。
@@ -196,7 +223,7 @@ Stop-Process -Id (Get-Content data/club-delete-preview.pid)
 
 「比賽管理」預設進入排級數：1～10 級橫向欄、緊湊姓名格，只呈現正取安排。比賽設定、刪除、報名名單與逐次操作稽核在「報名與設定」入口。右上搜尋圖示展開姓名／辨識註記篩選；右側歷史按需開啟。原圖僅參考格線布局，沒有匯入圖中姓名；欄位維持 1～10 級。
 
-滑鼠拖動姓名，手機長按小把手約 350ms 再拖曳；把手外可正常水平捲動，拖到表格邊缘會自動捲至遠欄。點姓名可查看資料並選目的級數，支援 Tab／Enter；Escape 或 touchCancel 取消未送出的拖曳。姓名格不常駐完整資訊或多顆動作鈕，長姓名可點開查看。
+滑鼠拖動姓名，手機長按小把手約 350ms 再拖曳；把手外可正常水平捲動，拖到表格邊缘會自動捲至遠欄。單擊姓名選格、雙擊／連點兩下查看資料並選目的級數，支援 Tab／Enter 查看、Space 選格；Escape 或 touchCancel 取消未送出的拖曳。姓名格不常駐完整資訊或多顆動作鈕，長姓名可雙擊開啟查看。
 
 每次放下立即自動儲存，**不用填原因／備註**。只取消調級的原因必填，其他報名管理規則不變。逐次稽核保留真正帳號、時間、前後值；沒有填的原因留空。會員 `level`、報名快照 `hard_level_snapshot`、當次 `competition_level` 各自獨立。候補／取消不出現在排級表，但原管理入口保留；取消後重報用新報名 ID 和新快照，候補遞補沿用自己的當次級數。只限未刪除 open／closed 場次正取可調整，其他場次唯讀。
 
@@ -246,3 +273,88 @@ Pop-Location
 初始備份／還原檢查 `data/arrangement-preview-verification.json`；完整證據及手機模擬限制見 `docs/acceptance.md`。舊8037、8448／8450、ngrok與r7～r10包未隨本輪程式更新。正式或舊預覽升級須依 `docs/deployment.md` 停寫、備份與明確migration；不能直接套用新程式到舊schema。
 
 自訂甲乙丙欄頭、當次安排列印、編隊／隊長／循環賽不在本輪範圍。原報名管理列印仍以報名快照為準。
+
+
+## B：精確格位安排表（0008，本機合成驗收）
+
+選手拖到哪一格就保存哪一格，同級換列也會自動儲存。有人格採插入向下讓位，先保留來源空格；必要時延伸資料列。文字／合併區保留，讓位選手跳過這些格子，不壓縮其他空格。未指定格位的點選／鍵盤移動放到目標級數欄最後已有內容之後。會員長期級數和報名 hard snapshot 不受影響。
+
+數字級數標頭上方可新增文字標題列，選空白格後編輯「甲組」等文字、選範圍合併；左方插文字欄可放與選手同列的隊名。這些都是布局文字，不建立隊伍或對戰。表格實際邊界提供＋與插入線預覽，選取後才浮現文字／合併操作；浮動操作不推動表格。插行列保留原穩定ID，現有選手分組不會因顯示列號改變而變動。最多500列／50欄，文字每格500字，沒有公式或Office匯入。
+
+合併只允許文字／空白，範圍有選手、多段非空文字、既有合併或跨越數字級數標頭時明確拒絕。底格文字位置不刪除，解除即恢復；合併格可直接改字，保留原非空文字來源格；原區全空白才用左上格。
+
+單擊姓名選取儲存格；雙擊／連點兩下查看本場餐食、當次與長期級數。素食按鈕以本場報名餐食計數並加柔和強調及不遮住姓名的「素」標記，不影響橙色異動。搜尋只顯示匹配姓名，非匹配選手顯示「已占用」但保留格位；拖入這些格仍按真正占用插入，不會覆蓋選手。
+
+橙色表示自最新保存版以來的格位或級數異動，移回原格／原級即清色；文字、行列、合併差異另外記錄，完整保存後建立新基準。每次小存／大存在途、結果未知或成功待讀回時，該場暫停布局修改，仍可切場。未知重送原請求，409先重讀核對；文字草稿與大存名稱／顯示編輯者／備註會保留於本次頁面工作區。頁面重載不保留未確認的記憶體草稿，離頁會提示。
+
+0007 舊歷史沒有座標，明示「未記錄儲存格位置」，僅按級數／順位檢視；未保存餐食／長期級數為未知。啟用B時以合法POST記錄當下位置基準，不補造舊歷史，也不清除A尚未大存的級數差。首次B完整保存後，位置與級數皆對新完整版比較。歷史唯讀，返回目前安排不還原、不寫入。
+
+[本機8042預覽](http://127.0.0.1:8042/admin/competitions)：獨立 worktree `D:\projects\fucheng-players-system-worktrees\arrangement-grid`、新 `data/grid-preview.db`、`dist-grid`，83位合成會員／3場／85報名，主場80人含上方甲乙丙與左側合成隊名示例。帳密僅ignored `data/grid-preview-admin.json`。沒有讀取A密碼或真會員資料。此入口尚非B公開交付。
+
+```powershell
+# 只在B隔離worktree執行；不要覆寫正在8042使用的成品。
+uv sync --locked
+npm --prefix frontend ci
+npm --prefix frontend run build -- --outDir ../dist-grid
+uv run --locked python scripts/create_level_preview.py --variant grid
+$env:FUCHENG_DATABASE_URL='sqlite:///data/grid-preview.db'
+$env:FUCHENG_STATIC_DIR='dist-grid'
+$env:FUCHENG_COOKIE_SECURE='false'
+uv run --locked uvicorn fucheng.app:app --host 127.0.0.1 --port 8042 --no-access-log
+```
+
+建立脚本拒絕覆寫DB／帳密／備份／還原檔。背景PID與日誌在 `data/grid-preview{,-launcher}.pid` 及 `.stdout.log`／`.stderr.log`。停止須先比對 netstat 的127.0.0.1:8042 listener及Python身分，僅停止該預覽，不能套用舊服務PID。
+
+E2E 使用 `FUCHENG_E2E_DATABASE_URL=sqlite:///data/grid-e2e.db`、`FUCHENG_E2E_PORT=8043`、`FUCHENG_E2E_STATIC_DIR=dist-grid`、`PYTHONUTF8=1`，執行 `npm --prefix frontend run test:e2e`。桌面／手機用獨立合成帳號避免測試自身觸發登入限流，沒有放寬正式驗證。證據見 `docs/acceptance.md`。升級／回退見 `docs/deployment.md`。
+
+
+### B拖曳互動修正成品
+
+拖曳中顯示與來源相近尺寸的姓名／註記浮動卡，來源保留格位並降至25%透明；放下或取消不開資訊卡，下一次正常點擊／輕觸／鍵盤仍可查看。此增量的獨立待交付成品為 `dist-grid-drag`，身份 `data/grid-drag-delivery-identity.json`；沒有覆寫原 `dist-grid` 或現用公開static。後續凍結換版由維運task依該身份核對，E2E仍使用專用8043/grid-e2e.db，實際證據見驗收文件。
+
+
+### B 表格編輯與當次安排列印（新授權增量）
+
+此節覆蓋前述 A 階段「自訂表頭／當次安排列印不在範圍」的排除。滑鼠在格邊、空白或文字按住框選；姓名與把手繼續移選手。雙擊文字／合併格／欄標題可直接編輯，Enter送出、Escape取消；手機點選格後用「編輯文字」，點欄標題可改名，「範圍選取」再點另一角可選矩形，普通滑動仍為捲動。邊界＋新增／＋標題顯示實際插入位置，鍵盤可聚焦相同按鈕。級數標題是顯示名稱，底層1–10及會員／報名級數不變。
+
+「列印安排」印目前正在檢視的安排或不可變歷史版，保留文字、合併、精確格位與全部姓名，不受搜尋或素食開關影響；已知素食一律印黑白可辨「素」。單幅A4橫向保持原表格，不新增列號／技术座標；寬表每幅最多12欄、長表每段18個資料列，分幅才提供續接資訊，跨幅合併文字標示續接。列印不替使用者保存完整安排，關閉或取消列印後清理暫存畫面。舊版缺餐食仍未知，缺格位則清楚說明僅依級數與順位呈現。瀏覽器縮放、紙張、超長內容與實體列印需使用者在列印預覽核對，沒有宣稱任意大小表格都能塞單頁。
+
+此增量為未提交 B snapshot，獨立成品 `dist-grid-edit`，測試DB `data/grid-edit-e2e.db`／8043，身份 `data/grid-edit-delivery-identity.json`。未更新8042或公開eb24；後續由task5序列凍結與受控換版，必要後端更新但無DB migration。舊backend不支援column_title，且response會遺漏title，不可當作新資料的無損回退版本。證據及界限見驗收／部署文件。
+
+
+### B 三項顯示與刪除增量（2026-09-21，本機完成待受控換版）
+
+行／自訂文字欄邊界的「⋯」可刪除指定整排或文字直欄，顯示範圍預覽；含文字先列出將刪除與保留內容，再明確確認。含選手的排必須先移走選手，固定1–10級欄及最後一排資料格不可刪。合併區保留合法剩餘範圍及唯一文字；不能無歧義保留時阻擋。刪除沿用token、同交易稽核及原樣重試，其他選手格位與version不動。
+
+素食按鈕開啟時為深綠底白字、關閉時白底深綠字，保留人數及aria-pressed；不篩人、不寫入，列印仍獨立標「素」。保存紀錄由起始基準至最新排序，首次打開捲到最新；看舊版、一般重讀不搶捲動，新大存回到最新。
+
+本輪成品 `dist-grid-axis`、合成DB `data/grid-axis-e2e.db`／8043、身份 `data/grid-axis-delivery-identity.json`。尚未更新公開eb24；現用grid-edit版與後續使用者資料保留，task5再受控凍結換版。需要同批前後端更新，schema0008及依賴不變。拖曳仍採插入／下移，本段為axis版歷史紀錄；後續中央交換已獲授權，見下節。
+
+
+### B 灰階、雙區拖曳與歷次級數（2026-09-21，已公開換版待人工驗收）
+
+- 姓名卡中央顯示交換對象；上下邊界顯示插入線及上／下方提示；空格直接移動。來源留洞，中央交換只影響兩人；放手採用當下已顯示的意圖。手機長按把手同樣操作，普通姓名輕觸仍開詳情。
+- 精簡＋在桌面邊界hover／鍵盤focus出現；邊緣可點選或右鍵，高亮整排／欄並開啟底色與刪除。手機可點窄邊緣直接操作，＋仍可直接插入；沒有常駐「＋新增」文字或標題鉛筆。雙擊文字／標題編輯，手機點標題或選格後「編輯文字」。
+- 行／表頭及自訂文字欄有無底色、3階淺灰；交叉取較深色，合併格取整個涵蓋範圍最深色。底色跟隨完整保存、歷史及列印；黑字、素食徽記與橘色異動邊框並存。
+- 單人詳情以「歷次比賽級數」顯示最近5場已結束比賽，無資料／查詢失敗分別提示。歷史快照的餐食／級數不變，參考區加註「以下為目前查詢結果」。移到級數是緊湊的次要操作，仍放欄底。
+
+成品 `dist-grid-interaction`、合成驗證 `data/grid-interaction-e2e.db`／8043，交付身份 `data/grid-interaction-delivery-identity.json`。已由 task5 更新同一 eb24，公開新前後端身份見頁首。無migration／依賴變更；新operation及shade同批更新，舊app不可視為無損回退。Windows／Chromium桌面與觸控模擬、PDF證據見 `docs/acceptance.md`；未驗證其他OS、實體手機或印表機。
+
+
+### 選格工具與本次編輯復原
+
+安排表上方提供復原、選取儲存格底色、文字編輯、合併與解除合併；窄螢幕可換行，選取不新增浮動列。灰色色票只顯示顏色，斜線圖形清除局部底色並恢復既有排／欄色。桌面可在選區右鍵，手機由上方工具操作；直接輕點姓名選取該格，詳情不再提供重複選格入口。局部色屬於格位，移動選手後仍留原格；橘底標示尚未大保存的位置／級數異動，大保存後露出格位底色，素食綠標另行保留。
+
+「復原」或 Ctrl+Z（Mac Command+Z）逐步復原本次頁面編輯已確認的安排操作；文字輸入內保留原生復原。復原本身也自動保存與留稽核，不刪保存歷史；他人變更後須重新核對，大保存開始新區段。重新整理不保留復原堆疊，不提供重做或回復歷史版本。
+
+詳情右上叉叉、Esc 或點視窗外面均可關閉。文字編輯 Enter 或點外面會保存退出，Esc 取消本次輸入；中文組字中不提交，失敗保留草稿。已送出的操作不能靠關閉撤銷，未確認時可返回表格核對，原文字仍保留。
+
+
+固定級數表頭現在預設顯示文字：單擊／鍵盤選取後，用上方工具列編輯文字或底色，雙擊才進入直接編輯。表頭色只影響表頭，不改下方資料格或級數身份；表頭與資料格不混選合併。安排請求若 20 秒內未完成，會顯示核對入口；未確認寫入保留原請求，使用「確認操作結果／原樣重試」，不要視為已取消。已有保存收據但讀取未完成時，只需「讀回目前安排」。
+
+
+### 版本雙欄與選手選取
+
+開啟歷史後，寬桌面依序顯示主表格、該版本變動、版本紀錄；寬度不足時保留表格寬度，兩區置於下方，手機先變動後版本。兩區可分別捲動，版本仍由舊到新、首次開啟定位最新，閱讀舊版不搶捲動。
+
+姓名單擊／輕點只選格，不修改安排；雙擊／連點兩下開資訊。Enter 查看、Space 選格；範圍選取時點姓名只延伸選區，不開資訊，包含選手的選區不可合併。滑鼠拖曳姓名與手機長按把手沿用原操作，拖放不開資訊；歷史可選取及查看資訊，但不能修改。

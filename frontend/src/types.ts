@@ -107,6 +107,8 @@ export interface CompetitionDetail {
 }
 
 export interface ArrangementRow {
+  diet: Diet | null
+  member_level: number | null
   registration_id: string
   member_id: string
   member_name: string
@@ -119,11 +121,41 @@ export interface ArrangementVersionSummary {
   id: string; competition_id: string; sequence: number; label: string
   editor_label: string; note: string | null; admin_id: string; actor_name: string; created_at: string
 }
-export interface ArrangementVersion extends ArrangementVersionSummary { rows: ArrangementRow[] }
+export interface ArrangementVersion extends ArrangementVersionSummary { rows: ArrangementRow[]; schema_version: number; layout: GridLayout | null }
 export interface ArrangementState {
+  schema_version: number; layout: GridLayout | null; layout_baseline: GridLayout | null; layout_revision: number; layout_initialized_at: string | null
   editable: boolean; rows: ArrangementRow[]; state_token: string; latest: ArrangementVersion | null; versions: ArrangementVersionSummary[]
 }
 export interface ArrangementSave {
   request_id: string; state_token: string; base_version_id: string
   label: string; editor_label: string; note: string
 }
+
+export type GridPoint = { row_id: string; column_id: string }
+export type GridCell = GridPoint & ({ kind: 'registration'; registration_id: string } | { kind: 'text'; text: string })
+export type GridMerge = { id: string; start: GridPoint; end: GridPoint }
+export interface GridLayout {
+  schema_version: number
+  rows: { id: string; role: 'header' | 'body'; shade?: number }[]
+  columns: { id: string; kind: 'level' | 'text'; level: number | null; title?: string | null; shade?: number; header_shade?:number|null }[]
+  cells: GridCell[]
+  cell_shades?: (GridPoint & { shade: number })[]
+  merges: GridMerge[]
+}
+export type GridOperation = { action: 'move'; registration_id: string; target: GridPoint }
+  | { action: 'undo'; target_request_id: string }
+  | { action: 'swap'; registration_id: string; target_registration_id: string }
+  | { action: 'insert'; registration_id: string; target: GridPoint; side: 'before' | 'after' }
+  | { action: 'move_empty'; registration_id: string; target: GridPoint }
+  | { action: 'shade_header'; column_id:string; shade:number }
+  | { action: 'shade_cells'; start: GridPoint; end: GridPoint; shade: number }
+  | { action: 'shade_row' | 'shade_column'; axis_id: string; shade: number }
+  | { action: 'move_bottom'; registration_id: string; level: number }
+  | { action: 'insert_row' | 'insert_column' | 'insert_header'; before_id: string | null }
+  | { action: 'delete_row' | 'delete_column'; axis_id: string; confirmed_text: boolean }
+  | { action: 'text'; target: GridPoint; text: string }
+  | { action: 'column_title'; column_id: string; text: string }
+  | { action: 'merge'; start: GridPoint; end: GridPoint }
+  | { action: 'unmerge'; merge_id: string }
+export type GridRequest = { request_id: string; state_token: string; operation: GridOperation }
+export type GridReceipt = { state_token?: string | null; undo_head?: string | null; request_id: string; competition_id: string; revision: number; operation: GridOperation; layout: GridLayout }

@@ -186,6 +186,7 @@ class ArrangementVersion(Base):
     actor_name: Mapped[str] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
     rows_json: Mapped[str] = mapped_column(Text)
+    layout_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     request_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
@@ -295,3 +296,24 @@ class AuthAttempt(Base):
     key_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     count: Mapped[int] = mapped_column(Integer)
     window_start: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
+
+
+class ArrangementWorkspace(Base):
+    __tablename__ = "arrangement_workspaces"
+    competition_id: Mapped[str] = mapped_column(ForeignKey("competitions.id", ondelete="RESTRICT"), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    layout_json: Mapped[str] = mapped_column(Text)
+    initial_layout_json: Mapped[str] = mapped_column(Text)
+    initialized_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"))
+    __table_args__ = (CheckConstraint("revision >= 1", name="ck_arrangement_revision"),)
+
+
+class ArrangementOperation(Base):
+    __tablename__ = "arrangement_operations"
+    request_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    competition_id: Mapped[str] = mapped_column(ForeignKey("competitions.id", ondelete="RESTRICT"), index=True)
+    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"))
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    receipt_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)

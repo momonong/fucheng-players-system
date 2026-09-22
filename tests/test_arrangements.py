@@ -228,7 +228,7 @@ def test_get_is_consistent_during_concurrent_write(app, client, auth, monkeypatc
         # After read snapshot begins, a different connection commits a level update.
         with sqlite3.connect(app.state.engine.url.database) as writer:
             writer.execute('UPDATE competition_registrations SET competition_level=8,version=version+1 WHERE id=?', (reg['id'],))
-            writer.execute("INSERT INTO arrangement_versions SELECT 'concurrent-version',competition_id,sequence+1,'合成並行版',editor_label,note,admin_id,actor_name,created_at,rows_json,'synthetic-race-key','synthetic-hash' FROM arrangement_versions WHERE sequence=0")
+            writer.execute("INSERT INTO arrangement_versions (id,competition_id,sequence,label,editor_label,note,admin_id,actor_name,created_at,rows_json,request_id,fingerprint) SELECT 'concurrent-version',competition_id,sequence+1,'合成並行版',editor_label,note,admin_id,actor_name,created_at,rows_json,'synthetic-race-key','synthetic-hash' FROM arrangement_versions WHERE sequence=0")
         return result
     monkeypatch.setattr(module, 'roster', interleave)
     assert read(client, comp) == before

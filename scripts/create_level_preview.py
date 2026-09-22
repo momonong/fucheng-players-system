@@ -14,7 +14,7 @@ from alembic.config import Config
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--variant', choices=['levels', 'level-drag', 'arrangement', 'arrangement-native'], default='levels')
+    parser.add_argument('--variant', choices=['levels', 'level-drag', 'arrangement', 'arrangement-native', 'grid'], default='levels')
     variant = parser.parse_args().variant
     database = Path(f'data/{variant}-preview.db').resolve()
     credentials = Path(f'data/{variant}-preview-admin.json')
@@ -26,6 +26,7 @@ def main():
     os.environ['FUCHENG_DATABASE_URL'] = f'sqlite:///{database.as_posix()}'
     os.environ['FUCHENG_COOKIE_SECURE'] = 'false'
     os.environ['FUCHENG_STATIC_DIR'] = f'frontend/dist-{"arrangement" if variant == "arrangement-native" else variant}'
+    if variant == 'grid': os.environ['FUCHENG_STATIC_DIR'] = 'dist-grid'
     command.upgrade(Config('alembic.ini'), 'head')
     command.check(Config('alembic.ini'))
     from fastapi.testclient import TestClient
@@ -77,6 +78,24 @@ def main():
         call('PUT', f"/api/admin/registrations/{regs[0]['id']}/level", {'version': 1, 'request_id': str(uuid4()), 'competition_level': 3, 'reason': '合成當次安排示例'})
         fields = ('name', 'competition_date', 'registration_deadline', 'capacity', 'notes', 'version')
         call('PUT', f"/api/admin/competitions/{main_comp['id']}", {**{k: main_comp[k] for k in fields}, 'status': 'closed', 'reason': '合成預覽停止額外報名'})
+        if variant == 'grid':
+            endpoint = f"/api/admin/competitions/{main_comp['id']}/arrangement"
+            def edit(operation):
+                current = client.get(endpoint).json()
+                return call('POST', endpoint+'/operations', {'request_id':str(uuid4()), 'state_token':current['state_token'], 'operation':operation})
+            edit({'action':'insert_header','before_id':None})
+            layout = client.get(endpoint).json()['layout']
+            for title, start, end in [('甲組',0,2),('乙組',3,5),('丙組',6,9)]:
+                a={'row_id':layout['rows'][0]['id'],'column_id':layout['columns'][start]['id']}
+                b={'row_id':layout['rows'][0]['id'],'column_id':layout['columns'][end]['id']}
+                edit({'action':'text','target':a,'text':title})
+                edit({'action':'merge','start':a,'end':b})
+            edit({'action':'insert_column','before_id':layout['columns'][0]['id']})
+            layout = client.get(endpoint).json()['layout']
+            for index,row in enumerate(r for r in layout['rows'] if r['role']=='body'):
+                edit({'action':'text','target':{'row_id':row['id'],'column_id':layout['columns'][0]['id']},'text':f'合成第{index+1}隊'})
+            current=client.get(endpoint).json()
+            call('POST',endpoint+'/versions',{'request_id':str(uuid4()),'state_token':current['state_token'],'base_version_id':current['latest']['id'],'label':'合成完整布局','note':'標題與隊名只示範布局，不產生隊伍或對戰資料。'})
         call('POST', '/api/auth/logout', None)
     app.state.engine.dispose()
     with credentials.open('x', encoding='utf-8') as file:

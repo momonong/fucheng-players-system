@@ -1,5 +1,29 @@
 # Windows Docker 部署、搬移與維運
 
+目前 B 公開版本為右側變動／版本雙欄與選手單擊選格、雙擊詳情，入口為 [b021 管理頁](https://b021-140-116-158-107.ngrok-free.app/admin/competitions)。以下 A、interaction、axis 及較早預覽均為歷史證據，不用舊 PID／來源啟動目前 B。
+
+## 目前 B panels 版執行身份（2026-09-22，Windows 限定預覽）
+
+release `data/grid-public-runtime/releases/grid-panels-20260922-164146`，57 檔來源摘要 `988a05d8bc620ec8bfe4909ccf88d8a96e460e0fee08c4db6d6d6c82b9c93cc0`。app **12780**／launcher **6996** 分別於 16:42:11.716／16:42:11.682（台北）啟動，ngrok **22148**／b021／8044 不變；WMI wrapper **30144** 的 parent 為 WmiPrvSE，跨工具與 smoke 後 guard 通過。公開 JS `index-DGQG1ehm.js`、CSS `index-DakIpyZL.css`；完整來源／資產 hash、HTTP 與程序時間見 `data/grid-public-runtime/grid-panels-update.json`。
+
+停寫 Backup API 備份在 release 的 `rollback/grid-public-before-panels.db`，84 檔舊 source/static/runtime/helper/logs hash 見 `rollback-identity.json`。只變更三個產品前端來源，backend/API/schema/deps 與 header 版一致；無 migration、reseed、未知請求重送或業務寫入。保留原 DB/admin/session、舊 assets 與歷次 release，index 原子切換。停法仍為 `stop-preview.ps1 -CheckOnly -AppOnly`，另獲授權才移除 CheckOnly；啟動仍由 `start-app-detached.ps1` 經 WMI，live ngrok 不重啟。以下 header／undo 身份為歷史證據。
+
+## 前次 B header 版執行身份（2026-09-22，Windows 限定預覽）
+
+release `data/grid-public-runtime/releases/grid-header-20260922-161245`，57 檔來源摘要 `9f4a1839f073951a69dd131aedf45be704ceb0f466804e675124684bc0d63d11`。app **53896**／launcher **67372** 分別於 16:13:07.911／16:13:07.875（台北）啟動；ngrok **22148** 自 14:58:00.483 沿用，b021／127.0.0.1:8044 不變。WMI wrapper **43256** 的 parent 為 WmiPrvSE，跨工具呼叫與 smoke 後 guard 通過。完整時間、hash、公開 HTTP 及 WMI 身份見 `data/grid-public-runtime/grid-header-update.json`。
+
+停寫 Backup API 備份在 release 的 `rollback/grid-public-before-header.db`；舊 source/static/runtime/helpers/logs 的 82 檔 hash 見 `rollback-identity.json`。公開 JS `index-6EzVBfUD.js`／CSS `index-BEIp3IaC.css` 來自凍結 `frontend/dist-grid-header`，保留舊 assets 並原子替換 index。schema0008、DB/admin/session/全部安排保留，無 migration 或依賴變動；header_shade/shade_header 要求前後端同版，不能假設舊 app 可無損回退。
+
+停前使用 `powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1 -CheckOnly -AppOnly`；另獲授權才移除 CheckOnly 停 B app。啟動沿用 `start-app-detached.ps1` 經 WMI 讀新 runtime.app_dir，勿重啟 live ngrok。未操作 A／8042、Git 或正式部署；本次沒有重送／清除原未知請求。以下 undo 身份為歷史證據。
+
+## 前次 B undo 版執行身份（2026-09-22，Windows 限定預覽）
+
+release `data/grid-public-runtime/releases/grid-undo-20260922-152840`，57 檔來源摘要 `95e65ef5ed6d10bf5eebea8dc9e175ed3f272f1e3e8a170c15e66faeeffb3c3b`；app **24292**／launcher **60616**，ngrok **22148** 原程序與 b021／127.0.0.1:8044 不變。新成品為 `frontend/dist-grid-undo`，公開 JS `index-DctYxroS.js`、CSS `index-CQDIqcMj.css`；3 檔完整 hash、HTTP／Cache-Control 及 WMI 身份見 runtime 的 `grid-undo-update.json`。舊 assets 保留，index 以原子替換切換。
+
+停寫備份為該 release 的 `rollback/grid-public-before-undo.db`；同目錄保留舊 source、static、runtime、啟停腳本及日誌，清單見 `rollback-identity.json`。沿用 `data/grid-public-preview.db`、schema0008、admin/session 與未大存安排；新 backend/front 必須同批。舊 receipts 無私有 metadata 可讀但不可 undo，不補造；舊 backend 不理解局部色／undo，不能因 schema 相同就無損回退，更不可用備份覆寫發布後操作。
+
+守門沿用 `powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1 -CheckOnly -AppOnly`。另獲授權後才移除 CheckOnly 停 app；啟動使用 `powershell -NoProfile -File data/grid-public-runtime/start-app-detached.ps1`，由 WMI 隱藏執行既有 start-app，讀取 runtime.app_dir，保持 live ngrok。此次 wrapper **27184** 的 parent 為 WmiPrvSE，跨工具呼叫與瀏覽器 smoke 後仍存活；不可直接以短命工具 child 啟動。沒有服務安裝、排程或開機自啟保證；未操作 A／8042、Docker／GPU、Git 提交／合併／推送或正式部署。
+
 2026-09-20 緊湊級數表格／完整安排保存版，已於本機8039及下列新建原生HTTPS合成入口驗證，schema為0007。舊Docker／ngrok、8448／8450與r7～r10套件未升級，r11仍hold；不能直接把新原始碼接舊schema。
 
 ## 原生臨時公開預覽（2026-09-20 22:44 台北啟動）
@@ -366,3 +390,106 @@ systemd 範本使用 `--no-access-log`；代理與 APM 也不要保存 body、Co
 既有 8032／8033 保持 0004／club-preview.db，8034 保持 0005／club-delete-preview.db，各程序與成品未動。新版程式不能搭配未升級的舊庫，也不能讓舊程式共寫 0006：舊程式新增報名未填非空 competition_level，且不知道新的安排語意。需要導入正式／原會員副本時，先取得相應資料操作及服務切換授權，決定唯一資料來源，核對各副本新增操作；不能直接任選一份覆蓋。
 
 正式切換前仍需 Backup API 備份、還原至新檔演練、逐欄保留驗證、停止所有舊版寫入、套用 `alembic upgrade head`、統一前後端版本後啟動。驗證報名三入口、當次級數隔離、正取／候補／取消、版本衝突與歷史，再開放使用。回退必須從升級前備份還原到新目的地，不能刪欄或單獨回退程式。本階段未正式部署或套用真實資料 migration。
+
+
+## B 0008 本機交付邊界（2026-09-21）
+
+B從已推送A `89cae09754eaefa4dba6c3dce308482526f33ff2` 建於唯一隔離worktree `D:\projects\fucheng-players-system-worktrees\arrangement-grid`，分支 `feat/competition-arrangement-grid`。A的8041从主目錄src/.venv載入，因此B使用自己的.venv/node_modules/DB/static，主目錄保持main，未重啟f9d0、未改密碼。B未commit/merge/push、沒有建立image、沒有操作Docker/GPU；公開B另由orchestrate安排。
+
+B本機入口8042、schema0008、`data/grid-preview.db`與`dist-grid`。合成initial backup `backups/grid-preview-initial.db`、restore新target `data/grid-preview-restore-check.db` 驗完整性/FK/筆數一致；不得拿它覆寫A資料或稱為正式遷移證據。帳密僅 `data/grid-preview-admin.json`。測試8043/grid-e2e.db獨立且完成後退出。
+
+後續升級須從B凍結source manifest＋static核對身份，使用獨立資料目標，明確停寫/備份後0007→0008。升級只新增layout欄與兩表，不造舊布局、不改舊歷史payload。回退使用相符A程式／0007 pre-update備份還原到新target，保留0008資料，不跑破壞性downgrade。舊Docker演練只適用其記錄版本，不能充當0007→0008容器驗證。當前已有SQLite合成migration/rollback備份驗證，但無B新image/volume演練。
+
+B後續公開預覽不可直接讀正在改動的worktree原始碼；由接手task在停寫後凍結來源、static與新合成備份，核對清單與hash並另安排入口。現用A帳密的沿用由task5依另授權安全處理，task4不讀A私有帳密。worktree保留供驗收與後續修正，未授權清理。
+
+## B 0008 公開合成預覽（2026-09-21）
+
+### 目前 interaction 版執行身份
+
+Windows 11／PowerShell 的原生 B 預覽使用 `data/grid-public-runtime/releases/grid-interaction-20260921-120352/source/src`，56 檔 production 摘要 `c00f5937c00291c58819e2630387d965a0bf3951f0ae9cb1a73c631ae30f83c2`。同一 eb24／127.0.0.1:8044，listener **45560**、launcher **41228**，取代 **45612／47980**；ngrok **57728** 的建立時間／config／URL 不變。runtime 記錄現用絕對路徑由已指定 B 工作目錄解析，文件路徑皆相對該根目錄。來源 import、公開 hash/cache、health 證據在 `data/grid-public-runtime/grid-interaction-update.json`。
+
+停寫後 Backup API 備份為該 release 的 `rollback/grid-public-before-interaction.db`；同 rollback 保存舊 source、完整 static、runtime 與啟停腳本，hash 清單為 `rollback-identity.json`。原 DB 路徑不變、沒有 migration；新 app 啟動及公開非寫入 smoke 後各核對 18 表 hash／count 一致，admin/session／未大存安排與先前來源 UNKNOWN 操作全保留。新 hashed assets 全部寫齊後原子替換 index，舊 assets 保留：HTML `9856bb7a...`、JS `index-mlLEaVwH.js`／`a323e368...`、CSS `index-BjtxJCLN.css`／`61f594b3...`；完整值見 release 的 `delivery-identity.json`。
+
+Windows 限定私有 helper 沿用既有流程：`powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1 -CheckOnly -AppOnly` 已對新 PID／建立時間／app-dir／父子及 port 歸屬通過。經授權只停 B app 時移除 CheckOnly、保留 AppOnly，ngrok 不動；`start-app.ps1` 從 runtime.app_dir 啟動現用凍結版本。資料比對使用 `uv run --locked python data/grid-public-runtime/grid-interaction-data-check.py smoke`。未重寫跨平台啟停、未測其他 OS，也沒有開機自啟保證。
+
+新 swap/insert/move_empty/shade receipt 與 shade 欄位不能交舊 backend 無損處理；需要恢復時先保留目前資料，評估向前修復或受控停寫，不能覆寫成發布前備份。舊 move client 仍保持插入語義，未知結果沿用原 request_id／receipt 確認。A／8042、Docker／GPU 未操作，沒有新 worktree 或 Git 提交／合併／推送。下面為歷次發布紀錄。
+
+### 歷次 axis 三項功能版執行身份
+
+現用 eb24／127.0.0.1:8044 的 app-dir 為 `data/grid-public-runtime/releases/grid-axis-20260921-113513/source/src`；production54 摘要 `5abb9dd18a96aae083bcab6a5eaf62d703daa6f522537b5b317ae56fb17efc5b`，manifest 為該 release 的 `delivery-identity.json`。新版 listener **45612**／launcher **47980**，取代 32752／36224；ngrok **57728**、網址及 config 不變，A／8042 未動。`runtime.json` 與 `grid-axis-update.json` 記錄現用身份、import、HTTP hash/cache 與重啟事實；下方其他版本均為歷史紀錄。
+
+已保存舊 source／完整 static／runtime／啟停腳本至 release 的 `rollback/`，停寫後 Backup API 備份為 `rollback/grid-public-before-axis.db`。啟動新版與完成唯讀 smoke 兩個時間點的 18 表皆與備份相同；migration、依賴及 schema0008 未改，DB/admin/session/使用者未大存安排保留。新 hashed assets 寫齊後原子替換 index，保留全部舊 assets；public HTML `ee9d65c5...`、JS `index-eRjUGez4.js`／`1f9b6e10...`、CSS `index-CaBnUpIx.css`／`3c0f4222...` 均 200、完整 hash 符合 manifest、Cache-Control:no-store。
+
+本次停止舊 app 後 launcher 在 Stop-Process 呼叫前自然退出，守門脚本於備份前停止；確認兩個舊 PID 均不存在、8044 已釋放後才接續備份與現用版本啟動，並通過 18 表一致檢查。停止守門已補上此已知競態：只有 PID 確實不存在才接受自然退出，任何仍存活／重用 PID 都拒絕。新身份的 `stop-preview.ps1 -CheckOnly -AppOnly` 已通過；只停 B app 用 `-AppOnly`，保留 ngrok／網址，重新啟動沿用 `start-app.ps1` 讀 runtime.app_dir。沒有額外測試重啟或更換 agent。
+
+新版 delete operations／receipts 無法由舊 backend 完整理解，不得因同為 0008 宣稱可無損退舊 app；保留目前資料，優先向前修復或協調受控停寫，不能以備份覆寫發布後操作。此次未 stage／commit／merge／push，沒有新 worktree、Docker／GPU 操作或正式資料部署。完整來源、備份及 rollback hash 清單保留於 release 的 `rollback-identity.json`。
+
+### 歷次 grid-edit 五項功能版執行身份
+
+同一 eb24／127.0.0.1:8044 已切換至 `data/grid-public-runtime/releases/grid-edit-20260921-110654/source/src`，53 檔 production 摘要 `eaf8d9ce6f002a89575710641bd36886c4da59812a89ec6ede17fe670b76eb48`；manifest 副本在該 release 的 `delivery-identity.json`。原 app／launcher 44424／63012 已受控停止，新 listener／launcher 為 **32752／36224**，ngrok **57728** 及其建立時間／config／eb24 不變。`runtime.json` 記錄現用身份；`grid-edit-update.json` 記錄來源 import 路徑、公開 static hash／cache、health 與啟停範圍。下方舊 PID 及來源身份保留為歷次紀錄，不代表現用 app。
+
+先凍結來源並驗證相容、完整保存舊 source/static/runtime 至該 release 的 `rollback/`，停止 B app 寫入後以 SQLite Backup API 建立 `rollback/grid-public-before-edit.db`。原 public DB 路徑與內容保留；新版啟動沒有 migration，切換前後 18 表逐表 hash／count 一致後才寫齊新 assets 並原子替換 index。舊 hashed assets 保留。現用 index `73c019c6...`、JS `index-wYMAYkTQ.js`／`e88a10da...`、CSS `index-DOk1_exm.css`／`22d159a8...`，完整 SHA256 見 manifest。原 A／8042 完全未操作。
+
+停止前在 B 工作目錄執行 `powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1 -CheckOnly -AppOnly` 核對現用程序；經授權只停 app 時去掉 CheckOnly、保留 AppOnly，ngrok／網址不動。不帶 AppOnly 會連 B ngrok 一起停止，僅供另行授權的整個 B 入口停用。`start-app.ps1` 已改為從 runtime.app_dir 讀取現用凍結版本，避免誤啟舊 backend，並核對／記錄新 listener；目前僅語法核對，沒有為測試再重啟。此次實際受控重啟使用 `restart-grid-edit.ps1`，該一次性腳本鎖定旧 PID，不可再次執行。沒有開機自啟或排程保證。
+
+回退備份僅供救援與比對，不可直接覆寫使用者後續資料。舊 backend 會吞掉 title 且不支援 column_title，接受新 JSON 後不可宣稱無損回退；優先向前修復或停止受影響寫入，評估只回前端亦需相容性核對。舊分頁與未確定請求保留原 key／receipt 語意，不清 session、不替使用者大存；重新整理前如有未知操作先確認結果。切換後觀察到的新操作也已保留。此版本沒有 Git 提交／合併／推送、新 Docker image、GPU 操作或正式資料部署。
+
+### 前次前端切換紀錄
+
+後續 dragfix static 切換已完成，eb24／8044 與 app **44424**、launcher **63012**、ngrok **57728** 均沿用。先備份現用 static 至 `data/grid-public-runtime/static-before-drag-20260921-081027`，新 hashed assets 全數寫齊後用原子替換切換 index，保留舊 assets 供已開分頁使用。新前端 manifest 為 `data/grid-drag-delivery-identity.json`；runtime 的 `frontend-drag-update.json` 記錄公開回應 hash／cache 與 rollback。`identity.json` 的舊 50 檔摘要 `c25556fb...` 仍描述未變的凍結來源；新 frontend build 來源摘要為 `490b5aa7...`，未把新前端來源覆蓋到 frozen source，也未替換 backend／migration。回退僅在取得授權後，核對備份 index 及其舊 assets，將備份 index 以同樣原子方式還原；不回復 DB、不重啟或切換 ngrok。此次停止腳本 CheckOnly 再次通過，既有資料、admin/session、未完整保存差異保留，A／8042 不動；未 commit／merge／push。
+
+上述本機交付後，task5 依獨立授權在 B worktree 建立第二個公開合成入口 `https://eb24-140-116-158-107.ngrok-free.app/admin/competitions`，已通過正常 TLS 登入／管理讀取及精確格位增量驗證。A f9d0／8041 與 B 原 8042 保留，兩個官方 ngrok agent 已並行；本次沒有操作 Docker 或 GPU。
+
+執行身份以 `data/grid-public-runtime/runtime.json` 的 PID、建立時間及設定為準：ngrok **57728**、Python launcher **63012**、app listener **44424**，僅監聽 `127.0.0.1:8044`。使用 B 自有 `.venv/Scripts/python.exe`，`--app-dir data/grid-public-runtime/source/src` 指向凍結來源，`--no-proxy-headers --no-access-log`；公開 static 為同 runtime 的 `static`，資料庫為 `data/grid-public-preview.db`（0008）。來源 allowlist 50 檔與 dist-grid 3 檔的 SHA256 及初始 Backup API 複製證據見 `identity.json`；`ready.json` 已確認實際匯入凍結 app.py，並非 A 或仍可變動的 B src。
+
+設定固定本次 eb24 HTTPS origin、可信代理 `127.0.0.1`、proxy kind ngrok、Secure cookie 開啟、local HTTP preview 關閉。B 專用 `ngrok.yml` 關閉 inspector／request inspection、remote management 及 update check；config、帳密、日誌及 runtime 證據均在 ignored 私有目錄，不能入 Git 或封裝。官方 ngrok 3.39.11 executable 沿用 A runtime 的已驗證檔案，但 agent/config/PID 分離；停止時不可依 executable 名稱殺掉所有 ngrok。
+
+`stop-preview.ps1 -CheckOnly` 已實測通過 PID 建立時間、命令列含 B app-dir／config、父子關係及 8044 歸屬檢查，沒有實際停止。經授權需要停止本入口時，在 B 工作目錄執行 `powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1`；此腳本只停止本次 B 三個程序，保留 DB、凍結來源與成品，不碰 A／8042。程序身份不符會拒絕，不可硬改 PID 繞過。
+
+`start-app.ps1` 僅保存本次已知 origin／agent 的受控啟動，不是通用重建器；它拒絕占用中的 8044，沒有開機自啟、排程或自動恢復。ngrok 重建可能換網址，屆時必須重新核對 origin、代理、runtime 身份及安全驗證，不能只重用舊命令。當前服務已跨多次工具 shell 及瀏覽器操作仍存活；不承諾電腦重啟後持續可用。
+
+本庫只有 83 名合成會員、3 場、85 筆報名；授權 admin 以正常 CLI 建入新庫，未覆寫原管理員或歷史 actor。公開驗收只改 B 新庫的合成 02 當次級數／格位並新增完整保存版，會員長期級數與 hard snapshot 保持一致。A 帳密／session 及正式／真實資料不變。本次不包含 Git 提交／合併／推送、B image、正式資料 migration、Docker 演練或實機觸控；worktree 與兩個 B 預覽保留供人工驗收及後續修正。
+
+
+### B 編輯／列印增量交付契約（尚未更新公開執行版本）
+
+`data/grid-edit-delivery-identity.json`描述新allowlist source與`dist-grid-edit`。新`column_title`operation及optional column.title需要同批後端／前端載入；DB仍0008，不跑migration、不reseed、不替使用者大存。task4只修改B工作樹、使用8043/grid-edit-e2e.db合成測試；8042、8044/ngrok、runtime/source/static、公開DB/admin/session未由task4修改。
+
+task5依既定授权序列核對source停寫／manifest、現況identity，受控停寫備份與短暫app換版，保留同eb24/ngrok、原DB與session、尚未大存差異。不能套用舊「只換static」程序，因舊backend不接受column_title且其GridLayout response會丟掉title。舊程式即使能開啟0008，也不能宣稱可無損顯示／處理新欄標題或合併直接編輯。回退不覆寫新產生的使用者資料；保留故障庫及新快照，先核對相容策略與授權，不默默還原舊DB。A/f9d0與8042不在換版範圍。工程與PDF合成證據不等同公開更新或人工接受。
+
+
+### 待換版：B 刪軸／素食按鈕／歷史順序
+
+本輪task4交付 `data/grid-axis-delivery-identity.json` 與獨立 `dist-grid-axis`，來源仍未提交snapshot。task5須先核對manifest、待task4停寫後凍結；此處尚未宣稱換版。现用公開grid-edit-20260921-110654、B listener32752／launcher36224、ngrok57728、eb24與原DB/admin/session保留；前文11:08／11:11來源UNKNOWN的後續安排不作回退或抹除。
+
+新增delete_row/delete_column operation需同批載入前後端；DB schema仍0008，不migration/reseed、不替使用者大存、不改舊snapshot。沿既有維運契約停寫、備份、凍結source/static、受控更新B app，保留ngrok與登入。換版前唯讀解析既有workspace／保存版／operations；若驗證公開UI，避免實際刪除、插入、drag drop或文字提交污染使用者安排。
+
+旧backend union不認識新刪軸operation/receipt，即使schema相同亦不可聲稱app-only無損回退。若新版已有寫入，先停寫、保留故障庫及所有後續資料，再依相容image/schema與授權恢復策略處理，不覆蓋回舊備份。合成測試只用8043/grid-axis-e2e.db；dist-grid、dist-grid-drag、dist-grid-edit及既有runtime releases均保留。
+
+
+### interaction 版相容契約與工程交付範圍（已受控更新）
+
+新來源／static以 `data/grid-interaction-delivery-identity.json` 核對，成品 `dist-grid-interaction`；原 `dist-grid`／`dist-grid-drag`／`dist-grid-edit`／`dist-grid-axis`及全部frozen releases不覆寫。DB仍0008無migration/reseed，新增swap/insert/move_empty/shade operation、row/column shade、admin歷次GET需要同批新前後端。舊move client仍保有原插入語義；舊JSON缺shade讀0且GET不改bytes，舊receipt仍可解析。新receipt/色階資料不能交舊backend無損處理，切回舊app可能拒新operation或遺漏色階，不因schema相同略過相容檢查。
+
+task4只在原B工作樹實作與8043新合成DB驗證，沒有操作public資料／管理session／服務；task5 已於停寫交付後依既有備份／相容解析／短停 app 程序換版，實際現用 PID 見本頁目前 interaction 身份。未更換 ngrok、未碰 A／8042，未替主場有效 drop/delete/color/text/save。既有未大存差異及 UNKNOWN 後續操作原樣保留。新歷次查詢無 seed 要求，公開沒有符合紀錄就顯示空，不能為展示補造。
+
+本次验证是Windows及Chromium PDF/觸控模擬；其他OS/實機/列印driver未驗。原生Windows preview/helper維持原用途，未為跨平台偏好重寫。文件中命令／artifact皆相對專案根目錄，task5依已指定工作樹解析，不複製虛擬環境到其他平台。
+
+
+### 局部底色／復原版工程交付（待 task5 受控換版）
+
+本輪獨立成品為 `frontend/dist-grid-undo`，合成測試為 8043／`data/grid-undo-e2e.db`。前輪 `frontend/dist-grid-cell-shade` 與所有既有成品、frozen releases 保留，不拿半成品換公開版。完成後以 `data/grid-undo-delivery-identity.json` 核對 source/static；交付以該 identity 的 source/static hash 與 freeze 狀態為準。
+
+資料庫仍 0008，不 migration/reseed。新增 cell_shades、shade_cells、undo operation 與 receipt 私有前狀態，需要同批前後端；舊 backend 不認新 operation，也可能丟局部色。即使 schema 相同仍不可無損 app-only 回退。舊 receipt 不補 metadata、舊 snapshot 不改 bytes；換版保留 admin/session、全部安排與未大存差異。公開備份／短停／凍結／換版仍由 task5 依來源授權執行，task4 只做工作樹與隔離合成驗證，無公開操作或正式資料驗收。
+
+
+### 表頭／待確認恢復版交付（待受控更新）
+
+新成品 `frontend/dist-grid-header`，專用驗證 8043／`data/grid-header-e2e.db`；已發布 `frontend/dist-grid-undo` 及所有舊 static/runtime releases 不覆寫。identity 為 `data/grid-header-delivery-identity.json`，以 source/static hash 及 freeze 狀態核對。仍 0008 無 migration／reseed；新增 shade_header receipt 與 optional header_shade 需同批前後端，舊 backend 可能拒 operation／丟表頭色，不能視為 app-only 無損回退。
+
+task4 不操作 public DB/session、既有 pending、現用 WMI app/ngrok；task5 維持原備份、相容核對、短停與 b021 更新流程。使用者原本未知 request 仍應由原瀏覽器安全確認，部署不能替代使用者修改或抹除未確認請求。公開只讀 smoke 不是有效上色／undo／save 的授權。
+
+
+### 版本雙欄／選手單雙擊版交付（待受控更新）
+
+新成品 frontend/dist-grid-panels，合成測試使用 8043／data/grid-panels-e2e.db，交付 identity 為 data/grid-panels-delivery-identity.json。這輪只有前端三檔來源及必要測試／文件，backend/API/schema/deps 與 grid-header identity 一致，無 migration／reseed。既有 grid-header、grid-undo 及全部舊 static 不覆寫。task4 凍結後由 task5 依 orchestrate 授權核對身份並受控更新；task4 不操作公開 app/DB/session/ngrok，也不代確認既有 unknown 操作。

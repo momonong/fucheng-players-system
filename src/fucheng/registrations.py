@@ -190,6 +190,9 @@ def _require_late_reason(competition: Competition, reason: str | None) -> None:
 def _idempotent_registration(db, request_id, action, competition_id=None, *, actor, fingerprint):
     audit = db.scalar(select(RegistrationAudit).where(RegistrationAudit.idempotency_key == request_id))
     if not audit:
+        from .models import ArrangementOperation, ArrangementVersion
+        if db.get(ArrangementOperation, request_id) or db.scalar(select(ArrangementVersion).where(ArrangementVersion.request_id == request_id)):
+            raise HTTPException(409, "此操作識別碼已用於其他操作")
         return None
     if (audit.actor_kind != actor.kind or audit.admin_id != actor.admin_id
         or audit.actor_visit_id != actor.visit_id or audit.request_fingerprint != fingerprint
@@ -299,6 +302,8 @@ def _mutate_registration(
     else:
         db.rollback()
         raise RuntimeError("未知報名操作")
+    from .arrangement_grid import sync_registration
+    sync_registration(db, registration)
     registration.version += 1
     registration.updated_by_admin_id = actor.admin_id
     registration.updated_by_visit_id = actor.visit_id
@@ -391,6 +396,8 @@ def _create_registration_in_transaction(db, competition, member, payload, actor,
     competition.next_sequence += 1
     db.add(registration)
     db.flush()
+    from .arrangement_grid import sync_registration
+    sync_registration(db, registration)
     db.add(_registration_audit(
         registration, admin_id, "create",
         {"status": {"before": None, "after": registration.status},

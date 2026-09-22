@@ -135,7 +135,19 @@ export function updateRegistrationLevel(registration: Pick<CompetitionRegistrati
   })
 }
 
-export const arrangement = (id: string) => request<ArrangementState>(`/api/admin/competitions/${id}/arrangement`)
-export const initializeArrangement = (id: string) => request<ArrangementState>(`/api/admin/competitions/${id}/arrangement/initialize`, { method: 'POST' })
-export const saveArrangement = (id: string, payload: ArrangementSave) => request<ArrangementVersion>(`/api/admin/competitions/${id}/arrangement/versions`, { method: 'POST', body: JSON.stringify(payload) })
-export const arrangementVersion = (id: string, versionId: string) => request<ArrangementVersion>(`/api/admin/competitions/${id}/arrangement/versions/${versionId}`)
+// Bound both transport and body decoding. An aborted write remains unknown to the
+// workspace controller: its original request_id/payload is retained for replay.
+async function arrangementRequest<T>(url:string,options:RequestInit={}):Promise<T>{
+  const controller=new AbortController()
+  const timer=setTimeout(()=>controller.abort(),20000)
+  try{return await request<T>(url,{...options,signal:controller.signal})}
+  catch(error){if(controller.signal.aborted)throw new Error('伺服器未及時回應，請重新核對操作結果。');throw error}
+  finally{clearTimeout(timer)}
+}
+
+export const arrangement = (id: string) => arrangementRequest<ArrangementState>(`/api/admin/competitions/${id}/arrangement`)
+export const initializeArrangement = (id: string) => arrangementRequest<ArrangementState>(`/api/admin/competitions/${id}/arrangement/initialize`, { method: 'POST' })
+export const saveArrangement = (id: string, payload: ArrangementSave) => arrangementRequest<ArrangementVersion>(`/api/admin/competitions/${id}/arrangement/versions`, { method: 'POST', body: JSON.stringify(payload) })
+export const arrangementVersion = (id: string, versionId: string) => arrangementRequest<ArrangementVersion>(`/api/admin/competitions/${id}/arrangement/versions/${versionId}`)
+
+export const mutateGrid = (id: string, payload: import('./types').GridRequest) => arrangementRequest<import('./types').GridReceipt>(`/api/admin/competitions/${id}/arrangement/operations`, { method: 'POST', body: JSON.stringify(payload) })

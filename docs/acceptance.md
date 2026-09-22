@@ -1,8 +1,148 @@
 # 驗收證據與限制
 
-最後更新：2026-09-21。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+最後更新：2026-09-22。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+
+## B 雙欄／選手互動公開更新（2026-09-22，待人工驗收）
+
+b021 已切換 `data/grid-public-runtime/releases/grid-panels-20260922-164146`，57 source／3 static hash 與凍結 manifest 一致；公開 health JSON200、三資產 hash 通過，WMI app12780／launcher6996、ngrok22148 持續存活。停寫備份與啟動、smoke 後 18 表 count/hash 全同；schema0008、integrity ok、FK0，2 workspace／6 保存版／109 receipts 可讀（81 舊筆無 undo metadata），沒有登入或業務異動。
+
+IAB 沿用 session，1920px 開歷史後主表、該版本變動、版本紀錄依序左右排列且無重疊；80 人正常載入。單擊 03 選手格為 grid-selected、無詳情；雙擊打開原詳情，『選取儲存格』按鈕為 0，關閉正常。未拖曳、套色、改字、merge、undo、save 或重送未知操作；其他尺寸、手勢與列印沿用 task4 合成證據，沒有重跑。證據：runtime 的 `grid-panels-update.json`、`grid-panels-browser.json` 與 release 的 `before-data.json`、`after-start-data.json`、`after-smoke-data.json`。
+
+## B 表頭／等待處理公開更新（2026-09-22，待人工驗收）
+
+b021 已更新為 `data/grid-public-runtime/releases/grid-header-20260922-161245`；57 source／3 static 符合凍結 manifest，公開 health JSON 200、HTML／JS／CSS hash 通過，app53896／launcher67372 經 WMI 持續運行、ngrok22148 不變。停寫備份與新版啟動、唯讀 smoke 後 18 表 hash/count 全同；schema0008、integrity ok、FK0，2 workspace／6 保存版／93 receipts 全可讀，其中 81 筆舊 receipt 無 undo metadata，未補造。
+
+IAB 沿用原 session，80 人可見；單擊「1 級」表頭後 BUTTON aria-pressed=true、th 內無輸入框，工具列底色／編輯文字啟用，復原與合併保持停用。只做選場與表頭選取，沒有套色、改字、拖曳、undo、merge、save、重新登入或未知請求重送。公開 smoke 不宣稱已重現／解決使用者原請求；逾時與寫入行為沿用 task4 同版本工程證據。來源：runtime 的 `grid-header-update.json`、`grid-header-browser.json`，release 的 `before-data.json`、`after-start-data.json`、`after-smoke-data.json`。
+
+## B 局部底色／復原公開更新（2026-09-22，待人工驗收）
+
+原 b021／8044 已更新至 `data/grid-public-runtime/releases/grid-undo-20260922-152840`，57 檔來源及 3 個公開資產符合 `delivery-identity.json`；新 app **24292**／launcher **60616** 經 Windows WMI 隱藏啟動，ngrok **22148** 不變。停寫 Backup API 備份與新版啟動、公開唯讀 smoke 後的 18 表 count／hash 全同，schema0008、integrity ok、FK0；2 workspace／6 保存版／81 舊 receipt 可由新模型唯讀解析，未補造 undo metadata。沒有 migration、重新登入、撤銷 session 或業務寫入，全部未大存差異保留。
+
+IAB 沿用登入，80 人及新 JS／CSS 可見；上方工具列復原停用，選空格後純色色票可用、清除鈕為斜線，未套色。卡片姓名字體 16.32px、詳情右上 × 可關閉；歷史保存版無復原與編輯工具列。未試做有效 undo／move／color／text／merge／save；點外退出、復原寫入與 PDF 沿用本文件 task4 同版本工程證據，不重跑公開寫入。證據：runtime 的 `grid-undo-update.json`、`grid-undo-browser.json` 及 release 的 `before-data.json`、`after-start-data.json`、`after-smoke-data.json`。以下各輪描述均為當時狀態。
+
+## B 灰階／雙區拖曳／歷次參考（2026-09-21，已公開換版待人工驗收）
+
+task5 已於同一 eb24 完成 Windows 11／Python 3.14.6 受控更新：release `data/grid-public-runtime/releases/grid-interaction-20260921-120352`，56 檔凍結 source 摘要 `c00f5937c00291c58819e2630387d965a0bf3951f0ae9cb1a73c631ae30f83c2`，HTML／JS／CSS 各 200、SHA256 符合 manifest、Cache-Control:no-store，health 回 JSON 200。舊 2 workspace／5 個有布局保存版／47 receipts 可由新模型唯讀解析。停寫 Backup API 備份後，以同一 DB 啟新版；啟動即時及公開 smoke 完成後，兩次 18 表 hash／count 皆與備份一致，含會員、報名快照、布局、完整保存版、回執、稽核、admin/session。integrity_check=ok、foreign_key_check=0、schema0008；沒有 migration／reseed／重設密碼或撤銷 session。
+
+獨立 IAB 分頁沿用原登入：新 assets 引用正確、鉛筆按鈕為 0；右鍵開啟整排操作，可見無底色／三階淺灰選單，僅關閉未選色。03 詳情含本場餐食、當次／長期級數與「最近 5 場已結束比賽」空態，移級下拉寬度 80px；舊完整快照無拖曳／軸選單，詳情的歷次參考另標「以下為目前查詢結果」，保存欄位仍獨立顯示。返回目前安排的全部格位內容一致。未執行 drag/drop/delete/color/text/save，也未為歷次查詢建立示範資料。證據為 runtime 的 `grid-interaction-update.json`、`grid-interaction-browser.json`，release 的 `before-data.json`、`after-start-data.json`、`after-smoke-data.json`。swap／insert／shade 的寫入有效性與 PDF 沿用下列相同交付版本合成證據，不在公開主場重做。
+
+以下保留 task4 本機工程與歷次交付證據；各段「未公開／待換版」描述的是該次工程交付時點，現用身份以本節及部署手冊為準。
+
+環境：Windows、Node24.11.0、Playwright1.63.0 Chromium桌面與390px觸控模擬。Python使用既有uv鎖定環境。只用新 `dist-grid-interaction`、`data/grid-interaction-e2e.db`／8043；未測其他OS／實機手機／實體印表機。無dependency/migration變更，不重跑Docker/GPU或無關管理功能。
+
+- `npm --prefix frontend run build -- --outDir ../dist-grid-interaction`（tsc＋Vite）通過。後端 `uv run --locked pytest tests/test_grid_interaction.py tests/test_arrangement_grid.py tests/test_arrangements.py -q -p no:cacheprovider --basetemp .test-tmp-grid-interaction`：46 passed／25.67秒。涵蓋same/cross-column swap、上下insert與obstacle、empty拒占用、雙人audit第二筆失敗全回滾、replay/CAS/self no-op、level/version/hard snapshot、shade合法值／CSRF／terminal／old bytes／history、歷次exact member/同名/confirmed/取消重報/date cutoff/台北午夜/tie/limit5/匿名隔離/最小schema。審查發現audit關聯應符合既有before/after格式，修正後單項 `test_swap_two_levels_audits_versions_atomic_replay_and_noop`：1 passed／0.78秒，增加交換後GET稽核200與兩筆關聯response驗證。
+- 初輪相關E2E `--grep '表格互動|拖曳修正|格位八十人|格位未知小存|格位文字409|格位大存未知|格位送出前|表格新版|表格刪除' --output test-results/grid-interaction-first`：33 passed／1 failed，1.5分鐘。既有28項全通過；唯一新mobile drag測試目的格未捲入viewport。新6項補跑 `grid-interaction-final` 為5 passed／1 failed（20.8秒），mobile改捲入後仍貼下緣，截圖等待觸發auto-scroll使預告改變；調整測試將目的格置中並在放手前再核預告，未放寬結果斷言。
+- 拖曳另補強只採用已render preview，不取pending frame；最終 `--grep '表格互動：中央|拖曳修正|格位八十人' --output test-results/grid-interaction-drag`：8 passed／31.6秒。桌面/可信touch中央同欄及跨欄swap、上下before/after、empty、每次preview/action/實際格位、人數唯一、swap稽核GET，既有80人/ghost同尺寸/來源25%/click抑制/取消/503恢復/普通pan均通過。所有34個相關案例均有通過證據，不稱同一次34 pass。
+- 新UI案例驗證精簡＋hover/focus、右鍵/觸控整排選取與色盤、無新增文字/鉛筆、三灰max交叉/merge、保存還原無淨差、immutable歷史及print；歷次late A不污染B、關閉重開、換場、空/error、live參考與已存diet/level分離；詳情移級select80px與次要按鈕。文案採「歷次比賽級數／最近5場已結束比賽」，僅歷史有短註。
+- 實際三種背景設定PDF：`--grep '表格互動：精簡邊界' --project desktop --output test-results/grid-interaction-pdf`：1 passed／8.3秒。每份PDF會觸發afterprint清理，因此測試每次重新建立printJob且斷言4人；**first/final目錄早期gray-background-off/on.pdf是在清理後誤印管理頁，不作證據**。正式PDF僅使用grid-interaction-pdf。三份均1頁、000..003各一次；Poppler100dpi PNG含237/217/196三階灰，merge採217。default/off逐像素一致；on保留全域頁首CSS背景，因此全頁不同，但灰階格與merge實際取樣色值一致、姓名完整。已目視黑字／格線／灰階，未操作實體印表機。PNG和機器核對結果在 `data/grid-interaction-pdf/verification.json`；off PNG為 `gray-background-off-1.png`。
+- screenshot證據：`frontend/test-results/grid-interaction-drag/competition-levels-表格互動：中央交換上下插入空白移動與預告一致-mobile/` 的 `intent-swap-0.5.png`、`intent-insert-0.1.png`、`intent-insert-0.9.png`、`compact-person-detail.png`；桌面同名project。`grid-interaction-final` 的 `history-reference-separation.png`及`grid-interaction-pdf`的`gray-history.png`保留參考區／灰階歷史證據。
+- 任務仍在原B worktree/feat/competition-arrangement-grid，base89cae097；未stage/commit/merge/push。公開axis版及所有使用者資料/未大存差異未由task4變更，前輪UNKNOWN來源不追查不歸因。交付identity `data/grid-interaction-delivery-identity.json`；完成後source/tests/docs/artifacts全停寫，由orchestrate驗收後task5受控同網址換版。工程完成與人工接受／公開更新分開。
+
+## B 刪除行欄、素食開關與歷史順序（2026-09-21，本機完成待公開換版）
+
+- `npm --prefix frontend run build -- --outDir ../dist-grid-axis`（tsc＋Vite）通過；未覆寫dist-grid／dist-grid-drag／dist-grid-edit。無migration或依賴變更。
+- 後端 `uv run --locked pytest tests/test_arrangement_grid.py tests/test_arrangements.py -q -p no:cacheprovider --basetemp .test-tmp-grid-axis`：41 passed、1 failed／25.16秒。唯一失敗為新增測試誤用大存HTTP201，修正為現有200後，以 `tests/test_arrangement_grid.py::test_delete_axis_confirm_cas_replay_history_and_registration_invariants`、`--basetemp .test-tmp-grid-axis-cas`補跑1 passed／0.89秒。42項均有通過證據，未稱同一次42 passed。覆蓋刪軸merge頭中尾縮小、單格解除、唯一文字保留／搬移、空白anchor、衝突原子拒絕、stable target、strict bool、文字/title確認、stale/replay、CSRF、audit注入失敗全回滾、ended拒絕、固定十級／含選手／最後body保護；保存版不變、其他選手座標／version不變。
+- 初輪新增3案例×desktop/mobile：6 passed／17.5秒，`frontend/test-results/grid-axis-first`。修正低位置多文字popup高度後，`npm --prefix frontend run test:e2e -- --grep '表格刪除|拖曳修正|格位八十人|格位未知小存|格位文字409|格位大存未知|格位送出前|表格新版：邊界' --output test-results/grid-axis-final`：24 passed／53.0秒。涵蓋刪除scope/文字確認取消、保護、保存前歷史不變與列印、captured token409、503已提交回應遺失原樣重試不重複revision、選格清理；素食on/off顏色及aria、人數/格位不變無寫入；歷史0..14升序、首次底部、舊版閱讀/重讀不跳、新大存15到最新。加上既有80人、drag/取消、邊界與小大存/斷線/切場回歸。
+- 低位置多文字案例使用1000×600桌面與390×600手機，10格各300餘字，選單與dialog內容實際可捲到最後、保留／刪除／關閉按鈕在viewport；已目視 `axis-low-menu.png`、`axis-long-confirm.png`。三項功能截圖均在grid-axis-final各project輸出。
+- 補強原CAS案例desktop inline draft：409及503未知仍保留原輸入，成功receipt＋讀回後編輯器／失效選格清除；兩次payload與captured token一致。`--grep '表格刪除：確認綁舊token' --output test-results/grid-axis-draft`：2 passed／9.6秒。僅測試加斷言，production source/static未再變。
+- 全部E2E用PYTHONUTF8=1、8043、`FUCHENG_E2E_DATABASE_URL=sqlite:///data/grid-axis-e2e.db`、`FUCHENG_E2E_STATIC_DIR=dist-grid-axis`、單worker。未操控公開eb24、現用DB/admin/session/80人安排或未保存差異。手機為Chromium觸控模擬，不替代實機；本輪無新PDF/實體印表機證據，列印實作未改、完整PDF證據沿用前輪。drag仍插入下移，交換未授權。
+- 交付身份 `data/grid-axis-delivery-identity.json`；branch feat/competition-arrangement-grid，base89cae097，未stage/commit/merge/push。task4交付後停寫source/tests/docs/artifacts，task5再依新identity受控換版；工程驗證完成不代表人工接受或公開部署完成。
+
+## B 表格直接編輯與列印（2026-09-21，本機工程完成待公開換版）
+
+使用者授權的五項增量已完成：實際邊界＋新增／＋標題與落點線、文字／合併格／欄顯示名稱直接編輯、矩形框選、柔和素食標記、當前／歷史安排列印。桌面雙擊Enter提交／Escape取消，IME composition不誤送；手機明確編輯／二點範圍選取、原生pan。首次框選不需先選格、不需Shift，浮動工具不推表。姓名／把手仍拖人與查看，dragfix不退化。全部操作沿用B串行、token、transaction/audit及receipt恢復邊界。
+
+- 建置 `npm --prefix frontend run build -- --outDir ../dist-grid-edit`（含tsc）通過；獨立新成品，不覆寫dist-grid／dist-grid-drag或runtime static。無新增migration或依賴。
+- 後端 `uv run --locked pytest tests/test_arrangement_grid.py tests/test_arrangements.py -q -p no:cacheprovider --basetemp .test-tmp-grid-edit-final`：**33 passed／23.12秒**。驗證title-only小存/大存/history、舊0008 JSON raw bytes不回填、missing/null/default等價及復原淨差歸零、會員/報名級數與version不動、非anchor合併文字經插列/改字/unmerge仍在原格、空白merge使用anchor、stale/replay、CSRF、audit注入失敗全回滾、ended阻擋。首次新增terminal測試誤用completed enum已改為合法closed→ended，未改產品驗收標準。
+- 最終 `npm --prefix frontend run test:e2e -- --grep '格位|拖曳修正|表格新版' --output test-results/grid-edit-complete`：**26 passed／1.0分鐘**，單worker desktop1440/mobile390，另測桌面1800宽度。環境 `PYTHONUTF8=1`、`FUCHENG_E2E_DATABASE_URL=sqlite:///data/grid-edit-e2e.db`、`FUCHENG_E2E_PORT=8043`、`FUCHENG_E2E_STATIC_DIR=dist-grid-edit`。保留全部20既有格位/拖曳案例加6新增，未放寬恢復/未知/late receipt斷言，沒有重跑無關管理全量或部署演練。
+- 新增trusted desktop mouse首次未選取直接框選，起點／終點精確且表格y不變；跨有人格merge被拒絕且人不移。手機tap編輯/二點範圍選取、素食標記、桌面雙擊與取消、標題復原、合併原位字、邊界插入stable IDs、title 503原payload重試/切場保留均通過。
+- 首輪舊測試仍找已移除「＋末列」導致恢復案例失敗；已改為同操作的新邊界入口。24/26輪另發現查看姓名同時啟動範圍工具可能遮住手機把手，已分離查看與選格並通過上述最終26。均保留原斷言，未跳過失敗。
+- PDF以合成80人、11欄當前/歷史，以及14欄20body列寬長表實際輸出，Poppler渲染全部頁、逐頁目視無姓名缺漏／截斷／工具欄；pypdf對嵌入字型康熙部首先NFKC正規化，確核三份PDF每位選手恰一次。A4橫向841.92×594.96pt，當前1頁27個素、歷史1頁27個素、現況餐食變更後寬長表5頁26個素。寬表有橫向合併續接、body合併跨段保留、最後原格的第039號僅出現一次。DOM也核對每registration ID恰一次，不受姓名搜尋／素食toggle影響。
+- 單幅不加技術列號；寬長表4個邏輯分幅因實際文字行高為5個紙頁，額外頁重複欄表頭，分幅/合併續接清楚；未宣稱18列必定一紙頁或任意500列50欄可塞一页。超長文字／更多表頭／不同字型、紙張與瀏覽器可能進一步分頁，仍需列印預覽核對。
+- 列印關閉/取消後afterprint清理portal、切場/切版亦清理；測試mock列印與真PDF均核對清理後app恢復。早期第二/三份PDF因測試explicit screen emulation輸出screen CSS，已更正每份PDF擷取前明確print media並斷言app隱藏/print可見；本節僅引用最終grid-edit-complete PDF。
+
+手機補驗：main指出complete截圖仍有desktop hint且左邊界接近裁切。已在既有mobile案例末段改為純tap並把scrollLeft回0；明確斷言「範圍選取」可見、desktop hint隱藏，實際tap左側插欄＋與上側插列＋，驗rows/columns各+1，再二點選取得到2格且scrollLeft=0。`npm --prefix frontend run test:e2e -- --project mobile --grep '表格新版：邊界' --output test-results/grid-edit-touch-origin`：**1 passed／9.5秒**。新viewport截圖 `frontend/test-results/grid-edit-touch-origin/competition-levels-表格新版：邊界插入、直接標題與合併原位文字、框選-mobile/grid-edit-mobile-touch-origin.png` 目視左＋/範圍入口清楚。原因是先前case混用.click及水平捲動的截圖狀態；production code/static未修改，未重build／重跑26項。
+
+證據路徑（以下相對B worktree）：
+
+- `frontend/test-results/grid-edit-complete/competition-levels-表格新版：邊界插入、直接標題與合併原位文字、框選-desktop/grid-edit-interactions.png` 及同名mobile目錄。
+- `frontend/test-results/grid-edit-complete/competition-levels-表格新版：完整列印與歷史凍結、寬表長表分幅-desktop/arrangement-current.pdf`、`arrangement-history.pdf`、`arrangement-wide-long.pdf`。
+- 全頁渲染 `data/grid-edit-pdf-final/current-1.png`、`history-1.png`、`wide-long-1.png`～`wide-long-5.png`；抽取核對 `verification.json`。
+- 來源/static身份 `data/grid-edit-delivery-identity.json`。branch仍feat/competition-arrangement-grid，base89cae097，既有未提交工作保留；未stage/commit/merge/push。8042 listener56896、8044 listener44424仍在、8043已退出，未改publicDB/admin/session/安排/未大存差異。沒有實體印表機／實機手機／公開換版證據。task4交付後source停寫，task5再受控更新同eb24。
+
+## B 拖曳互動修正（2026-09-21，本機工程完成待公開換版）
+
+使用者在eb24驗收後指出拖完會開資訊卡與拖曳視覺不足。本輪只修改三個應用來源：`useLevelCardDrag.ts`、`LevelCardBoard.tsx`、`styles.css`，其餘B source（含全部後端／migration）hash與前輪交付一致；不修改現用eb24/A服務、DB、密碼或session。既有所有dirty保留，未commit/merge/push。
+
+原因：pointerup呼叫onMove使小存進入blocked，瀏覽器後續click又被姓名按鈕的blocked分支當作查看；hook清除active後沒有保留該pointer的拖曳click歸屬。現在在window capture只攔截同次真拖曳完成/取消後的派生click，跨來源把手／姓名及落點皆生效；新pointerdown立即釋放歸屬，keyboard激活不阻擋，不用延遲全禁click吞下一個正常操作。普通查看統一由click觸發，取消時也清理pointer capture/計時器/visual。
+
+單一ghost改由body portal呈現，寬高取來源姓名卡，僅姓名＋原辨識註記；desktop跟游標、touch浮在手指上方，限制於viewport。active來源opacity=.25但原格保留，drop/Escape/touchCancel/失敗後恢復1；普通touch捲動不啟drag。grab僅可拖曳格，busy/readonly保留正常查看游標，active時grabbing。沒有改精確格位/插入/小存/大存/歷史/搜尋/合併契約。
+
+- `npm --prefix frontend run build -- --outDir ../dist-grid-drag`（含tsc）通過；新獨立成品 `dist-grid-drag`，未覆寫8042使用中的dist-grid或eb24 frozen static。
+- 首輪 `npm --prefix frontend run test:e2e -- --grep 拖曳修正 --output test-results/grid-drag-first`：**4 passed／13.9秒**。main目視desktop drag-preview-cell-name及mobile drag-preview-cell-grip確認尺寸／內容／淡化方向。
+- 補可拖曳游標scope及普通把手tap/click回歸後，最終 `npm --prefix frontend run test:e2e -- --grep '格位|拖曳修正' --output test-results/grid-drag-final`：**20 passed／41.8秒**（原B16＋新增4）。只跑受影響格位範圍，沒有重跑原12管理案例或backend/migration演練。
+- E2E使用8043、`data/grid-e2e.db`、`FUCHENG_E2E_STATIC_DIR=dist-grid-drag`、`PYTHONUTF8=1`，初始化的只有專用合成測試庫。trusted mouse由來源姓名/把手拖到目的姓名、trusted CDP touch長按把手拖到目的姓名，刻意掛起成功後GET，覆蓋最容易誤觸的blocked窗口。断言drop後無dialog、ghost可見及內容/尺寸/跟手座標、來源opacity=.25/清理回1、立即下一次click/tap與keyboard仍開；另測Escape/touchCancel/503失敗、busy詳情查看、普通touch橫捲不寫也不殘留淡化。最終截圖保存在grid-drag-final各project目錄。
+- 交付身份 `data/grid-drag-delivery-identity.json`：50 allowlist來源清單及新static三檔SHA；`changed_since_B`只有上述3檔，原dist-grid三檔與前次identity完全一致，`git diff --check`通過。JS `index--v5lmZ5o.js`、CSS `index-C7LmpEmg.css`。task5須依新identity核對並凍結換版；舊grid-delivery-identity仍保留供比對。
+- 收尾8042 listener56896與8044 listener44424維持，8043已退出，未另建預覽或操作現用session。手機是Chromium可信事件模擬，不替代實體手機驗收。新bundle尚未更新eb24；由orchestrate序列安排task5。task4交付後source停寫。
+
+## B 公開入口增量驗收（2026-09-21）
+
+最新 axis 三項功能版於同一 eb24 發布，54 個 production 檔摘要 `5abb9dd18a96aae083bcab6a5eaf62d703daa6f522537b5b317ae56fb17efc5b`。發布前新版唯讀解析原 2 workspace、5 個有布局保存版、47 receipt 成功；停止 B app 後 Backup API 備份，原 DB 啟動新版後 18 表 hash／count 完全一致。公開有限 smoke 結束後 18 表仍完全一致，integrity_check=ok、foreign_key_check=0、schema0008，未 migration／reseed／改密碼／登出／大存。
+
+實際 IAB 獨立分頁沿用 session：第 5 排含 10 位選手時刪除停用，第 11 直欄固定級數欄刪除停用；第 4 排文字預覽列出甲／乙／丙組，進入確認後焦點在「保留這個範圍」，選保留退出，沒有提交刪除。素食按鈕 on 為 aria-pressed=true、深綠 rgb(40,92,62)／白字，off 為 false／白底。歷史依起始基準→合成完整布局→公開 B 格位驗收→版本 3 排列，版本 3 帶最新標籤；首次清單 scrollTop=42、scrollHeight=330、clientHeight=288，已到底。讀取舊版後拖曳／邊界選單皆為 0，返回目前安排全部格位內容一致。證據：runtime 的 `grid-axis-browser.json`、`grid-axis-update.json`，release `grid-axis-20260921-113513` 的 before-data／after-start-data／after-smoke-data JSON。先前 UNKNOWN 活動紀錄保留，不因本次一致而改寫其歸因。
+
+沿用 task4 的 backend 41 項通過＋修正錯測後單項 1 項通過（不是一次 42 項）、24 E2E／53 秒＋draft/token 2 項／9.6 秒，以及含 tsc 的 build。沒有重跑無關全量、重產 PDF 或實機觸控驗收；列印與拖曳 insertion/downshift 行為保持既有範圍。工程公開驗證完成，使用者人工驗收另行確認。
+
+最新五項功能版已於同一 eb24 更新（11:08 台北）：production 53 檔摘要 `eaf8d9ce6f002a89575710641bd36886c4da59812a89ec6ede17fe670b76eb48`，成品 dist-grid-edit。發布前既有 2 個 workspace、4 個有布局保存版、32 筆操作 receipt 均可由新模型唯讀解析；停止 B app 後 Backup API 備份，啟動新版後 18 個資料表的 hash／count 全部一致（包含原 JSON bytes、稽核、admins、login_sessions、會員／報名快照）。integrity_check=ok、foreign_key_check=0、schema0008，沒有 migration、重建資料、大存或 session 撤銷。公開 `/api/health` 為 JSON 200，HTML／JS／CSS 全部 200、hash 符合 manifest、no-store。
+
+實際獨立 IAB 分頁沿用既有登入：取消拖曳後無詳情誤開、無 ghost、格位不變；正常點擊 03 詳情成功；合併文字原位編輯後 Escape 退出且文字／格位不變。列印按鈕建立完整 80 人、20 個「素」的 print DOM，registration IDs 與目前全名單相同，print CSS 已載入；IAB 本輪未進入實際 print media，媒體版面與分幅證據沿用 task4 已驗證 PDF，不能稱為公開實機列印完成。本 task 沒有有效 drop／插入／文字提交／完整保存。
+
+重啟當下的 18 表一致證據與後續使用情形分開記錄：11:08:37–45 出現 10 筆後續 insert_row／insert_column 操作，11:09:53 的 smoke 後比對 workspace／operations／competition_audits 因此不同，其餘 15 表含 session、會員、報名及保存版仍相同。11:11:24 又有一筆 insert_row；來源目前 UNKNOWN，不能歸因 main 或使用者。task5 手勢前首次 DOM 的行列 ID 及 80 人座標精確吻合 revision36，代表前兩筆已先發生；revision45 在 task5 驗證分頁關閉後發生，中間時段不能僅凭共用 admin actor 判定 client。沒有已確認的非預期 UI trigger，也未為此新增測試寫入；時間線已交 orchestrate 判斷。這些後續變更完整保留，不還原成舊備份。證據位於 runtime 的 `grid-edit-update.json`、`grid-edit-browser.json`、`grid-edit-operation-timeline.json`、`grid-edit-initial-dom.json`，及 `releases/grid-edit-20260921-110654/before-data.json`、`after-start-data.json`、`after-smoke-data.json`。沿用 task4 已交付 33 backend、26 E2E、追加 touch 1 項與 PDF 證據，未重跑完整測試；人工驗收仍由使用者決定。
+
+後續拖曳修正：task4 的 `dist-grid-drag` 已切至原 eb24，source50 摘要 `490b5aa7ead24f1a7b744a26e99aa2e0fed03c65bff102768c0c81a95dfa65ef`，只變更三個 frontend 來源。公開 HTML／JS／CSS 200、SHA256 與 manifest 一致、Cache-Control 均 no-store；原凍結來源未改。獨立 IAB 分頁使用既有 session，拖起合成 03 後移出表格取消，格位完整一致、無詳情誤開、ghost 已清；隨後正常點擊姓名可開啟詳情。未在主場有效落格、大存、重設、登入或登出；原本已有未完整保存差異並保留。切換前後會員、報名、安排 workspace／operations／versions、稽核與 admins 表 hash 一致。drop／saving 競態及 mouse／touch 由 task4 隔離環境 20 項 trusted E2E（41.8 秒）與 typecheck／build 通過證據支持，本次未重跑或外推為物理手機驗收。增量證據：runtime 的 `frontend-drag-update.json`、`frontend-drag-browser.json`。
+
+B 公開入口為 `https://eb24-140-116-158-107.ngrok-free.app/admin/competitions`，以下為本次增量證據，補充後文 task4 的本機交付紀錄。B 仍為 `89cae09754eaefa4dba6c3dce308482526f33ff2` 加未提交變更；50 檔來源 SHA256 `c25556fbde911448ce2672e0082ed9056b6aad48447a36fbce3f7b77bf546f2e`，原來源與凍結副本、3 檔 dist-grid 與公開 static 最終全部相符。
+
+- 正常 TLS 的公開 health／登入／管理讀取均 200。匿名管理讀取 401；錯誤 Origin／缺 CSRF 403；錯 Host、缺代理頭、HTTP forwarding、非信任 loopback forwarding 及公開偽造 forwarding 均 400；cookie 為 Secure、HttpOnly、SameSite=Lax。
+- 實際公開 IAB 桌面 1440×900：將合成 02 從第一隊第 2 級拖到同列第 1 級的指定空格，原格留空，畫面顯示已自動儲存；整頁 reload／重選場次後，完整格位 DOM 與重載前一致、80 人仍全數存在。
+- 經正常 UI 保存「公開 B 格位驗收」，打開該歷史版本後格位／合併／文字相同、拖曳 handles 為 0；返回目前安排仍完全一致。歷史讀取與返回前後所有 SQLite 表內容 hash 均未改變。
+- main 另在真正 IAB tab2 登入確認甲乙丙表頭／左隊名／密集表格、04 的本場餐食與當次／長期級數、欄底移動說明、素食 20 人、搜尋 80 後 1 姓名／79 占位；已清除篩選與選取，無管理寫入。task5 沿用 main 回報，未重複或撤銷其 session。
+- 新庫由 8042 合成庫以 SQLite Backup API 複製，初始逐表一致；保留原管理員及歷史 actor，再以既有 CLI/hash_password 建立已授權 admin。最後確認會員與 hard_level_snapshot 未改、原保存版完整保留、只新增 1 個完整保存版、integrity_check=ok、foreign_key_check=0，schema 為 0008。
+
+本次證據存於 B 的 `data/grid-public-runtime/identity.json`、`ready.json`、`security.json`、`browser.json`、`desktop.png`、`final-verification.json`。既有 109 backend／final affected 9／28 E2E（B 16＋既有 12）、型別及 build 結果沿用 task4 交付，不形式重跑；觸控證據仍是模擬測試，沒有真實手機觸控或球館現場驗收。工程驗證完成不代表使用者已接受；未 commit／merge／push／建立 B image／正式部署。
 
 2026-09-21階段A Git交付範圍：緊湊表格、完整安排保存／唯讀歷史、0007、必要測試與部署接續文件，共33項來源變更；從 `0970af2` 整合至main並正常推送，沒有納入後續B需求。整合核對48個應用來源與3個runtime靜態檔仍符合公開驗證身份，沿用下述101項後端、final affected 39項及22項E2E與公開80人證據，不形式重跑。DB、帳密、成品與ignored launcher不進Git；未執行的Docker drill仍僅為準備腳本。以下「未提交」及資源狀態均保留為各次驗證當時紀錄，最新Git身份以交付commit／main／origin/main核對為準。此Git交付不重啟預覽、不改資料／帳密／session，也不是正式部署或Docker hold解除。
+
+## B 精確格位安排表（2026-09-21，工程驗證完成待人工驗收）
+
+B從A已推送提交 `89cae09754eaefa4dba6c3dce308482526f33ff2` 建立唯一worktree `D:\projects\fucheng-players-system-worktrees\arrangement-grid`，分支 `feat/competition-arrangement-grid`；自己的.venv與node_modules，未改依賴lock。A從主目錄src載入8041，因此B source/DB/static/port均隔離。未commit/merge/push、未公開部署，worktree保留待驗收。
+
+已實作與驗證：精確格位小存／重載，同欄位置也保存；有人格先挪來源留洞、目標插入向下，僅推必要選手，保留原空洞／文字／merge，必要時增列；點選／鍵盤落目標欄底。受影響選手version更新，舊直接level stale409；會員長期級數與hard snapshot不改。行列穩定ID，插空列不把每人視為重新分組。header/body分層保存，甲乙丙合併在數字級數標頭上方，左側文字隊名可對齊選手橫列。文字/空格可合併與解除，多文本/選手/既有merge/跨數字標头明確拒絕；原底格內容保留。
+
+搜尋只呈現匹配姓名，其他人顯「已占用」不壓縮格位；搜尋後拖進隱藏占位仍插入讓位。素食以本場diet計數/外框高亮，不篩人、不改異動色；詳細卡含本場餐食、當次/長期級數，舊history未記錄欄位為未知。位置/級數改回基準清色，完整保存含文字/行列/merge，歷史唯讀、返回不寫入。未知結果及成功待fresh GET整場鎖，固定payload原樣重送，不用舊receipt覆蓋較新布局；409重新核對，文字草稿跨場保留。純布局/文字修改有實際admin與時間audit。
+
+### 實際驗證紀錄
+
+- `uv sync --locked`：獨立Python3.14.6/.venv成功；`npm ci`：123套件、0 vulnerabilities，沒有依賴修改。
+- 原 arrangements＋levels聚焦回歸：33 passed／21.32秒；新初版grid5 passed／2.90秒。
+- 全套 `uv run --locked pytest -q -p no:cacheprovider --basetemp .test-tmp-grid-all`：**109 passed／53.86秒**。之後只收緊diet回應Literal與新增公開報名同步測試，`tests/test_arrangement_grid.py --basetemp .test-tmp-grid-final`：**9 passed／5.04秒**。只有2項既有FastAPI/Starlette棄用warning；不將局部結果稱為重跑全套110。
+- 包括strict操作/明確GridLayout與receipt、跨API request_id409、位置與級數交易、公開正取新增/取消/遞補、所有被推選手version、同token兩admin一成一409、old receipt重送、workspace/operation/audit失敗rollback、insert header/文字merge/解除、多文本拒絕、文字欄不能落選手、移回無淨差。
+- 0007→0008合成含3個舊歷史版：舊所有表原欄位與rows_json原文逐欄一致，新layout全null、workspace/operations空，沒有回填歷史；pre-upgrade backup還原新target仍0007且舊snapshot相同。升級後integrity=ok/FK=0、Alembic check無差異。舊history API schema1/layoutnull、diet/member_level未知；B POST初始化不改舊latest且保留未大存級數差，第一次B大存schema2包含全部布局。
+- `npm --prefix frontend run build -- --outDir ../dist-grid` 含tsc通過。最終JS `index-CzXpTD6B.js`，CSS `index-LxQ8-DAs.css`；`git diff --check`通過。沒有把dist建進A成品或其static。
+- E2E全程 `FUCHENG_E2E_DATABASE_URL=sqlite:///data/grid-e2e.db`、port8043、static `dist-grid`、`PYTHONUTF8=1`，單worker、桌面1440×900／手機390×844（isMobile/hasTouch）。A的卡片/級數專用10 UI案例改写為B的16格位案例，其餘12管理/公開/刪除/匯入回歸保留。
+- 首次B10項為5過/5失敗，包含重載後測試沒重選場次、文字輸入定位、mobile測試目標位置；修正fixture/定位並用明確文字aria-label，套用main最新搜尋隐藏占位語義後，`--grep 格位 --output test-results/grid-second`：10 passed／23.2秒。
+- 擴至26項 `test-results/grid-all`：22 passed/4 failed（1.2m），同一合成帳號累積登入達既有限流，後段4項停在登入。改為每desktop/mobile獨立合成帳號，不變更限流規則，並新增最遠欄觸控案例。
+- 最終 `npm --prefix frontend run test:e2e -- --output test-results/grid-final`：**28 passed／59.0秒（B16＋原12）**，非首次全綠。含trusted mouse/CDP touch長按、Escape/touchCancel、普通touch橫捲不寫、邊緣自動橫捲到第10欄、80人搜尋後drop到真占用格、重載精確坐標、keyboard欄底、素食/詳情、header合併及左隊名、完整history、位置/級數復原清色、純插列不染所有人、外部終態重讀唯讀、前置斷線/commit後503/GET失敗整場鎖、文字409切場草稿、切場晚回應、大存未知後真另一admin另存/再修改原keyretry保持fresh latest。8043測試服務完成後退出。
+
+### 8042合成預覽與限制
+
+[本機安排預覽](http://127.0.0.1:8042/admin/competitions) 使用 `data/grid-preview.db`／`dist-grid`；83合成會員、3場、85報名，主場80人＋合成甲乙丙/隊名。腳本variant grid新建，沒有用照片姓名或讀A DB。`data/grid-preview-verification.json`記新庫與initial backup/restore：integrity=ok/FK=0/revision0008且筆數相同。這不是正式資料或Docker/volume演練。
+
+`node data/grid-preview-qa.cjs`對兩尺寸只登入、選場、搜尋、素食切換與history：80姓名格、11欄（十級＋文字）、1標題列，表高約505.5px；搜尋匹配1姓名、79占位；本場素食20，無頁面水平溢出/pageErrors，adminWrites=[]。結果 `data/grid-preview-browser-verification.json`、六張 `data/grid-preview-{desktop,mobile}-{table,search,history}.png`；desktop table與mobile search已目視核對。main另目視grid-second截圖確認版面方向；這不是使用者已驗收，也不代替球館實體手機。
+
+8042 listener **56896**／launcher **59956**，PID檔 `data/grid-preview.pid`、`grid-preview-launcher.pid`，logs同前綴stdout/stderr。帳密僅ignored `data/grid-preview-admin.json`，停止依README先核對當下PID/port/身分；留供驗收，未清理。主目錄A與現用f9d0/8041 source、DB/static/密碼/服務及Docker/GPU均未操作。B來源身份清單與static hash交付 `data/grid-delivery-identity.json`（後續凍結/公開由task5核對），不把未提交worktree冒稱A提交內容。
+
+已更新README/AGENTS/architecture/deployment；限制：最多500列/50欄、500字/格，合併文字先解除再編輯；無隊伍/對戰引擎、公式、Office匯入、協同游標或安排列印。公開B與使用者驗收由orchestrate接續安排，task4本輪未擴交付授權。
 
 ## 緊湊級數表格與完整安排版本（2026-09-20，取代下方 A+B 使用方式）
 
@@ -284,3 +424,57 @@ Python 3.15 正式版發布後，應更新 `.python-version` 與 `requires-pytho
 使用者於功能驗收後授權將目前全部更新提交、合併至 main 並推送 origin。此次範圍為首頁／公告、公開會員分級、免登入報名、已確認名單批次匯入、可還原的比賽刪除，以及相關遷移、測試與文件；不包含真實資料、資料庫、帳密、備份或建置成品。功能分支起點為 2679bf4，main 可快轉至相同已驗證程式；後續工作從整合後 main 接手。
 
 整合沿用本頁最近記錄的 45 項後端與 12 項 E2E 通過結果，驗證後僅調整文件接手敘述及預覽腳本的 schema revision 回報。Git 發布不代表資料庫遷移或正式部署；8032／8033／8034 預覽程序及各自資料保持不變。
+
+
+## 局部底色、復原與上方工具列驗證（2026-09-22）
+
+Windows／CPython 3.14.6／Node 24.11.0／Playwright Chromium desktop 1440×900 與 mobile 390×844 觸控模擬；無實機／其他 OS／實體印表機驗收。前端沿用既有依賴，`npm --prefix frontend run build -- --outDir ../frontend/dist-grid-undo`（含 TypeScript）及 `git diff --check` 通過。實際新版成品在 `frontend/dist-grid-undo`，舊 root `dist-grid-interaction` 等目錄不覆寫。
+
+後端：`uv run --locked pytest tests/test_grid_cell_shade.py tests/test_grid_undo.py tests/test_grid_interaction.py tests/test_arrangement_grid.py tests/test_arrangements.py -q -p no:cacheprovider --basetemp .test-tmp-grid-undo-regression` 為 **73 passed / 39.89s**。之後只新增 `test_insert_undo_restores_all_displaced_people_and_keeps_versions_monotonic`，以 `.test-tmp-grid-undo-insert` 單案 **1 passed / 0.78s**；生產碼未改，共 74 案證據，並非單次 74 passed。初輪兩個新測試 fixture 問題（預備調級已建基準、重用會員編號）已修正。
+
+驗證包含 cell_shades strict 值／重複或孤立座標／最大範圍／合併閉包與反向選取／move、insert、delete 保格色／舊 bytes、no-op、保存歷史、CAS、auth、terminal、audit rollback；undo 連續、分支、server 前態拒不合法／名單不符、外部名單／會員／餐食／保存斷鏈、多選手跨級稽核回滾與重播、version/revision 單調、舊 receipt 與私有 metadata 不外洩。
+
+E2E 均 single worker、8043、`FUCHENG_E2E_DATABASE_URL=sqlite:///data/grid-undo-e2e.db`、`FUCHENG_E2E_STATIC_DIR=frontend/dist-grid-undo`。於 frontend 執行 `npm run test:e2e -- competition-levels.spec.ts` 搭配下列 grep/output：
+
+- `編輯工具：上方|編輯工具：文字外點` → 首跑文字 desktop/mobile 2 passed，工具列 2 fail 是舊 helper 點 disabled 取消選取及誤把手機捲動當布局位移；修 helper 後 `編輯工具：上方` → **2 passed / 8.8s**，證據 `test-results/grid-undo-toolbar`。
+- `局部底色：|編輯工具：復原|表格互動：|拖曳修正|表格新版：` → **21 passed、1 failed**，證據 `test-results/grid-undo-integration`；失敗是舊標題斷言尋找已被保留的 disabled input 取代的 button。
+- 修該斷言與 inline pending 不攔核對按鈕後，`表格新版：標題失敗|編輯工具：文字外點|編輯工具：復原` → **6 passed / 20.0s**，證據 `test-results/grid-undo-final-text`。其他已通過且不受修正影響的證據沿用，總計 26 個不同 desktop/mobile 案例有通過證據，不宣稱單次全 26 通過。
+
+實際 PDF：`frontend/test-results/grid-undo-integration/competition-levels-局部底色：格位橘底合併歷史與實際PDF-desktop/local-default.pdf` 與 `local-background-off.pdf`。每次重新建立凍結 printJob 後呼叫 PDF，afterprint 清理正常；兩者各 1 頁，合成選手 000／001／002 各一次。Poppler 100dpi 渲染為 `data/grid-undo-pdf/*-1.png`，目視確認局部灰覆蓋排灰、文字／素標完整；237、217、196 三階灰像素分別 4902、3668、41808，default 與 background-off 全圖一致，詳 `data/grid-undo-pdf/verification.json`。本次文字待核對的小修不影響列印碼，重用同輪 PDF 證據。
+
+上方工具列手機換行及右上 X／綠色素標圖片在 `frontend/test-results/grid-undo-toolbar/competition-levels-編輯工具：上方固定入口與卡片外點關閉-mobile/`；orchestrate/main 已檢視。工程完成不等於使用者已驗收或公開部署；所有資料合成，本轮未動公開資料、session、ngrok、A、8042 或 8044 服務。
+
+
+## 表頭選取與等待恢復驗證（2026-09-22）
+
+本輪僅 B worktree、合成資料，Windows／CPython 3.14.6／uv 0.12.15／Node 24.11.0／Playwright 1.63.0 Chromium desktop 1440×900、mobile 390×844 觸控模擬。固定表頭可單選、工具列改字／上色與雙擊編輯；header_shade 不改 body、level 或 stable ID，清色回到既有 column.shade。未知寫入逾時保留原 request_id/payload；已取得 receipt 後讀回逾時只重新 GET。所有安排請求的 20 秒上限涵蓋 fetch 與完整 response body。
+
+根因證據：在保留的舊 frontend/dist-grid-undo 上，以合成 POST 真正提交後攔住回應並推進時鐘 21 秒，舊 UI 仍停 saving、沒有核對入口，單案預期失敗記於 frontend/test-results/grid-header-reproduce。這證實無等待上限的程式缺陷；公開使用者當次網路／代理／伺服器故障原因仍未知，不能把合成復現或 task5 的目前健康檢查當成該次原因證明。
+
+後端命令 `uv run --locked pytest tests/test_grid_header.py tests/test_grid_cell_shade.py tests/test_grid_undo.py tests/test_arrangement_grid.py -q -p no:cacheprovider --basetemp .test-tmp-grid-header`：**63 passed / 28.17s**。包含 strict 值、清除／舊 bytes、body 與軸隔離、title／undo／保存歷史、權限、CSRF、CAS、重播、no-op、交易回滾與終止場次；無新 migration／依賴，schema 仍 0008。舊程式未必能保留新欄位，不承諾舊 app 無損回退。
+
+瀏覽器均 single worker、8043、FUCHENG_E2E_DATABASE_URL=sqlite:///data/grid-header-e2e.db、FUCHENG_E2E_STATIC_DIR=frontend/dist-grid-header。在 frontend 執行 `npm run test:e2e -- competition-levels.spec.ts` 配合下列 grep/output：
+
+- `表頭修正：上色回應遺失` → **2 passed / 9.1s**，test-results/grid-header-timeout。真實合成提交後回應遺失、unknown 鎖定、原 key/payload 重播不重複 revision、恢復後再次修改。
+- `表頭修正：回應內容|表頭修正：單選|表格新版：|編輯工具：文字外點|編輯工具：復原|局部底色：選區|表格互動：中央` → **18 passed / 53.1s**，test-results/grid-header-integration。包括 body 讀取卡住、receipt 後 GET-only 恢復、初次 GET timeout、離線重試、表頭與 body 選取互斥、鍵盤／觸控、文字／色階、undo、歷史／列印及既有拖曳／文字回歸。
+- readonly review 發現選中表頭後 body 右鍵未清掉 header selection，修正後 `表頭修正：單選|局部底色：選區` → **4 passed / 14.0s**，test-results/grid-header-final；實際工具列上色請求為 shade_cells，表頭保持不變。
+- 手機單案視覺補驗發現窄畫面範圍按鈕依賴 pointer:coarse 且全域 hover 遮住表頭底色；test-results/grid-header-visual 的 1 failed 已以局部 CSS 修正。最終 `表頭修正：單選|編輯工具：上方` → **4 passed / 13.8s**，test-results/grid-header-visual-final。最新手機互動畫面為該目錄下 mobile/header-selected-toolbar-screen.png（完整路徑含 test 名稱）；header-mobile.png 是 print media，不作互動畫面證据。
+
+上述 scoped runs 共 **22 個不同 desktop/mobile 案例有通過證據**，並非單次 22 passed。最後僅將未知結果提示改成「表格調整與保存」「重試不會重複執行同一次修改」，沒有匹配舊句的測試 locator。最終 `npm --prefix frontend run typecheck` 與 `npm --prefix frontend run build -- --outDir ../frontend/dist-grid-header` 通過；文案後未重跑 E2E，重用相同行為與 CSS 的 scoped 證據。
+
+實際 PDF 取自 grid-header-visual-final 的 desktop/header-default.pdf 與 header-background-off.pdf。兩者各單頁、選手 000／001／002 各一次、表頭文字完整；Poppler 100dpi 渲染 1170×827，196 灰像素各 2451、兩圖完全一致，目視只有第一級表頭灰色，body 保持白色、素標與姓名完整。報告 data/grid-header-pdf/verification.json；最後恢復提示文案不影響列印碼。未驗證真實手機、其他 OS 或實體印表機，也不代表使用者已驗收。
+
+最終來源／成品／文件測試指紋見 data/grid-header-delivery-identity.json；舊六組 static 逐檔與各自 identity 核對不變，先前局部色部分成品保留。本輪未操作公開服務、DB、admin、session、ngrok，未動 A／8042，未 commit／merge／push。凍結後由 task5 依 orchestrate 授權處理發布，工程驗證不等於已發布。
+
+
+## 版本雙欄與選手單雙擊驗證（2026-09-22）
+
+B feat/competition-arrangement-grid、HEAD/base 89cae09754eaefa4dba6c3dce308482526f33ff2 上未提交增量。Windows／CPython 3.14.6／uv 0.12.15／Node 24.11.0／Playwright 1.63.0 Chromium desktop 與 mobile 觸控模擬，single worker。獨立 FUCHENG_E2E_DATABASE_URL=sqlite:///data/grid-panels-e2e.db、FUCHENG_E2E_PORT=8043、FUCHENG_E2E_STATIC_DIR=frontend/dist-grid-panels。全部合成資料，使用者截圖只參考視覺，未導入姓名或資料。
+
+命令 `npm --prefix frontend run test:e2e -- competition-levels.spec.ts --grep '雙欄選格：|拖曳修正|表格互動：中央|表格刪除：素食|編輯工具：上方|表格互動：歷次參考' --output=test-results/grid-panels-integration` 首輪 **15 passed、1 failed / 1.2m**。唯一失敗確實揭露手機取消選取後殘留 tap 候選，下一次單擊提早開詳情；修正姓名以外 pointerdown 清候選後，命令 grep `雙欄選格：單雙擊|拖曳修正|編輯工具：上方`、output test-results/grid-panels-click-final 得 **8 passed / 22.0s**。最後生產修正不改布局／版本／歷次參考，重用首輪相關通過證據，總計 **16 個不同案例有通過證據**，不是單次16passed。
+
+覆蓋單擊只選格且零寫入、mouse 雙擊、真 touch tap×2、跨人與超時不視為雙 tap、Space 不捲頁／Enter 資訊、range 雙擊只延伸不折疊不開資訊、選手區禁用 merge、歷史選取／資訊唯讀。既有拖曳正常／失敗／Escape／touchCancel／原生觸控捲動與下一次單雙擊恢復、交換／上下插入／空格落點、X／Esc／backdrop、歷次資訊晚回應／空／失敗／歷史餐食隔離皆有針對證據。
+
+布局幾何與實際 screen：1920×900 主表格>1100px、右側變動與版本頂對齊；1440×900 表格>1200px、下方兩欄；390×900 先變動後版本。三種寬度 document 溢位<=1px，diff 與版本獨立捲動，舊至新排序／最新標記／初次捲底／閱讀舊版不搶捲動與新保存定位最新均通過。screen 位於 test-results/grid-panels-integration/competition-levels-雙欄選格：寬桌面筆電手機布局與獨立捲動-{desktop|mobile}/history-panels-{1920|1440|390}-screen.png，三張已目視；最新版 readonly detail 與range screen 在 grid-panels-click-final 的「雙欄選格：單雙擊鍵盤範圍與唯讀資訊」子目錄。以上為 screen，非 print media。
+
+`npm --prefix frontend run typecheck`、`npm --prefix frontend run build -- --outDir ../frontend/dist-grid-panels`、`git diff --check` 通過。最終 build JS index-DGQG1ehm.js、CSS index-DakIpyZL.css；來源與成品完整雜湊以 data/grid-panels-delivery-identity.json 為準。僅三個前端 product 檔不同於 grid-header source manifest；backend/schema/API/deps、兩個 gesture hooks 與 print 元件未改，故不重跑後端或重新產 PDF。無實機手機／其他 OS 驗證，不宣稱使用者已驗收或已部署。8043 測試完成後退出，全部舊成品保留；無 Git stage/commit/merge/push，公開資料／服務／session／ngrok 未由 task4 操作。

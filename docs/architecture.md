@@ -148,6 +148,85 @@ SQLite batch 重建被參照表時，Alembic 專用連線暫關 FK enforcement�
 
 level每格獨立pending：saving→成功但待讀回refresh→fresh state確認version後解除；GET失敗仍鎖該格，僅重GET。未知結果固定原payload/key重PUT；409等明確拒絕可放棄再讀，不能偷換version。其他格可獨立操作，大存須所有格完成且state verified。metadata失敗保留；known拒絕核對後用新token/key保存，unknown只能原樣確認。beforeunload提醒，頁內記憶體不是持久離線佇列。
 
-排級數與報名／設定分開入口。LevelCardBoard是10欄緊湊table，手機容器水平捲動保欄位；只有小把手touch-action:none，其他區域pan-x/pan-y。350ms長按、滑鼠drag、邊缘水平／垂直捲動、點姓名展開選級數／鍵盤替代共用移動入口。橙色附前後值代表改級、綠色附加號代表新增、灰色側欄項代表移出；短暫移動描邊和持續淨差不同。歷史選版後所有格唯讀，回目前只切UI、不寫DB。state.editable隨重新讀取更新，外部結束／刪除後立即呈現唯讀。
+排級數與報名／設定分開入口。LevelCardBoard是10欄緊湊table，手機容器水平捲動保欄位；只有小把手touch-action:none，其他區域pan-x/pan-y。350ms長按、滑鼠drag、邊缘水平／垂直捲動、單擊姓名選格、雙擊姓名展開選級數／鍵盤替代共用移動入口。橙色附前後值代表改級、綠色附加號代表新增、灰色側欄項代表移出；短暫移動描邊和持續淨差不同。歷史選版後所有格唯讀，回目前只切UI、不寫DB。state.editable隨重新讀取更新，外部結束／刪除後立即呈現唯讀。
 
 目前無自訂表頭、當次安排列印、編隊或比賽引擎。版本和備份不可丟棄，0007 downgrade明確拒絕；維運回退需0006相符image與升級前備份還原至新target，保留更新後資料庫。
+
+
+## 0008 精確布局文件與交易
+
+`arrangement_workspaces` 每比賽一列，存目前 layout JSON、revision、初始化 layout、實際時間／admin；`arrangement_operations` 保存actor/payload綁定的 immutable receipt。`arrangement_versions.layout_json` nullable，新增欄不修改0007歷史row JSON或metadata。API `schema_version=2`表示具有新安排回應能力，版本自身 `schema_version=1/layout=null`表示當時沒有保存位置；布局文件內獨立 `schema_version=1` 描述 rows(role header/body)/columns(kind level/text)/sparse cells/merges 結構。
+
+穩定行列 ID 決定語義位置，完整有序row/column陣列保留空格與空行列；第幾個物理欄不能推導級數。操作以strict tagged union輸入及明確GridLayout/GridReceipt回應。BEGIN IMMEDIATE內驗auth/CSRF/lifecycle、完整state token（含本場diet/長期level）、目前layout，server運算操作，不接受client全表替換。操作結果、workspace、必要registration level/version和CompetitionAudit/RegistrationAudit一次commit；任一步失敗整體rollback。每個實際搬位者（包含被推下者）遞增registration.version；純插入列造成索引位移不遞增。
+
+legacy move插入路徑先移除來源留洞，目的為body級數格；遇選手交換carry並向下尋下一可用body格，文字與merge跳過，空格立即停止推移，必要時append body row。不接受選手落文字／合併／標題格。舊直接level API用原version契約，成功在同tx把選手放對應欄底；管理／公開正取新增、取消、遞補亦同tx同步既有workspace。沒有workspace時不因公開報名擅自生成admin布局基準。
+
+合併保留底格文字，不含選手、不重疊、不跨header/body，拒絕多段非空文字；unmerge只移除merge記錄。text操作可直接編輯合併區：使用唯一非空文字來源格，只有全空白才用anchor；多段文字或有人格衝突拒絕，保留其餘底格及解除座標。結構淨差忽略request/revision等技術欄，merge UUID亦不當內容差；row/column ID與順序、文字、merge端點以及玩家座標皆入完整保存。
+
+新布局初始化只由合法管理POST或首次合法調級的同交易執行，GET與migration不寫入。不改舊latest；舊latest.layout為null時，級數/名單差仍對舊保存版，位置/文字差對本次B初始化布局，介面明示分別基準。舊快照缺少diet/member_level預設null，不能join當前值補歷史。新保存凍結全部row展示資料與布局。
+
+同場所有布局修改／大存串行，unknown固定payload重送先查receipt，已知409重新讀取再由使用者核對送新請求；成功receipt之後讀fresh state再解鎖。切場不重定向晚回應，舊receipt不倒退latest。文字草稿由父controller按competition/cell保留，metadata亦保留；成功fresh state清對應草稿。搜尋渲染占位且不改layout，素食只改展示state。新資料不流入公開schema。
+
+
+### 0008 JSON 相容擴充：顯示標題與列印
+
+columns增加可選 `title`（不變更layout schema_version或資料表）；`column_title`以stable column ID修改顯示文字，與其他operation共用完整token／actor-payload receipt／交易稽核。title不改kind/level、選手格位、registration.version或會員／hard snapshot。missing/null預設「n 級」或「文字／備註」，明確空字串仍是空標題；前後端signature採相同預設正規化，改回預設沒有淨差。GET及舊receipt讀取只解析response，原DB JSON bytes不回填；新完整版本凍結title，後續改名不影響歷史。
+
+桌面框選與拖人分開hit ownership，前者從空白／文字／格邊起手，後者仍用name/grip。首次選取工具浮動而不推版面；手機明確二點選取保留原生pan。標題草稿使用competition/column stable ID，文字仍按competition/cell，成功fresh read才清除；unknown仍整場鎖並原樣重試。inline Enter排除IME composition，Escape取消此次編輯。
+
+ArrangementPrint從選定版本的完整rows/layout建立凍結printJob，portal隔離既有會員／管理名單print CSS。沒有按搜尋或diet toggle裁資料，diet只用該版rows。列印完成／取消afterprint、切場／切版及unmount清理portal，防止後續列印舊版。12欄／18body列分幅維持stable座標，每選手只屬一幅，交界merge取交集span並標示續接；表頭重複但不複製body選手。單幅不加技術座標欄。這是browser print，無新報表服務、Office或印表機操作。
+
+本次 JSON 擴充不需要 migration，但舊 backend 的模型會忽略 title、且不接受 column_title，因此不能以資料表 revision 同為 0008 推定可無損退回舊 app。公開更新採新凍結 source／原 DB，保留 operation receipts、state token 與 session；舊分頁仍須遵守衝突核對與未知請求原 key 重試，不撤銷 session 或替使用者重建操作。接受新 JSON 後若遇問題，優先向前修復或限制受影響寫入；僅回前端亦須先核對功能相容，不能以備份覆寫更新後資料。
+
+安全刪除布局的 delete_row／delete_column 亦屬 operation／receipt 契約擴充，雖然資料表仍為 0008，舊 backend 不認得新版 delete receipt，不能以 schema 相同作為回退依據。公開發布同批更新前後端，保留既有 request_id／receipt／session；若已有新版刪除或其他使用者操作，回退評估須以目前資料為準，不能還原發布前備份抹除操作。
+
+
+### 刪除軸、範圍確認與顯示狀態
+
+`delete_row`／`delete_column`採stable `axis_id`及strict boolean `confirmed_text`，透過既有mutate_grid的BEGIN IMMEDIATE、完整state_token與actor/payload idempotency、稽核同交易執行。固定級數欄、含registration的排、最後body排、不存在ID均拒絕。非空文字或自訂欄title需確認；不刪會員或報名。剩餘選手座標、級數、hard_level_snapshot與version保持原值。
+
+刪軸先規劃所有受影響merge，再變更layout；剩餘為矩形則保留原merge ID及合法端點，單格則解除，無剩餘則移除。唯一非空文字在剩餘格時維持原座標；來源軸被刪但merge仍有剩餘時搬至新anchor（去除anchor空白text，避免重複address）。多段文字或含選手的歧義merge拒絕，不默默丟內容。
+
+GridAxisMenu開啟時捕捉layout、token、axis ID，預覽及第二次確認使用同一範圍。對方改字後確認會409，不能沿用確認刪除新字。選單依viewport限制高度，內容獨立捲動、actions保持可達；dialog同樣處理多文字。未知操作鎖住原payload；receipt及新GET核對完成後，刪除不存在axis上的selected/end/editing及cell／column drafts。失败或未知未核對時保留輸入。
+
+素食按鈕的pressed樣式只影響呈現；badge與淨差橘色並存，不改列印資料。歷史由sequence升序渲染，最新保存版標「最新」。版本清單獨立scroll容器，只在首次開啟／換場或目前安排新增保存版時捲底；切歷史與一般rerender不重設閱讀位置。不更動基準／淨差／完整快照語意。
+
+
+### 明確拖曳意圖、灰階與歷次級數契約（2026-09-21）
+
+新前端以卡片中央作 `swap(registration_id,target_registration_id)`，上下各22%作 `insert(registration_id,target,side=before|after)`；空格用 `move_empty(registration_id,target)`。同格切換有4px遲滯，穩定上下插入線／交換對象提示；release取React layout effect已提交到畫面的preview，不重算mouseup座標，也不使用尚未渲染的frame。來源25%及單一同尺寸ghost、click抑制、取消／失敗清理沿用。legacy `move`仍為插入，不由backend猜新client意圖。空格API拒絕占用；insert錨定stable行欄格與before/after，下方尋下一合法body格，跳過header／文字／merge，不動無關欄。swap直接交換兩個合法body級數格；self／實際無變更拒絕422且無receipt或稽核。
+
+mutate_grid以操作前後所有registration座標比較，實際搬位者version各加1，跨級者competition_level及admin更新欄位同交易。跨級swap的兩個RegistrationAudit仍action=level，idempotency_key為SHA256({arrangement_request_id,registration_id})固定64字；changes中的arrangement_request_id用既有 `{before:null,after:原request_id}` 形狀，既有ActorAuditEntry可讀。整筆ArrangementOperation仍用原request_id、actor/payload fingerprint；receipt、兩人level/version/audit與布局/CompetitionAudit全成功或全回滾，重送先讀總receipt不交換第二次。會員level/hard snapshot不變。
+
+`shade_row/shade_column(axis_id,shade)`僅允許strict integer 0..3；row含header/body，column僅自訂文字欄。LayoutRow/Column可省略shade，讀為0，前後端signature正規化0，還原色階可清淨差；GET不寫回舊JSON。顏色固定白／#ededed／#d9d9d9／#c4c4c4，交叉及merged涵蓋軸取max。無migration，歷史與receipt回應皆明確解析shade；舊backend會遺漏shade且不接受新operation，不能無損app-only回退。列印用底層SVG rect前景物件，不依賴CSS背景開關；內容黑字覆於其上，跨幅merged顏色仍按完整原merge計算。
+
+新admin-only GET `/api/admin/competitions/{competition_id}/members/{member_id}/level-history`回明確四欄list：competition_id/name/date、competition_level；未知場次／會員404，無符合條件回空陣列。查詢精確member_id、registration.status=confirmed、competition.status=ended且未deleted、date<所選場且<=台北today，date DESC/id DESC取5。既有非取消列唯一索引排除取消重報舊列，不按姓名串接，不用member.level/hard_level_snapshot代替，也不視為實際出賽證明。不要求所選場目前仍有有效報名，以支援歷史快照中後來取消的人。
+
+MemberLevelHistory獨立呈現即時參考；close/unmount或換人／換場會取消回寫舊promise，畫面只取當前key結果。詳情本場diet/level仍來自已檢視ArrangementRow，歷史快照唯讀不被live參考修改；historical prop才加短註「以下為目前查詢結果」。keyboard/mobile保留可達文字編輯與欄底移動，不新增帳號／公開資料／報表服務。
+
+
+### 局部灰階與伺服器收據復原（2026-09-22）
+
+`cell_shades` 是獨立於 cells 佔位的 stable row_id/column_id → strict 1..3 清單；缺少欄位與空陣列在 signature 相同，GET 不改舊 JSON bytes。`shade_cells(start,end,shade)` 允許 0..3，0 只移除 override；不提供白色 override。選區以矩形閉包反覆擴到完整相交 merge，前端高亮與後端一致。單格有效色為 local override 或原排／欄 max；merge 顯示所有底格有效色 max，merge/unmerge 保留底格設定。刪軸只 prune 該軸設定、不隨保字搬色；選手移動不搬色，空白著色不建立 text。列印沿 SVG 前景色保留 local 色，跨幅 merge 仍取完整原區域色階。
+
+復原使用原 operations 入口與 `{action:"undo",target_request_id}`，不接受 client snapshot。成功操作在既有 receipt_json 加 private `_undo`（服務端 before_layout、parent_request_id、base_version_id），公開 GridReceipt 只加 optional state_token/undo_head；舊 receipt 缺 metadata 仍可重播但不能復原，不 migration。head 以 competition/actor、完整 state_token、workspace revision 精確匹配成功 receipt，不依 created_at 排序。undo target 必須是 head、同場同人同保存基準，服務端驗證恢復布局與當前正取名單後套用；version/revision 單調增加，跨級多人以 operation+registration 的 SHA256 稽核鍵同交易更新。undo 留新 receipt/稽核，head 指回 target.parent；連續 undo 不拿 target 舊 after-token 當目前 token，也不回寫舊版本號。新操作從當前 head 延伸，不提供 redo。
+
+完整 token 包含名單／餐食／會員資料／場次狀態／保存基準／布局與 revision；外部更新或大保存會斷鏈，合法普通操作仍可開始新鏈。前端只保存本頁面已成功並讀回的 request-ID stack；receipt token 與新 GET 不符時清除可復原狀態，失敗不 pop，unknown 固定 payload 原樣重試。大保存確認後清 stack；歷史唯讀、terminal 與 input 原生 undo 邊界不放寬。
+
+工具列常駐於表格前方，沒有選格時禁用相關按鈕；色票只顯色／清除圖形與 aria/title。詳情只在 pointerdown、pointerup 均落視窗外時關閉，避免內部拖選放手誤關。文字外點先提交並消耗該次點擊，待成功讀回才關閉；IME 不送出，失敗保留 per-cell 草稿，已有未決操作時允許返回表格核對。
+
+
+### 表頭選格與請求等待修正（2026-09-22）
+
+虛擬級數表頭保留 column ID/level，使用獨立 selectedHeader，不建立假 row/cell。單擊／Enter 選取、雙擊直接改字、工具列文字沿 `column_title`；選取 header 與 body 互斥，包含右鍵 body 切換，表頭不參與矩形範圍、merge/unmerge。多個畫面表頭對應同一 column 顯示設定。`shade_header(column_id,shade)` 接受 strict 0..3；optional `header_shade` 僅保存 strict 1..3，0 移除 override，回原 column.shade（missing 視 0），只影響 th／列印表頭，絕不擴散至 body。signature missing/null 等價、GET 不回寫舊 bytes；undo、保存、歷史沿原交易／快照機制。固定十級不能刪除，title 和 header_shade 不改語義級數。
+
+安排專用 `arrangementRequest` 以 AbortController + 20 秒計時包住整個 `await request`，包含 fetch 與 JSON body 解碼。僅安排讀取／初始化／operation／完整保存／歷史版本請求使用，不變更其他 API。超時 throw 無 HTTP status 的明確錯誤，寫入由既有 controller 分類 unknown，保留 request_id/payload、整場寫入鎖及原樣重播入口；不自動重送、不假失敗／成功。已取得 receipt 而 GET 超時時保留 refresh/receipt，只重讀 GET；初次／一般 GET 超時清 loading 顯示讀取錯誤與重試。超時不表示伺服器停止執行，正確性仍由 BEGIN IMMEDIATE 與固定請求識別守護。
+
+已證實的程式缺陷：前版裸 fetch／JSON 無界等待，合成 POST 實際 commit 後讓回應懸置，前版超過新期限仍 saving 且無確認入口。公開健康檢查正常但缺該次 mutation trace，不能將合成重現宣稱為使用者該次網路根因，也沒有據此歸咎 ngrok。
+
+
+### 版本雙欄與選手點擊（2026-09-22）
+
+CompetitionLevels 保留原 rows/baseline/layout 選版與捲動狀態邏輯，僅將差異拆成 arrangement-diff，DOM 順序表格、差異、版本；名稱為「該版本變動」「版本紀錄」。本頁 main 與相鄰比賽導覽上限 2200px，1700px 以上三欄、701–1699px 表格跨全寬且下方兩欄、700px 以下依序堆疊。表格維持內部水平捲動，兩側區各自有高度上限及捲動，不改全站容器。
+
+LevelCardBoard 分開 selectPlayer/openDetail。姓名有效 click 立即選格，mouse dblclick 必須有同人兩次被接受的 click，touch 則同人 500ms 內兩次有效 tap 開資訊。drag 被抑制的尾端 click 不算有效，移動／取消清候選，姓名以外 pointerdown 清候選。range 終點保留 count=0 的短暫手勢記號，同序列第二擊既不縮選區也不開詳情。Enter 開資訊、Space 選格並 preventDefault；range 下兩鍵皆選取延伸。詳情移除選格按鈕，X／Esc／內外 pointer 邊界保持；歷史能查看資訊，寫入依原 readonly/blocked 守門。選區含 registration 時禁用合併，後端規則不變。兩個 gesture hooks、API、backend、schema 與依賴本輪皆未修改。
