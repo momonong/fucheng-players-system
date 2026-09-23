@@ -1,7 +1,7 @@
 {
   "name": "fucheng-players-frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,10 +11,11 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.0.4",
-    "vite": "7.3.6",
-    "typescript": "5.9.2",
     "react": "19.1.1",
-    "react-dom": "19.1.1"
+    "react-dom": "19.1.1",
+    "typescript": "5.9.2",
+    "vite": "7.3.6",
+    "write-excel-file": "4.1.1"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

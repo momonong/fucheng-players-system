@@ -1,7 +1,8 @@
 import { createPortal } from 'react-dom'
 import type { ArrangementRow, GridLayout } from './types'
 import { shadeResolver, PrintedShade } from './gridShade'
-import { columnTitle, legacyLayout, pointKey } from './LevelCardBoard'
+import { legacyLayout, pointKey } from './LevelCardBoard'
+import { headerCells } from './gridHeader'
 
 // Bounded tiles preserve source coordinates; wide merges are clipped to each tile,
 // repeated with a continuation label. Every body registration belongs to one tile.
@@ -32,7 +33,12 @@ export function ArrangementPrint({rows,layout:known,title,version}:{rows:Arrange
     })}</tr>)}
     return <article className="arrangement-print-page" key={`${bi}/${ci}`}><header><h1>{title}</h1><p>{version}{multiple&&<> · 第 {bi*columnBands.length+ci+1} / {rowBands.length*columnBands.length} 幅{columnBands.length>1&&<> · 第 {ci*12+1}–{ci*12+columns.length} 欄</>}</>}</p></header>
       <p className="print-legend">共 {rows.length} 人 · 素＝本場素食{rows.some(r=>r.diet===null)?' · 此版未記錄的餐食保持未知':''}{!known?' · 舊版未保存格位，依級數與順位呈現，不代表當時分組':''}</p>
-      <table style={{width:`${columns.length/Math.min(12,layout.columns.length)*100}%`}}><thead>{renderRows(headers)}<tr>{multiple&&<th className="print-coordinate">列</th>}{columns.map(c=><th key={c.id} data-print-header={c.id}><PrintedShade shade={c.header_shade??c.shade??0}/><span className="print-cell-content">{columnTitle(c)}</span></th>)}</tr></thead><tbody>{renderRows(band)}</tbody></table>
+      <table style={{width:`${columns.length/Math.min(12,layout.columns.length)*100}%`}}><thead>{renderRows(headers)}<tr>{multiple&&<th className="print-coordinate">列</th>}{columns.map(c=>{
+        const heading=headerCells(layout).find(h=>h.column.id===c.id)!,included=layout.columns.slice(heading.left,heading.right+1).filter(v=>colIds.includes(v.id))
+        if(c.id!==included[0]?.id)return null
+        const split=included.length!==heading.right-heading.left+1
+        return <th key={c.id} colSpan={included.length} data-print-header={c.id}><PrintedShade shade={heading.shade}/><span className="print-cell-content">{heading.title}{split&&<small className="print-continuation">{c.id!==layout.columns[heading.left].id?'（合併續）':'（合併跨頁）'}</small>}</span></th>
+      })}</tr></thead><tbody>{renderRows(band)}</tbody></table>
       {columnBands.length>1&&<p className="print-legend">寬表分幅：依原欄位接續閱讀；選手不重複，合併文字於交界標示續接。</p>}
     </article>
   }))}</section>,document.body)

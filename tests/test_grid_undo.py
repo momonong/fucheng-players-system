@@ -21,6 +21,10 @@ def undo(client,auth,comp,receipt,status=200):
     return operate(client,auth,comp,{'action':'undo','target_request_id':receipt['request_id']},status)
 
 
+def redo(client,auth,comp,receipt,status=200):
+    return operate(client,auth,comp,{'action':'redo','target_request_id':receipt['request_id']},status)
+
+
 def test_undo_swap_two_people_audits_monotonic_versions_replay(app,client,auth):
     comp,member,a=setup_registration(client,auth,capacity=2)
     b=_register(client,auth,comp['id'],_member(client,auth,961)['id'])
@@ -49,10 +53,26 @@ def test_undo_swap_two_people_audits_monotonic_versions_replay(app,client,auth):
         assert db.get(CompetitionRegistration,a['id']).hard_level_snapshot==a['hard_level_snapshot']
     assert client.post(endpoint(comp)+'/operations',headers=auth,json=data).json()==receipt
     assert read(client,comp)==restored
-    undo(client,auth,comp,receipt,409) # Undo has no inverse/redo action.
+    undo(client,auth,comp,receipt,409)
     undo(client,auth,comp,swapped,409)
     assert save(client,auth,comp).status_code==422
+    redo_request=request(restored,{'action':'redo','target_request_id':swapped['request_id']})
+    redo_response=client.post(endpoint(comp)+'/operations',headers=auth,json=redo_request)
+    assert redo_response.status_code==200,redo_response.text
+    redone=redo_response.json()
+    redone_state=read(client,comp)
+    assert redone['redo_head'] is None and redone['undo_head']==swapped['request_id']
+    assert grid.signature(redone_state['layout'])==grid.signature(after['layout'])
+    assert {r['registration_id']:r['version'] for r in redone_state['rows']}=={r['registration_id']:r['version']+3 for r in initial['rows']}
+    assert client.post(endpoint(comp)+'/operations',headers=auth,json=redo_request).json()==redone
+    redo(client,auth,comp,swapped,409) # No redo remains after the successful receipt.
+    with app.state.session_factory() as db:
+        redo_audits=[r for r in db.scalars(select(RegistrationAudit)) if json.loads(r.changes_json).get('arrangement_request_id',{}).get('after')==redone['request_id']]
+        assert len(redo_audits)==2 and len({r.idempotency_key for r in redo_audits})==2
     assert client.get(endpoint(comp)+'/versions/'+initial['latest']['id']).json()==initial['latest']
+    undo(client,auth,comp,swapped)
+    redo(client,auth,comp,swapped)
+    assert save(client,auth,comp).status_code==200
 
 
 def test_continuous_undo_and_new_branch_restore_structure_text_merge_colors(app,client,auth):
@@ -60,7 +80,7 @@ def test_continuous_undo_and_new_branch_restore_structure_text_merge_colors(app,
     stack=[]
     def do(op):
         before=read(client,comp)['layout'];receipt=operate(client,auth,comp,op)
-        stack.append((receipt,before));return read(client,comp)['layout']
+        after=read(client,comp)['layout'];stack.append((receipt,before,after));return after
     layout=do({'action':'insert_row','before_id':initial['layout']['rows'][6]['id']})
     layout=do({'action':'insert_column','before_id':layout['columns'][0]['id']});col=layout['columns'][0]['id']
     layout=do({'action':'insert_header'})
@@ -76,29 +96,43 @@ def test_continuous_undo_and_new_branch_restore_structure_text_merge_colors(app,
     do({'action':'delete_column','axis_id':col,'confirmed_text':True})
     revision=read(client,comp)['layout_revision']
     for index in range(len(stack)-1,-1,-1):
-        receipt,before=stack[index]
+        receipt,before,_=stack[index]
         result=undo(client,auth,comp,receipt)
         assert result['undo_head']==(stack[index-1][0]['request_id'] if index else None)
         assert grid.signature(read(client,comp)['layout'])==grid.signature(before)
         revision+=1
         assert read(client,comp)['layout_revision']==revision
     assert read(client,comp)['rows']==initial['rows']
+    for index,(receipt,_,after) in enumerate(stack):
+        result=redo(client,auth,comp,receipt)
+        assert result['undo_head']==receipt['request_id']
+        assert result['redo_head']==(stack[index+1][0]['request_id'] if index+1<len(stack) else None)
+        assert grid.signature(read(client,comp)['layout'])==grid.signature(after), index
+        revision+=1
+        assert read(client,comp)['layout_revision']==revision
     # New action after an undo follows the surviving parent, never the discarded redo path.
-    a=operate(client,auth,comp,shade(initial['layout'],(6,6),value=1))
-    b=operate(client,auth,comp,shade(initial['layout'],(6,6),value=2))
-    assert undo(client,auth,comp,b)['undo_head']==a['request_id']
-    c=operate(client,auth,comp,shade(initial['layout'],(6,6),value=3))
+    a=operate(client,auth,comp,shade(initial['layout'],(5,5),value=1))
+    b=operate(client,auth,comp,shade(initial['layout'],(5,5),value=2))
+    undone=undo(client,auth,comp,b);assert undone['undo_head']==a['request_id'] and undone['redo_head']==b['request_id']
+    c=operate(client,auth,comp,shade(initial['layout'],(5,5),value=3));after_c=read(client,comp)['layout']
     undo(client,auth,comp,b,409)
+    redo(client,auth,comp,b,409) # A new successful edit discards the previous redo branch.
     assert undo(client,auth,comp,c)['undo_head']==a['request_id']
-    undo(client,auth,comp,a)
-    assert grid.signature(read(client,comp)['layout'])==grid.signature(initial['layout'])
+    undone_a=undo(client,auth,comp,a)
+    assert undone_a['undo_head']==stack[-1][0]['request_id'] and undone_a['redo_head']==a['request_id']
+    redo(client,auth,comp,a)
+    assert redo(client,auth,comp,c)['redo_head'] is None
+    assert grid.signature(read(client,comp)['layout'])==grid.signature(after_c)
 
 
 @pytest.mark.parametrize('external',['member_level','member_name','diet','competition','registration','save'])
 def test_external_changes_break_undo_but_allow_new_operation(app,client,auth,external):
     comp,member,reg=setup_registration(client,auth);initial=init(client,auth,comp)
-    previous=operate(client,auth,comp,shade(initial['layout'],(6,6),value=1))
+    parent=operate(client,auth,comp,shade(initial['layout'],(6,6),value=1))
+    previous=operate(client,auth,comp,shade(initial['layout'],(6,7),value=1))
     stale=request(read(client,comp),{'action':'undo','target_request_id':previous['request_id']})
+    undone=undo(client,auth,comp,previous)
+    stale_redo=request(read(client,comp),{'action':'redo','target_request_id':previous['request_id']})
     if external=='save':assert save(client,auth,comp).status_code==200
     else:
         with app.state.session_factory.begin() as db:
@@ -108,10 +142,13 @@ def test_external_changes_break_undo_but_allow_new_operation(app,client,auth,ext
             elif external=='competition':db.get(Competition,comp['id']).version+=1
             else:db.get(CompetitionRegistration,reg['id']).version+=1
     assert client.post(endpoint(comp)+'/operations',headers=auth,json=stale).status_code==409
+    assert client.post(endpoint(comp)+'/operations',headers=auth,json=stale_redo).status_code==409
     undo(client,auth,comp,previous,409) # Fresh token cannot bypass the broken chain.
+    redo(client,auth,comp,previous,409)
     fresh=operate(client,auth,comp,shade(initial['layout'],(6,6),value=2))
     assert undo(client,auth,comp,fresh)['undo_head'] is None
     undo(client,auth,comp,previous,409)
+    undo(client,auth,comp,parent,409)
 
 
 def test_undo_auth_actor_competition_old_receipt_and_terminal(app,client,auth,admin_password):
@@ -129,6 +166,8 @@ def test_undo_auth_actor_competition_old_receipt_and_terminal(app,client,auth,ad
         changed=operate(other,headers,comp,shade(initial['layout'],(4,4),value=3))
         undo(client,auth,comp,changed,409)
         assert undo(other,headers,comp,changed)['undo_head'] is None
+        redo(client,auth,comp,changed,409)
+        redo(other,headers,comp,changed)
     # Pre-upgrade receipt keeps replay compatibility but cannot acquire invented undo metadata.
     legacy_request=request(read(client,comp),shade(initial['layout'],(5,5)))
     current=client.post(endpoint(comp)+'/operations',headers=auth,json=legacy_request).json()
@@ -167,6 +206,33 @@ def test_undo_atomic_registration_and_layout_audit_failure(app,client,auth):
     receipt=client.post(endpoint(comp)+'/operations',headers=auth,json=data)
     assert receipt.status_code==200
     assert client.post(endpoint(comp)+'/operations',headers=auth,json=data).json()==receipt.json()
+
+
+def test_redo_atomic_registration_and_layout_audit_failure(app,client,auth):
+    comp,_,a=setup_registration(client,auth,capacity=2)
+    b=_register(client,auth,comp['id'],_member(client,auth,963)['id']);b=move(client,auth,b,8)
+    initial=init(client,auth,comp)
+    swapped=operate(client,auth,comp,{'action':'swap','registration_id':a['id'],'target_registration_id':b['id']})
+    undo(client,auth,comp,swapped)
+    before=read(client,comp)
+    data=request(before,{'action':'redo','target_request_id':swapped['request_id']})
+    def fail_second(mapper,connection,target):
+        if target.registration_id==b['id']:raise RuntimeError('redo second audit')
+    def fail_layout(mapper,connection,target):
+        if target.action=='layout_change':raise RuntimeError('redo layout audit')
+    for model,handler in [(RegistrationAudit,fail_second),(CompetitionAudit,fail_layout)]:
+        event.listen(model,'before_insert',handler)
+        try:
+            with pytest.raises(RuntimeError,match='redo'):client.post(endpoint(comp)+'/operations',headers=auth,json=data)
+        finally:event.remove(model,'before_insert',handler)
+        assert read(client,comp)==before
+        with app.state.session_factory() as db:assert db.get(ArrangementOperation,data['request_id']) is None
+    response=client.post(endpoint(comp)+'/operations',headers=auth,json=data)
+    assert response.status_code==200,response.text
+    receipt=response.json()
+    assert receipt['redo_head'] is None and receipt['undo_head']==swapped['request_id']
+    assert grid.signature(read(client,comp)['layout'])==grid.signature(swapped['layout'])
+    assert client.post(endpoint(comp)+'/operations',headers=auth,json=data).json()==receipt
 
 
 @pytest.mark.parametrize('corruption',['member','duplicate','merge','shade','baseline','revision'])

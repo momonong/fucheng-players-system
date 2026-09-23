@@ -19,10 +19,10 @@ export function GridInsertControls({layout,table,disabled,onOperate,stateToken}:
       const head=element.querySelector<HTMLElement>('.grid-level-head')
       if(head){
         found.push({id:'header',axis:'row',offset:head.getBoundingClientRect().top-box.top,label:'在級數標題上方插入表頭列',operation:{action:'insert_header',before_id:null}})
-        Array.from(head.children).forEach((col,i)=>found.push({id:`col-${i}`,axis:'column',offset:col.getBoundingClientRect().left-box.left,label:`在第 ${i+1} 欄左方插入文字欄`,operation:{action:'insert_column',before_id:layout.columns[i].id}}))
+        Array.from(element.querySelectorAll<HTMLElement>('col[data-column-id]')).forEach((col,i)=>found.push({id:`col-${i}`,axis:'column',offset:col.getBoundingClientRect().left-box.left,label:`在第 ${i+1} 欄左方插入文字欄`,operation:{action:'insert_column',before_id:layout.columns[i].id}}))
       }
       found.push({id:'col-end',axis:'column',offset:box.width,label:'在表格右方插入文字欄',operation:{action:'insert_column',before_id:null}})
-      if(head)Array.from(head.children).forEach((col,index)=>axes.push({axis:'column',id:layout.columns[index].id,index,offset:col.getBoundingClientRect().left-box.left,size:col.getBoundingClientRect().width}))
+      if(head)Array.from(element.querySelectorAll<HTMLElement>('col[data-column-id]')).forEach((col,index)=>axes.push({axis:'column',id:layout.columns[index].id,index,offset:col.getBoundingClientRect().left-box.left,size:col.getBoundingClientRect().width}))
       setBoundaries(found);setTargets(axes)
     }
     measure();const observer=new ResizeObserver(measure);observer.observe(element);window.addEventListener('resize',measure)

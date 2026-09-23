@@ -32,14 +32,16 @@ def test_header_color_and_clear_leave_body_and_axis_data_unchanged(kind):
         assert without_header==original
         grid.validate(layout,[])
     grid.apply(layout,grid.ShadeHeader(action='shade_header',column_id=column['id'],shade=0))
-    assert layout==original and 'header_shade' not in column
-    # Clearing inherits the original column color; no zero/white override persists.
+    assert column['header_shade']==0
+    without_header=deepcopy(layout);without_header['columns'][0].pop('header_shade')
+    assert without_header==original
+    # Explicit white overrides the original column color without changing it.
     assert column['shade']==3
     with pytest.raises(HTTPException):grid.apply(layout,grid.ShadeHeader(action='shade_header',column_id='missing',shade=1))
 
 
-@pytest.mark.parametrize('value',[0,4,-1,True,'2',1.5])
-def test_stored_header_color_is_strict_one_to_three(value):
+@pytest.mark.parametrize('value',[4,-1,True,'2',1.5])
+def test_stored_header_color_is_strict_zero_to_three(value):
     layout=grid.default_layout([]);layout['columns'][0]['header_shade']=value
     with pytest.raises(ValidationError):grid.GridLayout.model_validate(layout)
     with pytest.raises(HTTPException):grid.validate(layout,[])
@@ -87,10 +89,10 @@ def test_header_title_undo_save_history_and_replay(app,client,auth):
     saved=save(client,auth,comp)
     assert saved.status_code==200 and saved.json()['layout']['columns'][0]['header_shade']==2
     clear=operate(client,auth,comp,{**op,'shade':0})
-    assert read(client,comp)['layout']['columns'][0]['header_shade'] is None
+    assert read(client,comp)['layout']['columns'][0]['header_shade']==0
     with app.state.session_factory() as db:
         raw=json.loads(db.get(ArrangementWorkspace,comp['id']).layout_json)
-        assert 'header_shade' not in raw['columns'][0]
+        assert raw['columns'][0]['header_shade']==0
     undo(client,auth,comp,clear)
     assert save(client,auth,comp).status_code==422
     assert client.get(endpoint(comp)+'/versions/'+saved.json()['id']).json()==saved.json()
@@ -105,7 +107,6 @@ def test_header_auth_cas_strict_noop_and_atomic_rollback(app,client,auth):
         assert anonymous.post(endpoint(comp)+'/operations',json=data).status_code==401
     assert client.post(endpoint(comp)+'/operations',json=data).status_code==403
     for value in [True,'1',-1,4]:operate(client,auth,comp,{**op,'shade':value},422)
-    operate(client,auth,comp,{**op,'shade':0},422)
     operate(client,auth,comp,{**op,'column_id':'missing'},422)
     def fail_audit(mapper,connection,target):
         if target.action=='layout_change':raise RuntimeError('header rollback')

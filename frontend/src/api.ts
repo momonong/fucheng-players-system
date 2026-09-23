@@ -141,7 +141,16 @@ async function arrangementRequest<T>(url:string,options:RequestInit={}):Promise<
   const controller=new AbortController()
   const timer=setTimeout(()=>controller.abort(),20000)
   try{return await request<T>(url,{...options,signal:controller.signal})}
-  catch(error){if(controller.signal.aborted)throw new Error('伺服器未及時回應，請重新核對操作結果。');throw error}
+  catch(error){
+    if(controller.signal.aborted)throw new Error('伺服器未及時回應，請重新核對操作結果。')
+    const status=(error as Error & {status?:number}).status
+    if(status===401||status===403){
+      const message=status===401?'登入已失效；請在另一分頁以原帳號登入，再回此頁確認。':'安全驗證已變更；請先重新核對。若仍失敗，請在另一分頁以原帳號登入，再回此頁確認。'
+      throw Object.assign(new Error(message),{status})
+    }
+    if(error instanceof SyntaxError)throw new Error('伺服器回應不是有效資料，結果尚未確認。請稍後原樣重試。')
+    throw error
+  }
   finally{clearTimeout(timer)}
 }
 
@@ -151,3 +160,11 @@ export const saveArrangement = (id: string, payload: ArrangementSave) => arrange
 export const arrangementVersion = (id: string, versionId: string) => arrangementRequest<ArrangementVersion>(`/api/admin/competitions/${id}/arrangement/versions/${versionId}`)
 
 export const mutateGrid = (id: string, payload: import('./types').GridRequest) => arrangementRequest<import('./types').GridReceipt>(`/api/admin/competitions/${id}/arrangement/operations`, { method: 'POST', body: JSON.stringify(payload) })
+
+// Recovery refreshes the existing session token without navigating away from pending work.
+export async function refreshArrangementSession(expectedUsername:string){
+  const auth=await arrangementRequest<{username:string;csrf_token:string}>('/api/auth/me')
+  if(!auth||typeof auth.username!=='string'||typeof auth.csrf_token!=='string'||!auth.csrf_token)throw new Error('登入確認回應不完整，請稍後再試。原操作仍保留。')
+  if(auth.username!==expectedUsername)throw new Error(`請在另一分頁以原帳號 ${expectedUsername} 登入，再回此頁確認；原操作仍保留。`)
+  csrfToken=auth.csrf_token
+}

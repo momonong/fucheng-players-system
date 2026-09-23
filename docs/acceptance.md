@@ -1,6 +1,32 @@
 # 驗收證據與限制
 
-最後更新：2026-09-22。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+最後更新：2026-09-23。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+
+## B F 表頭選取／右鍵選單／白色色票公開更新（2026-09-23，待人工驗收）
+
+b021／8044 已更新至 `data/grid-public-runtime/releases/grid-menu-20260923-102847`。59 source、3 static、14 docs/tests 與19項 evidence 逐檔 hash 核對通過；source aggregate `676db4866a50700147a641331bc416917b9ee8a3835fcc3ef50fa03a61a326cf`，static aggregate `5dabf888c310598cd30f887e17ff1f0f489a56b78ea61451068d8d7666600b5b`。local/public health JSON200，三公開資產 HTTP200/hash 相符且 no-store。WMI app46196／launcher39588／wrapper14308（parent WmiPrvSE52800），ngrok22148 沿用。AppOnly guard 停止前、啟動後及公開驗證後皆通過。
+
+SQLite Backup API 停寫備份為 `data/grid-public-runtime/releases/grid-menu-20260923-102847/rollback/grid-public-before-menu.db`（SHA256 `4d1f782bfca7f8ba2f1e0b9262cf65f65f83d95b6ac1e695fb2d79d9161c8454`），另留91個舊 source/static/runtime/helper/log 的逐檔 hash。停寫備份、啟動後及公開驗證後的18表 count/hash一致，schema0008、integrity ok、FK0；保留2 workspace／9 versions／153 receipts（81筆舊receipt無undo metadata）。無 SQL migration，DB/admin/session 與其他 unknown 保留。
+
+功能驗證沿用本凍結版：task4記錄的14項適用E2E案例證據（涵蓋桌面／手機內容選單生命週期與觸控開啟不送操作）、畫面檢查、43項後端案例及歷史／列印／XLSX證據，不重跑測試。明確 persistence 契約增加 explicit white／optional `header_merges`，舊 app 不保證解讀，雖 SQL schema 仍為0008，回退需 source+匹配備份成組處理。無可沿用公開 admin session，因此公開UI互動未重測；不登入、不操作使用者原頁。請使用者自行重整取得F，這不代表代清原頁狀態。證據為 `data/grid-public-runtime/grid-menu-update.json` 與 release before/after 資料 JSON。README／部署身份已同步；本輪未 stage／commit／merge／push。
+
+## 前次 E 同色 no-op／底色色票公開更新（2026-09-22，已由 F 取代）
+
+原 b021／8044 更新至 `data/grid-public-runtime/releases/grid-shade-20260922-222334`，58 source／3 static hash 符合 manifest；local/public health JSON200、三個公開資產200/hash一致且 no-store。WMI app33220／launcher50204，ngrok22148 不變，跨工具 guard 通過。停寫 Backup API 備份、啟動後與公開核對後的 18 表 count/hash 相同；schema0008、integrity ok、FK0，2 workspace／7 保存版／115 receipts（81 舊筆無 undo metadata）保留。
+
+使用者精確警告與 task4 真實 D 同色 POST422 no-op → rejected 鎖場重現吻合。E 修正同色不送、精確首次422無變更自動GET核對、保留選取，其他422/409/unknown防護不變；表格底色整組共框與純白首項。沿用同版14不同適用案例的通過證據（不是單次14），最後 visual 2 pass／13.6s；不重跑無關 suite。公開 admin 互動本次未重測，未登入、找 session、操作原頁或 public 業務寫入；使用者可重整原頁載入 E，不能把部署當成原頁 pending 已解除。證據 `data/grid-public-runtime/grid-shade-update.json`、release before/after 資料 JSON；README／部署目前身份已更新，未提交／合併／推送。以下 D 的未知事件敘述保留為當時證據，現以本段及 task4 E 根因為準。
+
+## B D 請求恢復／版面修正公開更新（2026-09-22，待人工驗收）
+
+原 b021／8044 已更新至 `data/grid-public-runtime/releases/grid-recovery-20260922-215041`；58 source、3 static 與凍結 manifest 全部相符，local/public health JSON200、三個公開資產 HTTP200/hash 通過。WMI app24512／launcher63472，ngrok22148 不變。停寫 Backup API 備份與啟動後 18 表 count/hash 全同；schema0008、integrity ok、FK0，2 workspace／7 保存版／113 receipts（81 舊筆無 undo metadata）保留。
+
+功能證據沿用下方 task4 同版 28 distinct E2E 的適用通過證據及同高／歷史捲動／header 檢查，不重建成品或重跑 suite。本次無可用原管理分頁，**公開 admin 互動未重測**，也未登入、清 cookie、掃描其他 session、reload 原頁或重送／discard unknown。修復的是合成重現的 receipt／恢復缺口，不代表已證實原上色事件根因或已解決原操作。公開證據見 `data/grid-public-runtime/grid-recovery-update.json` 與 release 的 before/after 資料 JSON；只保留聚合 count/hash，不輸出姓名、token 或 payload。README／部署目前身份已更新，未提交／合併／推送，待人工驗收。
+
+## B 工具列／Excel／列印精修公開更新（2026-09-22，待人工驗收）
+
+b021 已更新 `data/grid-public-runtime/releases/grid-export-20260922-173559`；58 source／3 static hash 符合 manifest，health JSON200、三個公開資產 hash 通過，WMI app34072／launcher46404、ngrok22148 持續存活。停寫備份與啟動、smoke 後 18 表 count/hash 全同；schema0008、integrity ok、FK0，2 workspace／7 保存版／113 receipts 全保留。
+
+IAB 沿用 session，80 人可見、匯出 Excel 按鈕啟用，正常重新讀取按鈕為 0；歷史 aria-pressed/expanded 隨開關由 false 轉 true，背景白色／深綠切換；搜尋按鈕 40×40、SVG 20×20 置中。只切換歷史，沒有下載、列印、重新登入、業務寫入或未知請求重送。Excel 8 份讀取／3 份視覺與 5 份 PDF，以及實體 Excel／手機／印表機限制，沿用下方 task4 本輪證據。公開證據見 runtime 的 `grid-export-update.json`、`grid-export-browser.json` 及 release 的 before/after 資料 JSON；本輪未提交／合併／推送。
 
 ## B 雙欄／選手互動公開更新（2026-09-22，待人工驗收）
 
@@ -478,3 +504,105 @@ B feat/competition-arrangement-grid、HEAD/base 89cae09754eaefa4dba6c3dce3084825
 布局幾何與實際 screen：1920×900 主表格>1100px、右側變動與版本頂對齊；1440×900 表格>1200px、下方兩欄；390×900 先變動後版本。三種寬度 document 溢位<=1px，diff 與版本獨立捲動，舊至新排序／最新標記／初次捲底／閱讀舊版不搶捲動與新保存定位最新均通過。screen 位於 test-results/grid-panels-integration/competition-levels-雙欄選格：寬桌面筆電手機布局與獨立捲動-{desktop|mobile}/history-panels-{1920|1440|390}-screen.png，三張已目視；最新版 readonly detail 與range screen 在 grid-panels-click-final 的「雙欄選格：單雙擊鍵盤範圍與唯讀資訊」子目錄。以上為 screen，非 print media。
 
 `npm --prefix frontend run typecheck`、`npm --prefix frontend run build -- --outDir ../frontend/dist-grid-panels`、`git diff --check` 通過。最終 build JS index-DGQG1ehm.js、CSS index-DakIpyZL.css；來源與成品完整雜湊以 data/grid-panels-delivery-identity.json 為準。僅三個前端 product 檔不同於 grid-header source manifest；backend/schema/API/deps、兩個 gesture hooks 與 print 元件未改，故不重跑後端或重新產 PDF。無實機手機／其他 OS 驗證，不宣稱使用者已驗收或已部署。8043 測試完成後退出，全部舊成品保留；無 Git stage/commit/merge/push，公開資料／服務／session／ngrok 未由 task4 操作。
+
+## Excel 匯出、工具列與列印格線精修（2026-09-22）
+
+B `feat/arrangement-export-print`、base/HEAD acacb876c90aad109af12edd831561fd9fa93914，Windows／Node 24.11.0／Playwright 1.63.0 Chromium desktop + mobile 觸控模擬，single worker。全部合成資料；獨立 grid-export-e2e.db／8043／frontend/dist-grid-export。
+
+`npm --prefix frontend run typecheck`、`npm --prefix frontend run build -- --outDir ../frontend/dist-grid-export`、`npm --prefix frontend audit --audit-level=high`（0 vulnerabilities）、`git diff --check` 通過。最終命令 `npm --prefix frontend run test:e2e -- competition-levels.spec.ts --grep '匯出精修：|表格新版：完整列印|表頭修正：上色回應|表頭修正：回應內容|表格刪除：素食' --output=test-results/grid-export-final`：**14 passed / 35.8s**。涵蓋 toolbar 開關與SVG中心／順序、current/history/legacy下載、匯出零寫入與不裁搜尋、真實Blob URL下載階段失敗後finally清忙碌與同頁重試、unknown禁匯出、原key重試、GET與response-body逾時恢復、歷史捲動、完整列印及寬長分幅。必要安全恢復測試保留，只改原先依賴一般手動刷新圖示的fixture。
+
+前期按需載入測試曾 4 passed/2 failed，揭露瀏覽器快取失敗 module；main已改定靜態匯入，移除臨時loader/Vite plugin及舊lazy測試。中間整合14案例未完成即取消，不算通過證據；上述14通過為最終靜態版本。
+
+8份實際瀏覽器 current/history/retry/legacy下載，由 `scripts/verify_arrangement_exports.py` 用獨立 openpyxl 3.1.5 讀回，核對每個原生儲存格文字／空位／座標／thin border／灰階／wrap／行欄尺寸、merge範圍、每人一次、純字串、無公式／外部連結／macro／media，全通過。`=SUM(1,2)`、`+第一級`、`@隊名`、`-自訂文字`與換行／繁中／emoji均保存為文字。報告 `data/grid-export-xlsx-verification.json`。openpyxl報缺default named style並套用default的非致命警告；逐格明確樣式檢查通過，未宣稱Microsoft Excel實機測試。artifact-tool只用於QA匯入渲染，未加入產品依賴；current/history/legacy PNG（data/grid-export-xlsx-visual）已目視，合併、空位、姓名、素標及歷史差異清楚且無裁字。
+
+格線鑑識見 `data/grid-export-print-forensic/REPORT.md`、measurements.json、border-detail-comparison.png：同一合成表600dpi，原SVG覆蓋5851個深色格線像素；.25mm內縮後對照no-SVG缺失0、額外0；.125mm仍有1218個差異，故採.25mm。內縮約1CSSpx白邊已接受，不將正常次像素6–7px差異視為完全相等線寬。
+
+產品PDF取自最終E2E，Poppler渲染已目視。grid-lines-default/background-off各1頁且3名各一次；current/history各1頁且80名各一次；wide-long維持4個分幅、實際5頁（首分幅自然跨2頁），80人皆恰一次，跨頁合併標示與素標完整。背景開關兩張差異限預設表頭底色區，非全圖pixel相同；設定灰階196/217/237皆保存。報告 `data/grid-export-pdf/verification.json` 與各PNG。沒有橘色搜尋／選取高亮。
+
+無後端／schema／API變更，未重跑無關後端全套。未測實體Excel、真實手機、其他OS或實體印表機；不安裝或等待，工程證據不代表人工已接受。最終指紋 `data/grid-export-delivery-identity.json`，全部舊成品保留，8043退出。未操作公開資料／服務／session／ngrok，未stage／commit／merge／push；交由orchestrate核對後安排task5發布。
+
+## D 上色恢復、同高側欄、歷史捲動與頁首（2026-09-22）
+
+沿用 B feat/arrangement-export-print@acacb876c90aad109af12edd831561fd9fa93914 與上一未提交精修；新隔離 frontend/dist-grid-recovery／data/grid-recovery-e2e.db／8043。Windows、Node24.11.0、Playwright1.63.0 Chromium桌面與手機觸控模擬，單worker，全部合成資料。
+
+原事件限制：task5唯讀核對現用grid-export-20260922-173559的58份來源及公開3資產hash一致、health200；app無access log且ngrok inspect關閉，無當次POST/GET紀錄。可用瀏覽器沒有使用者原tab，21:26截圖警告被裁掉。因此不能判定原事件屬unknown/refresh/rejected或是否已保存，也不能歸因ngrok／睡眠／session；task4未讀寫public DB、重登／reload／清cookie／解除原unknown。
+
+修前因果證據（非原事件原因）：grid-recovery-reproduce的desktop實際POST先讓revision+1，再替換成功回應為200 {}，前端拋「Cannot read properties of undefined (reading 'action')」並永久refresh、只有不能解決問題的GET恢復；預期1failed。grid-recovery-auth-reproduce預期2failed：真實同帳號新登入輪替cookie使舊頁CSRF持續403，原恢復只GET不更新token；已提交但回應遺失的unknown重試401被降rejected。以上均在新合成服務重現。
+
+最終修正：嚴格辨識小存必要receipt與原request/payload，無效成功回應維持unknown；人工恢復先GET認證並核對原帳號，保留原key/payload及草稿；合法receipt後GET失敗只讀回。unknown後401/403不丟原請求；unknown後真正409/422可重新核對，避免初次未送達、其他頁變更後一直重送舊token。20s、CSRF、CAS、actor綁定與idempotency不放寬，沒有新自動重試。
+
+驗證結果按實際輪次保存：
+- grid-recovery-first：22項中20passed、2failed／55.0s。僅最後非同步歷史首載在setup碰到合成帳號登入頻率上限，未進功能斷言；不放寬產品限流，後續改用既有另一合成帳號。
+- grid-recovery-final：12項中10passed、2failed／1.5m。無效receipt擴充object/null/204/HTML/wrong-key/wrong-operation、stale CSRF、合法receipt後異常GET、同高尺寸／header與歷史async均桌面手機通過。兩fail是401測試只等button visible便切換mock，POST因而成功、下一次等待已移除按鈕；改等實際401 response與button enabled，不改產品處理來配合測試。
+- 審查另發現unknown一律保留會使確定409無法解鎖，收斂到只特別保留401/403。最終 grid-recovery-boundary-final：**12passed／20.9s**，命令 `npm --prefix frontend run test:e2e -- competition-levels.spec.ts --grep '狀態精修：未知|格位大存未知|格位文字409|表頭修正：上色回應|表頭修正：回應內容' --output=test-results/grid-recovery-boundary-final`。包含未知後持續401、認證preflight後POST401、不同帳號不重送、未送達後真實409重核對、大存舊receipt不回退、409文字草稿保留及20s transport/body期限。最終**28個不同案例有適用通過證據**，不是單次28全套。
+
+側欄幾何驗證表格與兩側頂部／高度差<2px，涵蓋插列、刪列、長文字換行、目前／歷史切換、換場及2400/1920 resize；標題保持固定、兩區獨立scroll。1440表格上兩欄下、390堆疊且document無橫溢。頁首brand/admin左緣與arrangement-main差<2px；切報名設定恢復1240px。每次關閉重開（仍選舊版）與非同步初載皆捲到底且不改selected，開著閱讀時一般rerender不搶捲動。畫面見 grid-recovery-final 的 aligned-1920/1440/390-screen.png 與 unknown-recovery-screen.png，已目視並交orchestrate核對。
+
+最後typecheck、production build、git diff --check通過。Excel exporter／列印元件及print CSS／package-lock與前輪一致，沿用匯出與PDF證據；backend/schema未改，不重跑無關全套。未測實體手機、其他OS或實體列印。最終identity為 data/grid-recovery-delivery-identity.json，舊9組成品保留且逐檔驗hash，8043測完退出。task4未stage/commit/merge/push/部署、未動A/8041/8042與public session/DB/ngrok。工程驗證通過不代替原使用者事件根因或人工接受。
+
+
+## 同色 no-op 鎖場與色票修正（2026-09-22）
+
+使用者補充確切原文「安排沒有變更」及「重新讀取並核對」。修前先核對來源58/58檔等同D identity，獨立 dist-grid-shade／grid-shade-e2e.db／8043 合成80人、既有底色及歷史；真實 shade_header 已為2再按2，POST422 detail「安排沒有變更」→rejected／verified=false→所有編輯鎖定，桌面手機均重現。證據 grid-shade-normal-confirmed/*既有同色重點*/same-shade-observations.json。正常不同色 POST200／receipt／GET200 完成，無 React pageerror；成功清選取另導致色票disabled，與使用者的422鎖場是不同現象。沒有修改或重送原公開請求。
+
+修正：已選同色不POST；成功保留選區，outline不遮底色，支持同格不重選連續換色。「表格底色」共框、白最左及3灰、沒有可見文字數字／斜線；白保持清除局部色／繼承軸色。controller僅首次精確no-op422自動GET核對，未偽造receipt／revision／Undo／已儲存；GET失敗仍鎖定。一般422／409與unknown保持原保護，不加入自動重送。
+
+本輪14個不同案例有適用通過證據（不是單次14全套）：grid-shade-fix 8passed／2fixture failed／30.9s；grid-shade-boundary 4passed／2fixture failed／16.4s；修正合成fixture先合法插空列後 grid-shade-merge-final 2passed／16.6s。兩次merge fixture失敗分別為不存在row索引、選到含人列而被合法422拒絕，產品沒有為fixture放寬。最終去除手機色票暫時tap藍色遮罩後，grid-shade-visual-final 2passed／13.6s。早期正常診斷中止另有登入前預期401混入console監測、header清除合法null被測試誤判為0，均已修測試窗口與空值斷言。
+
+案例包含80人＋4保存版＋既有底色、header/body不重新選格连续6色、同色／已無局部色按白／merge no-op不POST、真後端3種no-op皆422且state完全不變、真422無變更自動GET再繼續修改、讀回失敗只GET恢復、一般422与unknown不自動解鎖、已寫入回應遺失原payload重試及真409衝突。正常觀測 JSON 含request/receipt/revision/選取/控制可用性。最終1440與390截圖見 grid-shade-visual-final/*/shade-palette-screen.png，已目視共框、純白及選框。Windows／Node24.11.0／Playwright1.63.0 Chromium桌面与觸控模擬；沒有真手機／其他OS證據。
+
+typecheck隨production build通過，git diff --check通過。相對D產品只5檔：LevelCardBoard、CellShadeMenu、gridShade、styles、useArrangementWorkspace。Excel exporter、列印與D側欄／頁首邏輯、後端、schema、依賴不變；沿用其前輪證據，不重跑無關全套。舊10組成品逐檔hash不變；8043已退出。指紋 data/grid-shade-delivery-identity.json，task4未stage／commit／merge／push／部署，未動公開session／DB／app／ngrok。公開更新由orchestrate核對後交task5；工程通過不代表人工已驗收。
+
+## F 格位操作選單、表頭合併與明確白色（2026-09-23）
+
+B `feat/arrangement-export-print`、起始 HEAD `acacb876c90aad109af12edd831561fd9fa93914`，Windows／Node 24.11.0／Playwright 1.63.0 Chromium desktop 與 390×844 mobile 觸控模擬、single worker。只使用合成 `data/grid-menu-e2e.db`／8043／`frontend/dist-grid-menu`；沒有公開資料、A／8041／8042／8044、ngrok 或既有 runtime 操作。新增 JSON／operation 契約沿用 schema 0008，無 migration。
+
+根因與修正：早期 `grid-menu-touch-lifecycle` 2 項失敗，一項是桌面 outside click 沒關閉，一項是手機 ⋯ 開啟後 dialog 消失；`grid-menu-header-fixed` 桌面通過、手機仍在初次開 menu 失敗。`grid-menu-touch-diagnostic` 的 `touch-events.json` 證實 pointerdown／touchstart 在 trigger，touchstart 後 portal mount；同一手勢後續相容 click 改命中新出現的 `.secondary` 菜單操作鈕並關閉 dialog。移除提前開啟的 `onTouchStart`、保留原生按鈕 click；outside pointerdown 改同步 capture-phase 並安全處理非 Element target。這是瀏覽器事件順序的實證，不是鍵盤 emulation 限制。
+
+最終 Playwright 證據（以下為分開 scoped runs，非全套一次跑完）：
+
+- `grid-menu-menu-lifecycle-fixed`：**2 passed／8.7s**。桌面完整驗表頭選取／合併／編字／Undo／outside close／Shift+F10；mobile 驗表頭 ⋯、底色 tap、outside close 與 Escape。
+- `grid-menu-mobile-no-post`：**1 passed／6.2s**。開啟手機表頭選單前後 operations POST 為 0，`layout_revision`／`state_token` 不變且 menu 保持可見；再 tap 底色才寫入，接著外點與 Escape 均關閉。
+- `grid-menu-export-recovery`：**6 passed／15.6s**。desktop／mobile 的明確白色跨區操作、目前／歷史列印與匯出、未知結果固定 payload 重試與真 409 保護、跨分幅表頭／淡橘差異 PDF／XLSX。
+
+上述結果對應的實際命令及 Playwright `.last-run.json` 完成時間（UTC）：
+
+```text
+2026-09-23T01:54:57.9766278Z  npm --prefix frontend run test:e2e -- grid-menu.spec.ts --grep 'F表頭與資料共用選單' --output=test-results/grid-menu-menu-lifecycle-fixed
+2026-09-23T01:55:44.1564053Z  npm --prefix frontend run test:e2e -- grid-menu.spec.ts --grep 'F白色|F選單未知|F跨分幅' --output=test-results/grid-menu-export-recovery
+2026-09-23T01:56:40.2499487Z  npm --prefix frontend run test:e2e -- grid-menu.spec.ts --grep 'F表頭與資料共用選單' --project=mobile --output=test-results/grid-menu-mobile-no-post
+```
+
+後端沿用本輪 touch/UI 修正前已完成的 `tests/test_grid_menu.py`、`tests/test_grid_header.py`、`tests/test_grid_cell_shade.py`、`tests/test_grid_undo.py` **43 passed**；這之後沒有後端程式變更，不重跑。`npm --prefix frontend run build -- --outDir ../frontend/dist-grid-menu`（內含 app typecheck）通過。明確白色以持久化 shade 0 覆寫軸色；缺少局部項目保留舊繼承行為，且不回填舊 JSON。
+
+`scripts/verify_arrangement_exports.py` 獨立讀回 `grid-menu-export-recovery` 的 6 份 desktop/mobile current、history、wide-header XLSX；每份 3 名選手，所有儲存格文字／座標／填色／合併／邊框／格式檢查均 **PASS**。uv 專案環境沒有 openpyxl，因此用 Codex bundled Python／openpyxl 3.1.5 執行，不新增產品依賴；openpyxl 的 no-default-style warning 非致命，逐格樣式檢查通過。兩份 desktop PDF 以 Poppler 渲染並目視：白色歷史版 1 頁、跨分幅版 2 頁，無裁切／重疊；第 2 頁只有第 13 欄，是測試此跨幅合併延續的稀疏頁。渲染 PNG 已清除，原 PDF／XLSX 留在忽略的 E2E 結果目錄。
+
+不含實體手機、其他 OS、Microsoft Excel 實機或實體印表機驗收。task4 僅交付 B worktree 未提交變更與新 identity；沒有 stage／commit／merge／push／部署。舊成品需逐檔核對後才列為未變，公開更新仍依 task5 的既有授權與 freeze／GO 流程；工程通過不等於人工驗收。
+
+## B 逐步重做、差異定位與側欄驗收（2026-09-23）
+
+B `feat/arrangement-export-print`，起始 HEAD `acacb876c90aad109af12edd831561fd9fa93914`，Windows／Python 3.14.6／Node 24.11.0／Playwright 1.63.0 Chromium desktop 與 390×844 mobile 觸控模擬、single worker。沿用 `schema_version=1` 的 0008 layout 與 receipt JSON，沒有 migration file 變更。Playwright runner 只在全新 synthetic DB 執行既有 Alembic 0001–0008；未遷移任何既有／真實資料庫。未操作公開 app、真實會員資料、session、ngrok、8041／8042 或既有預覽；8043 每輪由 Playwright 啟停，最後 listener 為 0。
+
+後端將伺服器保存的 undo 前布局引用保存在私有 receipt `_redo_stack`。Redo 只取同一 actor／場次／保存基準及現有 head、token、revision 下的 stack 頂端，以新 receipt、單調 revision／報名 version 與稽核交易重做；不接受或重送 client snapshot／舊 operation。普通新操作清除 redo 分支；大保存與外部更新斷鏈。前端 pending／unknown 保留固定 key／payload；receipt 後讀回失敗只 GET。快捷鍵 Undo Ctrl／Command+Z，Redo Ctrl／Command+Shift+Z 或 Ctrl+Y；文字輸入／IME／dialog 原生復原、歷史唯讀與 locked state 不攔截或寫入。無新增資料表或 schema migration。
+
+差異卡按 registration ID 顯示新增、移出、同級換位、跨級移動及交換，只定位目前布局中實際存在的來源／目標 stable 格位；點卡不改 revision、選區或 arrangement POST，歷史版與鍵盤／觸控操作可用。舊版本無座標／來源軸被刪除時不推算位置，顯示旁列原因。左右側欄標題保持固定、各自獨立捲動且標示比較版／目前安排；切換或重開仍回到最新版本。純結構差異保持保存能力，不出現泛用結構提示或錯誤的「沒有變更」。固定級數表頭 hover 顯示 `cell` cursor。目視發現全站 `button:hover` 會令淺色卡片轉深綠、黑字對比不足；改為淺底 hover/focus、保留新增／移出顏色，並加入 computed background assertion。
+
+驗證均對應最後 source snapshot：
+
+- `UV_CACHE_DIR=%TEMP%\codex-grid-redo-uv-cache uv run --locked pytest -q -p no:cacheprovider --basetemp %TEMP%\fucheng-grid-redo-backend-20260923 tests/test_grid_menu.py tests/test_grid_header.py tests/test_grid_cell_shade.py tests/test_grid_undo.py`：**44 passed／19.26s**，僅 Starlette/httpx 相依棄用警告。
+- `npm --prefix frontend run typecheck` 通過；`npm --prefix frontend run build -- --outDir ../frontend/dist-grid-redo-final` 通過。最終獨立 CSS `frontend/dist-grid-redo-final/assets/index-W7BGt1dM.css` SHA-256 `78399245B8D89F915CE85290FF1A2FEF5E4E0BB48A604C0DD04DA3061ACE2CA2`，內容包含淺底 hover 規則。舊 `dist-grid-redo` 原樣保留。
+- `npm --prefix frontend run test:e2e -- e2e/grid-redo-locator.spec.ts --output %TEMP%\fucheng-grid-redo-e2e-output-20260923-final-visual`：**10 passed／31.2s**；desktop／mobile 各 5 項。覆蓋 Undo/Redo 多步與分支、保存鎖定、輸入及 IME 例外、unknown 固定重試、receipt 後只讀回、外部更新失效、diff cards／歷史／舊座標、獨立側欄捲動與凍結標題、重新開啟定位最新及結構差異。
+- `npm --prefix frontend run test:e2e -- e2e/grid-redo-locator.spec.ts --grep '變動卡片以 stable 格位定位新增移出移位交換與歷史版本' --output %TEMP%\fucheng-grid-redo-e2e-output-20260923-contrast`：**2 passed／11.2s**，desktop／mobile 均對最終 build 斷言 computed background `rgb(255, 240, 194)`。
+- `git diff --check` 通過，只有既有 CRLF 正規化提示。Earlier E2E attempts found fixture issues (collapsed panel, locked menu, no-op baseline save, and a selected historical version that was not re-fetched); the fixtures/assertions were corrected without loosening API validation. A scoped rerun verified the missing-layout route interception before the final full run.
+
+最終 E2E DB 為 `data/grid-redo-20260923-final-visual-e2e.db`，對應獨立 static `frontend/dist-grid-redo-final`、port 8043；顯示用截圖複本在 ignored `data/grid-redo-visual-20260923/`（12 張 desktop／mobile current／history／missing-layout／recovery／undo-history／sidebar screens），Playwright 原始輸出保留於上述 `%TEMP%` 目錄。`data/grid-redo-delivery-identity.json` 記錄完整 dirty source、static 與 screenshot hash。其他合成測試 DB／輸出均保留，未 stage／commit／merge／push／deploy；沒有進行人工接受、實體手機或其他 OS 驗收。
+
+## v0.2.0 大型保存快照與歷史側欄（2026-09-23）
+
+B worktree `feat/arrangement-export-print`，基底 commit `acacb876c90aad109af12edd831561fd9fa93914`。後端回歸 `tests/test_arrangements.py::test_large_save_preserves_exact_layout_across_receipt_get_noop_and_history` 1 passed；覆蓋保存 receipt、GET、歷史快照、無變更 422、後續保存及第一版歷史不變。合成資料刻意含使用者新增尾列、文字／合併、列色與局部色；workspace 原始 layout JSON 在第一次大型保存前後相同。
+
+最終 Playwright E2E `frontend/e2e/grid-save-tail.spec.ts` 在 Windows Chromium 桌機與 390×844 觸控模擬各 1 passed（共 2 passed／13.0s），使用新建合成資料庫 `data/grid-save-tail-final-20260923-e2e.db`、既有 0001–0008 migrations 與獨立 `frontend/dist-grid-save-tail-final-20260923`。檢查合法滿級移動所新增列確實含選手，Undo／Redo 回復；再核對尾端空白有色列及文字／合併列在大型保存 receipt、GET、歷史讀回、第二次保存、無變更拒絕及重新整理後 row ID、角色、格數與選手位置不變。無變更保存回 422，第一版歷史保持原快照。最終輸出及截圖複本位於 `C:/Users/morris/AppData/Local/Temp/fucheng-grid-save-tail-e2e-final-20260923` 與 `data/grid-save-tail-visual-20260923/`；8043 測試後監聽數為 0。
+
+歷史側欄標題「版本紀錄」與「目前安排」按鈕同列靠兩側；保留原凍結標頭、版本列表獨立捲動與分隔線。E2E 驗證目前／歷史點選、`aria-pressed` 及按鈕高度至少 44px；桌機及手機截圖已保存。`npm --prefix frontend run typecheck` 與獨立 build 通過；未新增 migration。沒有動真實／公開資料庫、既有服務或正式部署。
+
+先前一次探索性瀏覽器測試把保存後會合理消失的淨差文字標記納入整列 `innerText` 比對，也重複執行了桌機／手機回圈；它不是產品缺陷證據。最終斷言改比 stable row ID／role／格數／選手 ID；這項測試斷言修正不是產品修復，也不代表尾端空列已修好。尾端空列偶見於大型保存或重新啟動後的情況，本輪未重現、未修復，使用者同意延後；沒有新增裁切或 fallback，也沒有以修改保存流程掩蓋問題。沒有進行公開資料、正式服務、實體手機或其他作業系統驗收。Git、image 與 B 預覽的發布狀態見 `docs/deployment.md`。

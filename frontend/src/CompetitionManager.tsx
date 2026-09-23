@@ -30,7 +30,7 @@ export function CompetitionManager({ username, onLogout }: { username: string; o
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<CompetitionDetail | null>(null)
   const [creating, setCreating] = useState(false)
-  const arrangements = useArrangementWorkspace()
+  const arrangements = useArrangementWorkspace(username)
   const [view, setView] = useState<'arrangement' | 'management'>('arrangement')
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 

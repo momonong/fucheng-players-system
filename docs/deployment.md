@@ -1,8 +1,40 @@
 # Windows Docker 部署、搬移與維運
 
-目前 B 公開版本為右側變動／版本雙欄與選手單擊選格、雙擊詳情，入口為 [b021 管理頁](https://b021-140-116-158-107.ngrok-free.app/admin/competitions)。以下 A、interaction、axis 及較早預覽均為歷史證據，不用舊 PID／來源啟動目前 B。
+目前 B 公開版本為 F 表頭選取／右鍵選單／白色色票修正，入口為 [b021 管理頁](https://b021-140-116-158-107.ngrok-free.app/admin/competitions)。以下 A、interaction、axis 及較早預覽均為歷史證據，不用舊 PID／來源啟動目前 B。
 
-## 目前 B panels 版執行身份（2026-09-22，Windows 限定預覽）
+## 目前 B grid-menu 版執行身份（2026-09-23，Windows 限定預覽）
+
+release `data/grid-public-runtime/releases/grid-menu-20260923-102847`。凍結 identity SHA256 `8c9b8879499e52a68e52cf1b63560d1d7391a22dcfc575fe0f4eda7131cf9589`；59 source aggregate `676db4866a50700147a641331bc416917b9ee8a3835fcc3ef50fa03a61a326cf`，3 static aggregate `5dabf888c310598cd30f887e17ff1f0f489a56b78ea61451068d8d7666600b5b`。public HTML `e155fca8bf7799fd62b68e8fe979b2d1dd880b659ede00ca9e204d96446ff916`、JS `index-BHRspbMV.js` SHA256 `6ce590cb20a6d811a4d96faacdd20fadfd939453652404832875147d21d8cdee`、CSS `index-BLYowlPJ.css` SHA256 `dc36d36295c72ad7a64502f4cf3b923dba33aa7876f46be980f2e9e3d1f8f5dd`，HTTP 200、no-store；local/public health 均 JSON200。完整證據 `data/grid-public-runtime/grid-menu-update.json`。
+
+app **46196**／launcher **39588** 分別於台北 10:29:32.137／10:29:32.102 啟動；WMI wrapper **14308**、parent WmiPrvSE **52800**。原 ngrok **22148**（2026-09-22 14:58:00.483 台北啟動）、b021／127.0.0.1:8044 沿用，沒有重啟或換 URL。AppOnly guard 在停止前、啟動後與公開核對後通過。
+
+停止舊 B app 後 SQLite Backup API 備份為 `data/grid-public-runtime/releases/grid-menu-20260923-102847/rollback/grid-public-before-menu.db`，SHA256 `4d1f782bfca7f8ba2f1e0b9262cf65f65f83d95b6ac1e695fb2d79d9161c8454`；91 個舊 source/static/runtime/helper/log 檔保存於同一 release 的 `rollback/`，逐檔指紋見 `rollback-identity.json`。停寫備份、啟動後、公開 health/static 驗證後的 18 表 count/hash 一致；schema `0008_arrangement_grid`、integrity `ok`、FK errors 0。保留當時 2 workspace／9 versions／153 receipts（81 筆舊 receipt 沒有 undo metadata）、DB/admin/session、其他 unknown 與舊 static/releases。沒有 SQL migration、reseed、公開業務寫入或原 pending 重送／丟棄。
+
+本版持久化 JSON 契約增加 explicit white 與 optional `header_merges`，不改 SQL schema；舊 app 不保證能解讀新版資料。若需回退，需將相符舊 source/static 與其匹配資料庫備份作為一組，先另行授權並保留故障後資料；不能只按 Alembic schema 判斷，也不能把舊 DB 覆蓋在已有新寫入的 DB 上。本次未測公開 admin UI，無現成 session；使用者需自行重整原頁載入 F。停止命令：`powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1 -CheckOnly -AppOnly`；已授權維護時才移除 CheckOnly。啟動沿用 `start-app-detached.ps1` 經 WMI，不重啟 live ngrok。未操作 A／8041／8042、Git 交付或清理。
+
+## 前次 B shade 版執行身份（2026-09-22，Windows 限定預覽）
+
+release `data/grid-public-runtime/releases/grid-shade-20260922-222334`，58 source 摘要 `ce1d6c8b068af44d8868701b22ed4373c997a51ae1094866374cb0777017c27a`，manifest SHA256 `a0f5e884eb75d140ae4490ce7b2b7209bfdb30c24bce65f3e09a99f64eccfdb2`。app **33220**／launcher **50204** 分別於台北 22:24:09.194／22:24:09.161 啟動，WMI wrapper **40792**、parent WmiPrvSE **52800**。ngrok **22148** 自 14:58:00.483 沿用，b021／127.0.0.1:8044 不變；JS `index-I2_TPn6a.js`／CSS `index-BQ87w01t.css` 及 HTML 公開 hash/health 證據見 `data/grid-public-runtime/grid-shade-update.json`。
+
+停寫 Backup API 備份 release 的 `rollback/grid-public-before-shade.db`，89 檔舊 source/static/runtime/helpers/logs 與備份 hash 見 `rollback-identity.json`。18 表 before/after-start/after-verification count/hash 相同，schema0008、integrity ok、FK0；保留 2 workspace、7 保存版、115 receipts、原 DB/admin/session/其他 unknown 及舊 assets/releases，index 原子替換。只變更五個前端來源，後端/schema/依賴不變，無 migration/reseed/public 業務測試寫入。
+
+本次無可沿用原管理分頁，公開 admin 互動未重測；未登入或另找 session、未重送/discard/reload 原頁。使用者「安排沒有變更」對應已合成重現的同色 no-op422 鎖場；新修正不等於原頁 pending 已解除，使用者可重整載入 E 版。停止先 `powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1 -CheckOnly -AppOnly`，另授權才移除 CheckOnly；啟動沿 `start-app-detached.ps1` WMI，不重啟 live ngrok。未操作 A／8042、Git 交付或清理；未建排程。以下 recovery 及更早身份為歷史紀錄，其事件未知敘述僅代表當時證據。
+
+## 前次 B recovery 版執行身份（2026-09-22，Windows 限定預覽）
+
+release `data/grid-public-runtime/releases/grid-recovery-20260922-215041`，58 檔來源摘要 `d3e03084b51b4f55846682b0848f010f5c71286795dbabfd4927e0d917a2e780`；manifest SHA256 `eec4fce900e73b5febc2f6327c5d94b981b7bd469dfb09511670c81e6390d0ea`。app **24512**／launcher **63472** 分別於台北 21:51:36.729／21:51:36.695 啟動；WMI wrapper **66852**、parent WmiPrvSE **52800**。ngrok **22148** 自 14:58:00.483 沿用，原 b021／127.0.0.1:8044 不變。新 JS `index-XIjfDQUe.js`／CSS `index-Bvc7fl3I.css` 與 HTML 的公開回應 hash、health 及完整時間見 `data/grid-public-runtime/grid-recovery-update.json`。
+
+停寫 SQLite Backup API 備份為 release 的 `rollback/grid-public-before-recovery.db`，87 檔舊 source/static/runtime/helpers/logs 與備份指紋見 `rollback-identity.json`。只更新五個前端來源；後端/schema0008/依賴不變，無 migration/reseed。18 表前後 count/hash 相同，原 DB/admin/session、未大存安排、所有舊 assets/releases 保留，index 原子切換。無可沿用的原管理分頁，因此本次公開 admin 互動未重測，未登入、掃描其他 session、reload、重送或 discard 原 unknown；原事件根因與結果仍未確認。
+
+停止先用 `powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1 -CheckOnly -AppOnly`，另獲授權才移除 CheckOnly；重新啟動仍經 `start-app-detached.ps1` 的 WMI，不重啟 live ngrok。回退須另獲授權並核對當時資料與版本，不用舊 DB 覆蓋後續操作。本次未 stage/commit/merge/push、未動 A／8042，沒有新增排程或清理。以下 export 等身份為歷史證據。
+
+## 前次 B export 版執行身份（2026-09-22，Windows 限定預覽）
+
+release `data/grid-public-runtime/releases/grid-export-20260922-173559`，58 檔來源摘要 `8c1c694bb5269a498f65340df75e854c8ffac9f70442f2b929ad8c322e21c274`。app **34072**／launcher **46404** 分別於 17:36:17.793／17:36:17.757（台北）啟動；ngrok **22148**／b021／8044 保持不變。WMI wrapper **27496** 的 parent 為 WmiPrvSE，跨工具與 smoke 後 guard 通過。公開 JS `index-Dk9E5fFa.js`／CSS `index-PNa2NX9l.css`，完整 hash、HTTP、程序時間見 `data/grid-public-runtime/grid-export-update.json`。
+
+停寫 Backup API 備份為 release 的 `rollback/grid-public-before-export.db`，86 檔舊 source/static/runtime/helper/logs hash 見 `rollback-identity.json`。backend/API/schema0008 沿用；新增前端依賴已包含在凍結 bundle，未重建或安裝後端依賴，無 migration/reseed/未知重送。保留原 DB/admin/session、舊 assets 與 releases，原子替換 index。停法為 `stop-preview.ps1 -CheckOnly -AppOnly`，另獲授權才去除 CheckOnly；啟動沿用 `start-app-detached.ps1` 經 WMI，不重啟 live ngrok。本輪只更新預覽，未 stage/commit/merge/push、未操作 A／8042。以下 panels 等身份為歷史證據。
+
+## 前次 B panels 版執行身份（2026-09-22，Windows 限定預覽）
 
 release `data/grid-public-runtime/releases/grid-panels-20260922-164146`，57 檔來源摘要 `988a05d8bc620ec8bfe4909ccf88d8a96e460e0fee08c4db6d6d6c82b9c93cc0`。app **12780**／launcher **6996** 分別於 16:42:11.716／16:42:11.682（台北）啟動，ngrok **22148**／b021／8044 不變；WMI wrapper **30144** 的 parent 為 WmiPrvSE，跨工具與 smoke 後 guard 通過。公開 JS `index-DGQG1ehm.js`、CSS `index-DakIpyZL.css`；完整來源／資產 hash、HTTP 與程序時間見 `data/grid-public-runtime/grid-panels-update.json`。
 
@@ -493,3 +525,41 @@ task4 不操作 public DB/session、既有 pending、現用 WMI app/ngrok；task
 ### 版本雙欄／選手單雙擊版交付（待受控更新）
 
 新成品 frontend/dist-grid-panels，合成測試使用 8043／data/grid-panels-e2e.db，交付 identity 為 data/grid-panels-delivery-identity.json。這輪只有前端三檔來源及必要測試／文件，backend/API/schema/deps 與 grid-header identity 一致，無 migration／reseed。既有 grid-header、grid-undo 及全部舊 static 不覆寫。task4 凍結後由 task5 依 orchestrate 授權核對身份並受控更新；task4 不操作公開 app/DB/session/ngrok，也不代確認既有 unknown 操作。
+
+## B Excel 匯出精修交付（2026-09-22，待受控發布）
+
+本輪從 acacb876c90aad109af12edd831561fd9fa93914 的 `feat/arrangement-export-print` 產生未提交增量；沿用 B 工作目錄。新增正式前端相依 write-excel-file 4.1.1／fflate，依既有 npm ci 與 build 流程即可，不新增後端／migration／服務／建置外掛。
+
+驗證隔離為 `frontend/dist-grid-export`、`data/grid-export-e2e.db`、8043；測試結束無 listener。此前所有 static、公開預覽 DB／admin／session／ngrok 與 A 服務不由 task4 操作。最終來源、lock、文件／測試及新 static 指紋位於 `data/grid-export-delivery-identity.json`。task5 依 orchestrate 授權核對並凍結來源及成品後才處理公開預覽更新；task4 未 stage／commit／merge／push／部署。
+
+## D 恢復與版面精修（待受控更新）
+
+本輪 source/static 使用 data/grid-recovery-delivery-identity.json 與 frontend/dist-grid-recovery；沿用B同分支與未提交前輪成果。產品只變更5個前端檔，無後端／migration／依賴變更。task4只操作合成grid-recovery-e2e.db／8043，不處理public原unknown。orchestrate核對新freeze後由task5依既有WMI／停寫備份／source與static manifest／原子index／readonly smoke與DB對比流程更新同b021，正常啟動不migration；舊release/static及public admin/session不清除。沒有新排程、Git交付或cleanup授權。
+
+
+### 同色上色 no-op 修正交付（2026-09-22，尚未部署）
+
+B 新成品 `frontend/dist-grid-shade`，合成驗證 `data/grid-shade-e2e.db`／8043；交付來源與資產指紋 `data/grid-shade-delivery-identity.json`。task4 完成後停止寫入，由 orchestrate 核對再交 task5 受控凍結與更新；沿用原授權的 URL／資料與帳密，不操作原使用者分頁。舊 D 與全部既有成品保留，沒有新增 migration／依賴。已確認本事件為明確未寫入的 no-op422；更新完成後使用者可重整此頁載入修正，其他結果未知請求仍遵守既有原樣核對契約。此段不改寫上方目前服務與發布紀錄。
+
+### F 格位操作選單／表頭合併工程版（2026-09-23，待 task5 受控更新）
+
+沿用 B `feat/arrangement-export-print`、HEAD `acacb876c90aad109af12edd831561fd9fa93914`。task4 成品只寫入 `frontend/dist-grid-menu`，合成 E2E 僅用 `data/grid-menu-e2e.db`／8043；source／static／舊成品核對記錄在 `data/grid-menu-delivery-identity.json`。identity 另列本次文件／測試 hash、十個既有 static 成品 hash 與驗證結果。測試後 8043 listener 為 0；前述 grid／export／print 成品都保留。
+
+新增 `cell_shades` 明確白色與 optional `header_shade`／`header_merges` JSON，以及 `shade_cells`、`merge_header`、`unmerge_header`、`header_text` operations；資料表仍 schema 0008，無 migration／reseed 或新增依賴。舊 backend 不保證保存新增欄位，也不支援全部新 operation；公開更新需 task5 按既有 GO 同批處理前後端，不可只換 app 或假設同 schema 可無損回退。task4 沒有操作 public DB／session／app／ngrok／A／8042／8044，未 stage／commit／merge／push／部署。工程證據不等同正式部署或人工驗收。
+
+人工本機檢視使用的隔離識別為 `data/grid-menu-e2e.db`／`frontend/dist-grid-menu`／`127.0.0.1:8043`；本輪只由 Playwright webServer 暫時啟動，結束自動停止，最後 listener count 為 0。若另需前景手動預覽，先確認 8043 無 listener，再由 repo root 設定以下環境並直接啟動（不經會刪除重建 E2E DB 的 `scripts/run_e2e_server.py`）：
+
+```powershell
+$env:FUCHENG_DATABASE_URL='sqlite:///data/grid-menu-e2e.db'
+$env:FUCHENG_COOKIE_SECURE='false'
+$env:FUCHENG_STATIC_DIR='frontend/dist-grid-menu'
+uv run --locked uvicorn fucheng.app:app --host 127.0.0.1 --port 8043 --no-access-log
+```
+
+以前景視窗 Ctrl+C 停止，再確認 `Get-NetTCPConnection -LocalPort 8043 -State Listen` 無結果。本輪未留下可登入的人工預覽程序或密碼；E2E 管理密碼由測試程序隨機產生，未寫入 identity。重建 static 使用 `npm --prefix frontend run build -- --outDir ../frontend/dist-grid-menu`，不得改寫其他 `dist-*` 或既有 runtime。
+
+### B Undo／Redo 與差異定位工程版（2026-09-23，尚未部署）
+
+沿用 `feat/arrangement-export-print`、起始 HEAD `acacb876c90aad109af12edd831561fd9fa93914`；新交付身份為 `data/grid-redo-delivery-identity.json`，最終獨立前端成品 `frontend/dist-grid-redo-final`。合成驗證使用 `data/grid-redo-20260923-final-visual-e2e.db`／8043，完整 desktop／mobile spec 10 passed，CSS contrast 定向 spec 2 passed；目前無 8043 listener。Playwright 初始化的只是新 synthetic DB，僅套用既有 migrations 0001–0008；沒有新增 migration file、遷移既有／正式資料或改動服務。
+
+Redo 新增操作與私有 receipt stack 需要相符的新後端和前端一起更新；舊 backend 不認 redo operation，也不保證保存 `_redo_stack`，即使 schema 仍為 0008 也不能 app-only 回退或宣稱無損。公開更新仍需 orchestrate 依既有授權與 GO 流程核對來源、成品、相容性與 freeze；本 task 沒有 stage／commit／merge／push／部署，也沒有更動 public DB／app／session／ngrok／A／8042／8044。此工程驗收不代表正式部署或人工接受；全部舊成品與 synthetic evidence 均保留。

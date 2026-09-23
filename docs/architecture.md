@@ -189,7 +189,7 @@ ArrangementPrint從選定版本的完整rows/layout建立凍結printJob，portal
 
 GridAxisMenu開啟時捕捉layout、token、axis ID，預覽及第二次確認使用同一範圍。對方改字後確認會409，不能沿用確認刪除新字。選單依viewport限制高度，內容獨立捲動、actions保持可達；dialog同樣處理多文字。未知操作鎖住原payload；receipt及新GET核對完成後，刪除不存在axis上的selected/end/editing及cell／column drafts。失败或未知未核對時保留輸入。
 
-素食按鈕的pressed樣式只影響呈現；badge與淨差橘色並存，不改列印資料。歷史由sequence升序渲染，最新保存版標「最新」。版本清單獨立scroll容器，只在首次開啟／換場或目前安排新增保存版時捲底；切歷史與一般rerender不重設閱讀位置。不更動基準／淨差／完整快照語意。
+素食按鈕的pressed樣式只影響呈現；badge與淨差橘色並存，不改列印資料。歷史由sequence升序渲染，最新保存版標「最新」。版本清單獨立scroll容器，每次開啟／換場／非同步初載或目前安排新增保存版時捲底；重開時即使仍選取舊版也到底，但不改selected。保持開啟時切歷史與一般rerender不重設閱讀位置。不更動基準／淨差／完整快照語意。
 
 
 ### 明確拖曳意圖、灰階與歷次級數契約（2026-09-21）
@@ -213,7 +213,7 @@ MemberLevelHistory獨立呈現即時參考；close/unmount或換人／換場會�
 
 完整 token 包含名單／餐食／會員資料／場次狀態／保存基準／布局與 revision；外部更新或大保存會斷鏈，合法普通操作仍可開始新鏈。前端只保存本頁面已成功並讀回的 request-ID stack；receipt token 與新 GET 不符時清除可復原狀態，失敗不 pop，unknown 固定 payload 原樣重試。大保存確認後清 stack；歷史唯讀、terminal 與 input 原生 undo 邊界不放寬。
 
-工具列常駐於表格前方，沒有選格時禁用相關按鈕；色票只顯色／清除圖形與 aria/title。詳情只在 pointerdown、pointerup 均落視窗外時關閉，避免內部拖選放手誤關。文字外點先提交並消耗該次點擊，待成功讀回才關閉；IME 不送出，失敗保留 per-cell 草稿，已有未決操作時允許返回表格核對。
+工具列常駐於表格前方，沒有選格時禁用相關按鈕；「表格底色」標籤與四個純色色票共框，白色在最左並保留清除／繼承語義，aria/title 提供可及名稱。成功上色保留不遮底色的選框，同一選區可連續換色；已按下的同色不發請求。詳情只在 pointerdown、pointerup 均落視窗外時關閉，避免內部拖選放手誤關。文字外點先提交並消耗該次點擊，待成功讀回才關閉；IME 不送出，失敗保留 per-cell 草稿，已有未決操作時允許返回表格核對。
 
 
 ### 表頭選格與請求等待修正（2026-09-22）
@@ -227,6 +227,45 @@ MemberLevelHistory獨立呈現即時參考；close/unmount或換人／換場會�
 
 ### 版本雙欄與選手點擊（2026-09-22）
 
-CompetitionLevels 保留原 rows/baseline/layout 選版與捲動狀態邏輯，僅將差異拆成 arrangement-diff，DOM 順序表格、差異、版本；名稱為「該版本變動」「版本紀錄」。本頁 main 與相鄰比賽導覽上限 2200px，1700px 以上三欄、701–1699px 表格跨全寬且下方兩欄、700px 以下依序堆疊。表格維持內部水平捲動，兩側區各自有高度上限及捲動，不改全站容器。
+CompetitionLevels 保留原 rows/baseline/layout 選版與捲動狀態邏輯，僅將差異拆成 arrangement-diff，DOM 順序表格、差異、版本；名稱為「該版本變動」「版本紀錄」。本頁 main 與相鄰比賽導覽上限 2200px，1700px 以上三欄、701–1699px 表格跨全寬且下方兩欄、700px 以下依序堆疊。表格維持內部水平捲動。寬桌面兩側區以 ResizeObserver 讀取表格外框高度與工具列造成的頂部偏移，單向寫入 CSS 變數，不用側欄撐高表格；標題／控制固定、內容 flex:1/min-height:0 獨立捲動。中尺寸及手機置於下方、最高60vh。只有存在 arrangement-main 的頁首白導覽與綠管理header共用2200px容器，切到報名設定及其他公共頁仍用原1240px。
 
 LevelCardBoard 分開 selectPlayer/openDetail。姓名有效 click 立即選格，mouse dblclick 必須有同人兩次被接受的 click，touch 則同人 500ms 內兩次有效 tap 開資訊。drag 被抑制的尾端 click 不算有效，移動／取消清候選，姓名以外 pointerdown 清候選。range 終點保留 count=0 的短暫手勢記號，同序列第二擊既不縮選區也不開詳情。Enter 開資訊、Space 選格並 preventDefault；range 下兩鍵皆選取延伸。詳情移除選格按鈕，X／Esc／內外 pointer 邊界保持；歷史能查看資訊，寫入依原 readonly/blocked 守門。選區含 registration 時禁用合併，後端規則不變。兩個 gesture hooks、API、backend、schema 與依賴本輪皆未修改。
+
+## 安排 Excel 匯出與列印格線（2026-09-22）
+
+`arrangementExcel.ts` 靜態匯入 `write-excel-file@4.1.1/browser`，使用原生 cell、rowSpan/columnSpan、thin borders、wrap、灰階與合理行欄尺寸；正式相依只新增該套件及 fflate。CompetitionLevels 在已驗證且無未知操作／保存／讀取中的狀態下，複製完整 rows/layout 後產生下載；try/catch/finally 保證錯誤後解除匯出忙碌。沒有自訂 loader、動態載入重試或 Vite 擴充。
+
+只輸出比賽標題、版本標籤及表格可見的姓名、辨識註記、餐食素標與自訂文字；不輸出 ID、會費、稽核等其他欄位。所有值明確使用 String 與 `@` 格式，`= + - @` 起始文字不轉公式；不產生 macro、外部連結或圖片。原生儲存格可離線修改，不新增匯入或資料庫寫入。歷史 rows/layout 使用所選保存版；layout=null 沿用既有級數／順位 fallback 並明示不代表原始分組，未知餐食不補現況。
+
+官方套件契約：<https://github.com/catamphetamine/write-excel-file>，使用 browser `toFile`、String、columnSpan/rowSpan、backgroundColor、borderStyle、height、wrap；版本鎖定於 package-lock，npm audit 於本輪為零漏洞。
+
+列印不一致的原因是前景 SVG 填色覆蓋 collapsed table border 邊緣像素。保留既有列印引擎與分幅，只將 `.print-cell-shade` 四側內縮 .25mm、寬高扣 .5mm，避免填色蓋住格線。代價約 1 CSS px 白色內緣；背景圖形關閉仍保留 SVG 灰階。獨立對照與實際產品 PDF 見驗收文件。
+
+## 安排恢復狀態修正（2026-09-22 D）
+
+20秒期限仍涵蓋transport與JSON body。小存成功回應先驗證request_id、competition_id、非負revision、與原payload逐欄相符的operation及layout必要結構；大存也驗證必要保存版結構。空回應、null、錯誤JSON/HTML、錯key或operation不符保持unknown原key/payload，不能只憑HTTP2xx進refresh。讀回資料先驗證根結構，失敗保留合法receipt以便只GET恢復。
+
+人工recover按同場去重並暫停寫入，先bounded GET /auth/me核對本頁原帳號及非空CSRF再更新token；認證失敗或另一帳號不清pending，不自動登入或重播。成功後重讀當前pending：unknown原樣POST；refresh只GET安排；rejected才清操作並GET核對，草稿保留。unknown重試遇401/403繼續unknown；409/422等確定拒絕仍走rejected，避免未送達後token過期造成無限重試。後端先查同actor/key/payload receipt，再查state token，原子寫入及安全契約未變。
+
+上方狀態優先顯示saving/loading/unknown/refresh/rejected，避免整場鎖住卻只顯示上次保存。恢復待辦存在時，讀取錯誤只顯示原因並沿用該待辦的明確確認按鈕，不另提供可能誤解成純GET的通用重讀入口。離頁保護仍在；session失效引導另一分頁以原帳號登入後回此頁確認。
+
+
+同色 no-op 恢復：controller 僅對首次操作的 HTTP 422 且 detail 精確為「安排沒有變更」清除未寫入請求，再走既有 GET／版本核對。沒有 receipt、revision、audit 或 Undo 偽造；讀回成功才 verified，失敗仍鎖定且提供重新讀取。一般 422、409 及 unknown 重試不走此特例，原 request_id／payload、認證、衝突與不可降版檢查不變。相同 token 保留 Undo，其他頁異動仍斷鏈。後端與 schema 0008 未改。
+
+## 格位共用操作選單、明確白色與表頭合併（2026-09-23 F）
+
+本節是目前契約，修訂前文 2026-09-22 局部色與固定表頭章節中的歷史限制。`cell_shades` 以 stable row_id／column_id 存 0..3；0 是明確白色 override，缺少該格項目才沿用 row／column 有效色階。舊 JSON 的 missing／null／空集合仍可讀，GET 不回填；無 migration，資料表維持 0008。合併格的底格色仍逐格保存，顯示時依完整 merge 範圍取 max；明確白色格不被軸色重新染色。列印與 Excel 均輸出當前或所選歷史版的同一色階。
+
+固定級數表頭是以 stable column ID／level 投影的虛擬列。optional `header_shade` 支援 0..3；0 明確白色，欄位缺少時沿用 column 色階，只畫在表頭與列印表頭。optional `header_merges` 用 start／end column ID 表示同一虛擬表頭列內的合併；它與 body 的 `merges` 分開保存，不能跨表頭、body 或自訂標題列合併。`merge_header`／`unmerge_header`／`header_text` 經既有 operation、state token、actor/payload receipt 與稽核流程執行；編輯合併標題不改固定十級身份或 stable 欄 ID。舊 backend 不保證保留新增的 JSON 欄位或辨識新 operation，因此 schema 同為 0008 不代表可無損退回舊 app。
+
+表頭與 body 共用同一個格位操作選單，可在單一矩形選區內一併上色；不以假 row 寫入資料模型。merge 僅允許同一表頭／標題／body role，跨表頭、body 或自訂文字列會拒絕並在選單說明。桌面右鍵／ContextMenu／Shift+F10 與觸控原生按鈕 click 開啟選單，外部 pointerdown 或 Escape 關閉。觸控入口只在 click 開啟，避免同一 tap 的相容 click 命中新掛出的 portal 操作鈕。整張表格 Undo 位於獨立群組，僅依本頁已成功 receipt、目前 head/token/revision 與 server 保存前狀態發出既有 undo operation；它不接受任意 client snapshot，不回退版本號，也不等同文字欄原生復原。
+
+ArrangementPrint 將 header_merges 映射成表頭 colspan；跨 12 欄分幅時只輸出本幅交集並加續接標記，不複製 body 選手。Excel 使用原生 header merge 與格位合併，明確白色填色保留為實際儲存格樣式。選單入口與列印裝置無關，驗收只使用瀏覽器下載／PDF，不操作實體印表機。
+
+### 逐步重做與差異格位定位（2026-09-23 B 後續）
+
+重做沿用 `/operations` 的 `{action:"redo"}`、固定 request ID、actor/payload receipt、state token、寫鎖及稽核交易。可重做佇列存於成功 receipt JSON 的私有 `_redo_stack`；每個項目只引用伺服器保存的 undo 前狀態與 parent receipt，不接受或重送 client snapshot／舊 operation。`operation_cursor` 在目前 competition、actor、token、layout revision 與 undo/redo head 下讀取游標；redo 只可套用佇列頂端，並核對保存基準、前序 receipt、目前名單及布局與伺服器快照相符。套用後以新 receipt、單調遞增的 revision／報名 version 與同交易稽核記錄結果。正常新操作清空 redo 分支；大保存及外部名單、角色、token、head 或 revision 改變會使前端鏈失效。未知寫入保留原 request ID/payload 原樣重試，收到 receipt 而讀回逾時則只 GET。只在本頁保存已確認堆疊；換場、保存、歷史唯讀、pending／locked 狀態不發編輯請求。快捷鍵為 Ctrl／Command+Z、Ctrl／Command+Shift+Z 及 Ctrl+Y；輸入欄、文字編輯、原生 dialog 與 IME 組字保留原生復原。改動只擴充既有 receipt JSON/API operation，schema 仍為 0008、無 migration；不支援新 redo operation 的舊 app 不保證相容。
+
+目前安排的差異卡依 registration ID 比較來源與目標 stable row／column ID，卡片只高亮仍存在的實際端點，不建立矩形選區或寫回布局；新增、取消、移動、同級換位、跨級移動及交換皆可從卡片定位，鍵盤與觸控可啟用。舊快照無座標或軸已刪除時只定位可證實存在的端點，並說明缺失原因；換場、換版本及一般格位選取清除定位。卡片位於獨立捲動的「該版本變動」側欄，基準標題固定顯示相較版本；右側「版本紀錄」固定標題及「目前安排」控制，兩側各自捲動。僅 compact card 本身縮小間距，不改表格與側欄捲動行為。結構差異仍參與保存與淨差，移除泛用結構提示；純結構變更仍可保存且不顯示「沒有變更」。固定級數表頭及其按鈕 hover 使用 `cell` cursor。
+
+大型保存只把目前 workspace 的完整布局附加為不可變版本快照，不執行新增、刪除或裁切布局列；row 的變更只由明確布局操作產生。大型保存後的尾端空列仍須依使用者回報另行觀察，不能在保存路徑以裁切或 fallback 隱藏。

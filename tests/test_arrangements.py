@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from fucheng.models import ArrangementVersion, Competition, CompetitionAudit, Member
+from fucheng.models import ArrangementVersion, ArrangementWorkspace, Competition, CompetitionAudit, Member
 from test_competition_levels import setup_registration, payload, url
 from test_competitions import _member, _register, _competition_payload
 
@@ -256,3 +256,92 @@ def test_save_and_level_have_serializable_snapshot(app, client, auth, admin_pass
         assert current['latest']['sequence'] == 1
     else:
         assert current['latest']['sequence'] == 0
+
+def test_large_save_preserves_exact_layout_across_receipt_get_noop_and_history(app, client, auth):
+    competition = client.post('/api/admin/competitions', headers=auth,
+        json=_competition_payload(capacity=2)).json()
+    member = _member(client, auth, 1801)
+    _register(client, auth, competition['id'], member['id'])
+    baseline = init(client, auth, competition)
+    endpoint_url = endpoint(competition)
+
+    def mutate(operation):
+        current = read(client, competition)
+        response = client.post(endpoint_url + '/operations', headers=auth, json={
+            'request_id': str(uuid4()), 'state_token': current['state_token'], 'operation': operation})
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    def layout_facts(layout):
+        return {key: layout[key] for key in ('rows', 'columns', 'cells', 'merges')}
+
+    # Preserve a deliberately appended user row with text, shades, and a merge.
+    mutate({'action': 'insert_row', 'before_id': None})
+    mutate({'action': 'insert_column', 'before_id': None})
+    mutate({'action': 'insert_column', 'before_id': None})
+    layout = read(client, competition)['layout']
+    tail_id = layout['rows'][-1]['id']
+    text_columns = [column for column in layout['columns'] if column['kind'] == 'text']
+    assert len(text_columns) == 2
+    anchor = {'row_id': tail_id, 'column_id': text_columns[0]['id']}
+    end = {'row_id': tail_id, 'column_id': text_columns[1]['id']}
+    mutate({'action': 'text', 'target': anchor, 'text': 'user-tail-text'})
+    mutate({'action': 'merge', 'start': anchor, 'end': end})
+    mutate({'action': 'shade_row', 'axis_id': tail_id, 'shade': 2})
+    mutate({'action': 'shade_cells', 'start': {'row_id': tail_id, 'column_id': layout['columns'][4]['id']},
+        'end': {'row_id': tail_id, 'column_id': layout['columns'][4]['id']}, 'shade': 3})
+
+    before = read(client, competition)
+    before_facts = layout_facts(before['layout'])
+    assert before['layout']['rows'][:-1] == baseline['layout']['rows']
+    assert before['layout']['rows'][-1] == {'id': tail_id, 'role': 'body', 'shade': 2}
+    assert not any(cell.get('registration_id') for cell in before['layout']['cells'] if cell['row_id'] == tail_id)
+    assert any(cell.get('text') == 'user-tail-text' and cell['row_id'] == tail_id for cell in before['layout']['cells'])
+    assert before['layout']['merges'][-1]['start'] == anchor
+    assert before['layout']['cell_shades'][-1]['shade'] == 3
+    players_before = sorted((cell['registration_id'], cell['row_id'], cell['column_id'])
+        for cell in before['layout']['cells'] if cell['kind'] == 'registration')
+    with app.state.session_factory() as db:
+        workspace_bytes_before = db.get(ArrangementWorkspace, competition['id']).layout_json
+
+    first_response = save(client, auth, competition, save_payload(before, label='tail-save-one'))
+    assert first_response.status_code == 200, first_response.text
+    first = first_response.json()
+    assert layout_facts(first['layout']) == before_facts
+    after_first = read(client, competition)
+    first_history_response = client.get(endpoint_url + f"/versions/{first['id']}")
+    assert first_history_response.status_code == 200
+    first_history = first_history_response.json()
+    assert layout_facts(after_first['layout']) == before_facts
+    assert layout_facts(first_history['layout']) == before_facts
+    assert sorted((cell['registration_id'], cell['row_id'], cell['column_id'])
+        for cell in after_first['layout']['cells'] if cell['kind'] == 'registration') == players_before
+    with app.state.session_factory() as db:
+        assert db.get(ArrangementWorkspace, competition['id']).layout_json == workspace_bytes_before
+
+    # Unchanged save is rejected without appending a row or history version.
+    no_change = save(client, auth, competition, save_payload(after_first))
+    assert no_change.status_code == 422
+    after_noop = read(client, competition)
+    assert layout_facts(after_noop['layout']) == before_facts
+    assert after_noop['latest']['id'] == first['id']
+    assert len(after_noop['versions']) == len(after_first['versions'])
+
+    mutate({'action': 'text', 'target': anchor, 'text': 'user-tail-text-two'})
+    mutate({'action': 'shade_row', 'axis_id': tail_id, 'shade': 1})
+    before_second = read(client, competition)
+    second_facts = layout_facts(before_second['layout'])
+    assert len(before_second['layout']['rows']) == len(before['layout']['rows'])
+    second_response = save(client, auth, competition, save_payload(before_second, label='tail-save-two'))
+    assert second_response.status_code == 200, second_response.text
+    second = second_response.json()
+    after_second = read(client, competition)
+    second_history_response = client.get(endpoint_url + f"/versions/{second['id']}")
+    assert second_history_response.status_code == 200
+    assert layout_facts(second['layout']) == second_facts
+    assert layout_facts(after_second['layout']) == second_facts
+    assert layout_facts(second_history_response.json()['layout']) == second_facts
+    assert layout_facts(client.get(endpoint_url + f"/versions/{first['id']}").json()['layout']) == before_facts
+    assert len(after_second['layout']['rows']) == len(before['layout']['rows'])
+    with app.state.session_factory() as db:
+        assert db.get(ArrangementWorkspace, competition['id']).layout_json != workspace_bytes_before

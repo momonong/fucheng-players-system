@@ -37,7 +37,7 @@ def test_closure_reverse_selection_unmerge_preserves_underlying_colors():
     grid.validate(layout,[])
     grid.apply(layout,grid.MergeCells(action='merge',start=a,end=b))
     grid.apply(layout,grid.ShadeCells(action='shade_cells',start=a,end=a,shade=0))
-    assert not any(grid.key(c) in set(grid.region(layout,layout['merges'][0])) for c in layout['cell_shades'])
+    assert all(c['shade']==0 for c in layout['cell_shades'] if grid.key(c) in set(grid.region(layout,layout['merges'][0])))
 
 
 def test_colors_stay_at_coordinates_across_moves_insertions_and_deletion():
@@ -68,7 +68,7 @@ def test_colors_stay_at_coordinates_across_moves_insertions_and_deletion():
     assert grid.cell_at(blank,**b)['text']=='保留'
 
 
-@pytest.mark.parametrize('value',[0,4,-1,True,'2',1.5])
+@pytest.mark.parametrize('value',[4,-1,True,'2',1.5])
 def test_layout_color_values_are_strict(value):
     layout=grid.default_layout([]); p=point(layout,0,0)
     layout['cell_shades']=[{**p,'shade':value}]
@@ -117,8 +117,9 @@ def test_color_api_old_bytes_history_replay_cas_and_no_net(app,client,auth):
     assert client.post(endpoint(comp)+'/operations',headers=auth,json={**data,'request_id':str(uuid4())}).status_code==409
     assert client.post(endpoint(comp)+'/operations',headers=auth,json={**data,'operation':{**op,'shade':3}}).status_code==409
     operate(client,auth,comp,{**op,'shade':0})
-    assert grid.signature(read(client,comp)['layout'])==grid.signature(initial['layout'])
-    assert save(client,auth,comp).status_code==422
+    assert len(read(client,comp)['layout']['cell_shades'])==6
+    assert all(c['shade']==0 for c in read(client,comp)['layout']['cell_shades'])
+    assert save(client,auth,comp).status_code==200
     operate(client,auth,comp,op)
     snapshot=save(client,auth,comp)
     assert snapshot.status_code==200
@@ -138,7 +139,6 @@ def test_color_auth_noop_rollback_and_terminal(app,client,auth):
         assert anonymous.post(endpoint(comp)+'/operations',json=data).status_code==401
     assert client.post(endpoint(comp)+'/operations',json=data).status_code==403
     for value in [True,'1',-1,4]:operate(client,auth,comp,{**op,'shade':value},422)
-    operate(client,auth,comp,{**op,'shade':0},422)
     def fail_audit(mapper,connection,target):
         if target.action=='layout_change':raise RuntimeError('color rollback')
     event.listen(CompetitionAudit,'before_insert',fail_audit)

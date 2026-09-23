@@ -51,7 +51,7 @@ Python 使用 uv、`pyproject.toml`、`uv.lock` 與專案 `.venv`；前端使用
 灰階以row／自訂文字column的shade 0–3保存，missing視為0、GET不回填舊JSON；交叉與merge涵蓋軸取max，不疊加。灰階入完整保存／淨差／歷史／列印，列印用實體SVG填色以保留背景圖形關閉時的灰階。歷次級數參考僅admin查同member confirmed、未刪ended、日期早於所選且不晚於台北今天的最近5場registration.competition_level；不回寫快照或擴public schema。
 
 
-局部色cell_shades綁stable格位、strict1–3 override軸色，0只清除；merge閉包選取且保底格，delete軸prune，空色不佔位。undo僅依server成功receipt前狀態及目前head/token/revision，同actor/基準驗證後以新transaction/receipt留存；version不得倒退，不接受client任意snapshot、不刪歷史。大保存與外來更新斷鏈；本頁stack失敗不pop，unknown固定payload重試。新增契約仍schema0008但不保證舊app可無損回退。本輪驗證8043/grid-undo-e2e.db/frontend/dist-grid-undo，保留前輪dist-grid-cell-shade與全部現用成品。
+局部色 `cell_shades` 綁 stable 格位，shade 僅 0–3；0 是明確白色 override，缺少局部項目才沿用原 row／column 色階，舊 JSON 的 missing／null／空集合保持相容，GET 不回填。merge 閉包選取並保留底格色，delete 軸 prune，空格著色不建立文字。undo 僅依 server 成功 receipt 前狀態及目前 head/token/revision，同 actor／保存基準驗證後以新 transaction／receipt 留存；version 不倒退，不接受 client 任意 snapshot、不刪歷史。大保存與外來更新斷鏈；本頁 stack 失敗不 pop，unknown 固定 payload 重試。新增契約仍 schema 0008，但不保證舊 app 可無損回退。
 
 
-固定表頭用column顯示選取，header_shade只影響th/print、不得染body或改level/id；表頭/body選取互斥且不混選merge。安排專用請求等待涵蓋完整body，逾時寫入保持unknown與原key/payload；receipt後讀回逾時保持refresh，只重讀不再POST。新版驗證frontend/dist-grid-header/grid-header-e2e.db/8043，不覆寫現用grid-undo成品。
+固定十級表頭以 stable column ID／level 呈現，支援虛擬表頭選取與共用操作選單；optional `header_merges` 以 stable 欄 ID 保存，只能在同一表頭列內合併，不可跨表頭、body 或自訂文字列；合併不改十級身份或欄 ID。`header_shade=0` 是明確白色，缺少時沿用原欄色；只影響 th／列印表頭，不染 body。表頭與 body 可同在一個矩形選區內上色；跨表頭、body 或自訂文字列的合併須拒絕並在選單說明。表格選單可由桌面右鍵／Shift+F10 或觸控 ⋯ 開啟，點擊外部／Escape 關閉；整張表格 Undo 保持獨立操作，依服務端 receipt 前狀態與當前 token 驗證。安排專用請求等待涵蓋完整 body，逾時寫入保持 unknown 與原 key／payload；receipt 後讀回逾時保持 refresh，只重讀不再 POST。無新增 migration，schema 仍 0008；新版需與接受上述 JSON／operation 的前後端同批更新。

@@ -211,7 +211,7 @@ def save_version(db, auth, competition_id, payload):
 
 
 
-def undo_head(db, competition_id, admin_id, token, revision):
+def operation_cursor(db, competition_id, admin_id, token, revision):
     # A complete token includes layout revision, roster/member data and saved baseline.
     # Any external change breaks the chain; old receipts have no token and are ineligible.
     record = db.scalar(select(ArrangementOperation).where(
@@ -221,9 +221,38 @@ def undo_head(db, competition_id, admin_id, token, revision):
         func.json_extract(ArrangementOperation.receipt_json, "$.revision") == revision,
     ).limit(1))
     if not record:
-        return None
-    receipt = json.loads(record.receipt_json)
-    return receipt.get("undo_head") if receipt.get("_undo") else None
+        return None, []
+    try:
+        receipt = json.loads(record.receipt_json)
+        if not receipt.get("_undo"):
+            return None, []
+        redo_stack = receipt.get("_redo_stack", [])
+        if (not isinstance(redo_stack, list)
+                or any(not isinstance(item, str) or not 8 <= len(item) <= 64 for item in redo_stack)
+                or len(redo_stack) != len(set(redo_stack))):
+            raise ValueError("invalid redo stack")
+        head = receipt.get("undo_head")
+        if head is not None and (not isinstance(head, str) or not 8 <= len(head) <= 64):
+            raise ValueError("invalid undo head")
+        return head, redo_stack
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise HTTPException(409, "復原紀錄與目前安排不符；請重新讀取") from error
+
+
+def checked_snapshot(layout, current, action):
+    try:
+        validated = grid.GridLayout.model_validate(layout)
+        snapshot = validated.model_dump()
+        levels = {column["id"]: column["level"] for column in snapshot["columns"]}
+        restored = {cell["registration_id"]: levels[cell["column_id"]]
+                    for cell in snapshot["cells"] if cell["kind"] == "registration"}
+        if set(restored) != {row.registration_id for row in current.rows}:
+            raise ValueError("名單不同")
+        rows = [{**row.model_dump(), "competition_level": restored[row.registration_id]} for row in current.rows]
+        grid.validate(snapshot, rows)
+        return snapshot
+    except (ValidationError, ValueError, KeyError, TypeError, HTTPException) as error:
+        raise HTTPException(409, f"{action}紀錄與目前名單或布局不相容") from error
 
 
 def undo_layout(db, competition_id, admin_id, current, target_request_id, head):
@@ -234,21 +263,30 @@ def undo_layout(db, competition_id, admin_id, current, target_request_id, head):
         raise HTTPException(409, "只能復原自己在這場的最近安排")
     receipt = json.loads(target.receipt_json)
     metadata = receipt.get("_undo")
-    if (not metadata or receipt["operation"]["action"] == "undo"
+    if (not metadata or receipt.get("operation", {}).get("action") in {"undo", "redo"}
             or metadata.get("base_version_id") != (current.latest.id if current.latest else None)):
         raise HTTPException(409, "保存基準已變更或這筆紀錄不可復原")
-    layout = metadata.get("before_layout")
-    try:
-        grid.GridLayout.model_validate(layout)
-        levels = {c["id"]: c["level"] for c in layout["columns"]}
-        restored = {c["registration_id"]: levels[c["column_id"]] for c in layout["cells"] if c["kind"] == "registration"}
-        if set(restored) != {r.registration_id for r in current.rows}:
-            raise ValueError("名單不同")
-        rows = [{**r.model_dump(), "competition_level": restored[r.registration_id]} for r in current.rows]
-        grid.validate(layout, rows)
-    except (ValidationError, ValueError, KeyError, TypeError, HTTPException) as error:
-        raise HTTPException(409, "復原紀錄與目前名單或布局不相容") from error
+    layout = checked_snapshot(metadata.get("before_layout"), current, "復原")
     return layout, metadata.get("parent_request_id")
+
+
+def redo_layout(db, competition_id, admin_id, current, target_request_id, head, redo_stack):
+    if not redo_stack or redo_stack[-1] != target_request_id:
+        raise HTTPException(409, "目前沒有這一步可重做；請重新核對")
+    target = db.get(ArrangementOperation, target_request_id)
+    if not target or target.competition_id != competition_id or target.admin_id != admin_id:
+        raise HTTPException(409, "只能重做自己在這場已復原的安排")
+    receipt = json.loads(target.receipt_json)
+    metadata = receipt.get("_undo")
+    if (not metadata or receipt.get("operation", {}).get("action") in {"undo", "redo"}
+            or metadata.get("base_version_id") != (current.latest.id if current.latest else None)
+            or metadata.get("parent_request_id") != head):
+        raise HTTPException(409, "保存基準或復原順序已變更；請重新核對")
+    before = checked_snapshot(metadata.get("before_layout"), current, "重做")
+    if grid.signature(before) != grid.signature(current.layout.model_dump()):
+        raise HTTPException(409, "目前布局已不同於待重做操作的起點；請重新核對")
+    after = checked_snapshot(receipt.get("layout"), current, "重做")
+    return after, target_request_id
 
 
 def mutate_grid(db, auth, competition_id, payload):
@@ -272,8 +310,9 @@ def mutate_grid(db, auth, competition_id, payload):
         before = workspace.layout_json
         layout = json.loads(before)
         operation = payload.operation
-        parent = undo_head(db, competition_id, admin_id, current.state_token, workspace.revision)
+        parent, redo_stack = operation_cursor(db, competition_id, admin_id, current.state_token, workspace.revision)
         next_head = payload.request_id
+        next_redo_stack = []
         if operation.action in {"move", "move_bottom", "move_empty", "insert", "swap"}:
             ids = [operation.registration_id]
             if operation.action == "swap":
@@ -285,6 +324,11 @@ def mutate_grid(db, auth, competition_id, payload):
         before_positions = {c["registration_id"]:grid.key(c) for c in layout["cells"] if c["kind"] == "registration"}
         if operation.action == "undo":
             layout, next_head = undo_layout(db, competition_id, admin_id, current, operation.target_request_id, parent)
+            next_redo_stack = [*redo_stack, operation.target_request_id]
+        elif operation.action == "redo":
+            layout, next_head = redo_layout(db, competition_id, admin_id, current,
+                operation.target_request_id, parent, redo_stack)
+            next_redo_stack = redo_stack[:-1]
         else:
             grid.apply(layout, operation)
         columns = {c["id"]:c for c in layout["columns"]}
@@ -298,9 +342,9 @@ def mutate_grid(db, auth, competition_id, payload):
                 affected.competition_level = level
                 # One receipt owns the whole swap. Per-person audit keys are deterministic,
                 # bounded SHA256 values; the original request is retained in each audit.
-                audit_key = digest({"arrangement_request_id":payload.request_id,"registration_id":affected.id}) if operation.action in {"swap", "undo"} else payload.request_id
+                audit_key = digest({"arrangement_request_id":payload.request_id,"registration_id":affected.id}) if operation.action in {"swap", "undo", "redo"} else payload.request_id
                 changes = {"competition_level":{"before":old_level,"after":level}}
-                if operation.action in {"swap", "undo"}:
+                if operation.action in {"swap", "undo", "redo"}:
                     changes["arrangement_request_id"] = {"before":None,"after":payload.request_id}
                 db.add(RegistrationAudit(registration_id=affected.id, competition_id=competition_id, admin_id=admin_id,
                     actor_kind="admin", action="level", changes_json=json.dumps(changes), reason=None,
@@ -320,6 +364,8 @@ def mutate_grid(db, auth, competition_id, payload):
         receipt = {"request_id":payload.request_id,"competition_id":competition_id,"revision":workspace.revision,
             "operation":operation.model_dump(), "layout":layout,
             "state_token":after_token, "undo_head":next_head,
+            "redo_head":next_redo_stack[-1] if next_redo_stack else None,
+            "_redo_stack":next_redo_stack,
             "_undo":{"before_layout":json.loads(before), "parent_request_id":parent,
                      "base_version_id":current.latest.id if current.latest else None}}
         db.add(ArrangementOperation(request_id=payload.request_id,competition_id=competition_id,admin_id=admin_id,

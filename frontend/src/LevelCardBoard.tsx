@@ -4,10 +4,11 @@ import { createPortal } from 'react-dom'
 import { useLevelCardDrag } from './useLevelCardDrag'
 import { useGridSelection } from './useGridSelection'
 import { MemberLevelHistory } from './MemberLevelHistory'
-import { shadeResolver, expandedSelection, ShadePalette, shades } from './gridShade'
+import { shadeResolver, expandedSelection, shades } from './gridShade'
 import { CellShadeMenu, type CellShadePanel } from './CellShadeMenu'
 import { GridInsertControls } from './GridInsertControls'
-export const columnTitle = (c: GridLayout['columns'][number]) => c.title ?? (c.kind === 'level' ? `${c.level} 級` : '文字／備註')
+import { HEADER_ROW_ID, selectionLayout, headerCells, columnTitle } from './gridHeader'
+export { columnTitle } from './gridHeader'
 
 export type ArrangementChange = { kind: 'level' | 'position' | 'added' | 'removed'; row: ArrangementRow; before?: number; after?: number }
 export const pointKey = (p: GridPoint) => `${p.row_id}/${p.column_id}`
@@ -31,6 +32,7 @@ export function structureSignature(layout: GridLayout | null) {
   return JSON.stringify({ rows: layout.rows.map(r => [r.id, r.role, r.shade??0]), columns: layout.columns.map(c => [c.id, c.kind, c.level, columnTitle(c), c.shade??0, c.header_shade??null]),
     text: layout.cells.filter((c): c is GridCell & { kind: 'text' } => c.kind === 'text').map(c => [pointKey(c), c.text]).sort(),
     cell_shades: (layout.cell_shades??[]).map(c=>[pointKey(c),c.shade]).sort(),
+    header_merges:(layout.header_merges??[]).map(m=>[m.start_column_id,m.end_column_id,m.title??null]).sort(),
     merges: layout.merges.map(m => [pointKey(m.start), pointKey(m.end)]).sort() })
 }
 export function legacyLayout(rows: ArrangementRow[]): GridLayout {
@@ -39,24 +41,24 @@ export function legacyLayout(rows: ArrangementRow[]): GridLayout {
   const heights = Array.from({ length: Math.max(8,...groups.map(g => g.length)) },(_,i) => ({ id: `legacy-row-${i}`, role: 'body' as const }))
   return { schema_version: 1, rows: heights, columns, merges: [], cells: groups.flatMap((g,i) => g.map((r,j) => ({ kind: 'registration' as const, registration_id:r.registration_id, row_id:heights[j].id, column_id:columns[i].id }))) }
 }
-export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, changes, search, vegetarian, readonly, busy, textDrafts, onTextDraft, onOperate, stateToken, competitionId, historical, confirmedGrid, canUndo, onUndo }: {
+export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, changes, search, vegetarian, readonly, busy, textDrafts, onTextDraft, onOperate, stateToken, competitionId, historical, confirmedGrid, canUndo, onUndo, canRedo, onRedo, locatedChangeId, locatedPoints, onClearLocated }: {
   rows: ArrangementRow[]; layout: GridLayout | null; baselineLayout: GridLayout | null; changes: ArrangementChange[]; search: string; vegetarian: boolean
-  canUndo:boolean; onUndo:()=>void; confirmedGrid?:{request_id:string;action:GridOperation['action']}; historical:boolean; competitionId:string; stateToken: string; readonly: boolean; busy: boolean; textDrafts: Record<string, string>; onTextDraft: (key: string, text: string) => void; onOperate: (operation: GridOperation, expectedToken?: string) => void
+  canUndo:boolean; onUndo:()=>void; canRedo:boolean; onRedo:()=>void; locatedChangeId:string|null; locatedPoints:GridPoint[]; onClearLocated:()=>void; confirmedGrid?:{request_id:string;action:GridOperation['action']}; historical:boolean; competitionId:string; stateToken: string; readonly: boolean; busy: boolean; textDrafts: Record<string, string>; onTextDraft: (key: string, text: string) => void; onOperate: (operation: GridOperation, expectedToken?: string) => void
 }) {
   const layout = knownLayout ?? legacyLayout(rows)
   const [selected, setSelected] = useState<GridPoint | null>(null)
-  const [selectedHeader,setSelectedHeader]=useState<string|null>(null)
+  const selectionDocument=selectionLayout(layout),headings=headerCells(layout)
+  const selectedHeader=selected?.row_id===HEADER_ROW_ID?selected.column_id:null
   const [end, setEnd] = useState<GridPoint | null>(null)
   const [rangeMode, setRangeMode] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [shadePanel,setShadePanel]=useState<CellShadePanel|null>(null)
   const textPending=useRef<string|null>(null),composing=useRef(false),outsideDetail=useRef(false),outsideText=useRef(false),consumeOutsideClick=useRef(false)
-  const shadePending=useRef<string|null>(null)
   const playerClicks=useRef<{id:string;at:number;count:number;touch:boolean}|null>(null)
   const playerPointer=useRef<{x:number;y:number}|null>(null)
   const cellShade=shadeResolver(layout)
   const [target, setTarget] = useState('1')
-  const [editing, setEditing] = useState<{ key: string; point?: GridPoint; column?: string; inline: boolean; original: string; persisted:string } | null>(null)
+  const [editing, setEditing] = useState<{ key: string; point?: GridPoint; column?: string; headerMerge?:string; inline: boolean; original: string; persisted:string } | null>(null)
   const [text, setText] = useState('')
   const detailDialog = useRef<HTMLDialogElement>(null), textDialog = useRef<HTMLDialogElement>(null), tableRef = useRef<HTMLTableElement>(null)
   const cells = new Map(layout.cells.map(c => [pointKey(c),c])), rowMap = new Map(rows.map(r => [r.registration_id,r]))
@@ -72,8 +74,12 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
     for (let r=ri;r<=rj;r++) for (let c=ci;c<=cj;c++) { const value = cells.get(pointKey({ row_id:layout.rows[r].id,column_id:layout.columns[c].id })); if (value?.kind === 'text') texts.push(value.text) }
     for (let r=ri;r<=rj;r++) for (let c=ci;c<=cj;c++) merged.set(pointKey({ row_id:layout.rows[r].id,column_id:layout.columns[c].id }),{ id:merge.id, anchor:pointKey(merge.start), rowSpan:rj-ri+1,colSpan:cj-ci+1,text:texts.join(' ') })
   }
-  function selectHeader(id:string){if(blocked)return;playerClicks.current=null;setSelectedHeader(id);setSelected(null);setEnd(null);setRangeMode(false);setShadePanel(null)}
-  function select(point: GridPoint, extend = false) { playerClicks.current=null;setSelectedHeader(null);if ((extend || rangeMode) && selected) { setEnd(point); setRangeMode(false) } else { setSelected(point); setEnd(null) } }
+  function select(point: GridPoint, extend = false) {
+    if(blocked)return
+    onClearLocated()
+    playerClicks.current=null;setShadePanel(null)
+    if ((extend || rangeMode) && selected) { setEnd(point); setRangeMode(false) } else { setSelected(point); setEnd(null) }
+  }
   function selectPlayer(id:string,extend=false) {
     const cell=layout.cells.find(c=>c.kind==='registration'&&c.registration_id===id)
     if(cell)select(cell,extend)
@@ -116,80 +122,108 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
   useEffect(()=>{if(drag)playerClicks.current=null},[drag])
   useEffect(() => { if (detailId) detailDialog.current?.showModal() },[detailId])
   useEffect(() => { if (editing && !editing.inline) textDialog.current?.showModal() },[editing])
-  const selection=selected?expandedSelection(layout,selected,end??selected):null
+  const selection=selected?expandedSelection(selectionDocument,selected,end??selected):null
   function selectedRange(point:GridPoint){
     if(!selection)return false
-    const ri=layout.rows.findIndex(r=>r.id===point.row_id),ci=layout.columns.findIndex(c=>c.id===point.column_id)
+    const ri=selectionDocument.rows.findIndex(r=>r.id===point.row_id),ci=layout.columns.findIndex(c=>c.id===point.column_id)
     return ri>=selection.top&&ri<=selection.bottom&&ci>=selection.left&&ci<=selection.right
   }
   function openShade(point:GridPoint,left:number,top:number){
     if(blocked)return
-    setSelectedHeader(null)
-    const box=selectedRange(point)?selection:expandedSelection(layout,point)
-    if(!box)return
-    if(!selectedRange(point)){setSelected(point);setEnd(null);setRangeMode(false)}
-    const local=new Map((layout.cell_shades??[]).map(c=>[pointKey(c),c.shade]))
-    const values=new Set<number>()
-    for(let r=box.top;r<=box.bottom;r++)for(let c=box.left;c<=box.right;c++)values.add(local.get(`${layout.rows[r].id}/${layout.columns[c].id}`)??0)
-    setShadePanel({start:box.start,end:box.end,token:stateToken,left,top,value:values.size===1?[...values][0]:undefined})
+    if(!selectedRange(point))select(point)
+    setShadePanel({left,top})
   }
-  useEffect(()=>{
-    if(shadePending.current!==null&&confirmedGrid&&['shade_cells','shade_header'].includes(confirmedGrid.action)&&shadePending.current!==confirmedGrid.request_id){
-      shadePending.current=null;setSelectedHeader(null);setSelected(null);setEnd(null);setRangeMode(false);setShadePanel(null)
-    }
-  },[confirmedGrid])
   function applyShade(shade:number){
-    if(blocked||(!selection&&!selectedHeader))return
-    shadePending.current=confirmedGrid?.request_id??''
-    if(selectedHeader)operate({action:'shade_header',column_id:selectedHeader,shade},stateToken)
-    else if(selection)operate({action:'shade_cells',start:selection.start,end:selection.end,shade},stateToken)
+    if(blocked||!selection)return
+    operate({action:'shade_cells',start:selection.start,end:selection.end,shade},stateToken)
   }
-  const localShades=new Map((layout.cell_shades??[]).map(c=>[pointKey(c),c.shade]))
   const selectedShades=new Set<number>()
-  if(selectedHeader)selectedShades.add(layout.columns.find(c=>c.id===selectedHeader)?.header_shade??0)
-  if(selection)for(let r=selection.top;r<=selection.bottom;r++)for(let c=selection.left;c<=selection.right;c++)selectedShades.add(localShades.get(`${layout.rows[r].id}/${layout.columns[c].id}`)??0)
+  if(selection)for(let r=selection.top;r<=selection.bottom;r++)for(let c=selection.left;c<=selection.right;c++){
+    const row=selectionDocument.rows[r]
+    selectedShades.add(row.id===HEADER_ROW_ID?(layout.columns[c].header_shade??layout.columns[c].shade??0):cellShade(layout.rows.findIndex(v=>v.id===row.id),c))
+  }
   const startSelection = useGridSelection(!blocked, select)
   const selectionHasPlayer=layout.cells.some(c=>c.kind==='registration'&&selectedRange(c))
   const selectionMerge = selected ? merged.get(pointKey(selected)) : undefined
   const selectionCell = selected ? cells.get(pointKey(selected)) : undefined
+  const locatedKeys = new Set(locatedPoints.map(pointKey))
+  function locatedCell(point:GridPoint){
+    const key=pointKey(point)
+    if(locatedKeys.has(key))return true
+    const covered=merged.get(key)
+    return !!covered&&locatedPoints.some(candidate=>merged.get(pointKey(candidate))?.anchor===covered.anchor)
+  }
+  useEffect(()=>{
+    if(!locatedChangeId)return
+    setSelected(null);setEnd(null);setRangeMode(false);setShadePanel(null);playerClicks.current=null
+    if(!locatedPoints.length)return
+    const keys=locatedPoints.map(point=>merged.get(pointKey(point))?.anchor??pointKey(point))
+    const frame=requestAnimationFrame(()=>{
+      const container=tableRef.current?.closest<HTMLElement>('.arrangement-table-scroll')
+      const targets=keys.map(key=>Array.from(tableRef.current?.querySelectorAll<HTMLElement>('[data-grid-cell]')??[]).find(cell=>cell.dataset.gridCell===key)).filter((cell):cell is HTMLElement=>!!cell)
+      targets[0]?.scrollIntoView({block:'nearest',inline:'nearest'})
+      if(!container||targets.length<2)return
+      const boxes=targets.map(target=>target.getBoundingClientRect()),viewport=container.getBoundingClientRect()
+      const left=Math.min(...boxes.map(box=>box.left)),right=Math.max(...boxes.map(box=>box.right))
+      const top=Math.min(...boxes.map(box=>box.top)),bottom=Math.max(...boxes.map(box=>box.bottom))
+      if(right-left<=container.clientWidth){if(left<viewport.left)container.scrollLeft-=viewport.left-left;else if(right>viewport.right)container.scrollLeft+=right-viewport.right}
+      if(bottom-top<=container.clientHeight){if(top<viewport.top)container.scrollTop-=viewport.top-top;else if(bottom>viewport.bottom)container.scrollTop+=bottom-viewport.bottom}
+    })
+    return()=>cancelAnimationFrame(frame)
+  },[locatedChangeId,locatedPoints,layout])
+  const selectedHeading=selectedHeader?headings.find(h=>h.column.id===selectedHeader):undefined
+  const headerMerge=selectedHeading?.merge
+  const headerOnly=!!selection&&selection.start.row_id===HEADER_ROW_ID&&selection.end.row_id===HEADER_ROW_ID
+  const crossesHeader=!!selection&&selectionDocument.rows.slice(selection.top,selection.bottom+1).some(r=>r.id===HEADER_ROW_ID)&&!headerOnly
+  const multiple=!!selection&&(selection.top!==selection.bottom||selection.left!==selection.right)
+  const hasMerge=!!selection&&(selectionDocument.merges.some(m=>selectedRange(m.start)||selectedRange(m.end)))
+  const mergeReason=crossesHeader?'不能跨越級數表頭合併；請分別選取表頭、標題或資料區。':selectionHasPlayer?'選區含選手，不能合併。':!headerOnly&&selection&&new Set(selectionDocument.rows.slice(selection.top,selection.bottom+1).map(r=>r.role)).size>1?'標題與資料區請分開合併。':''
+  function menuAction(action:()=>void){if(blocked)return;setShadePanel(null);action()}
+  function menuKeyboard(event:React.KeyboardEvent<HTMLElement>,point:GridPoint){
+    if(event.key==='ContextMenu'||event.key==='F10'&&event.shiftKey){event.preventDefault();const box=event.currentTarget.getBoundingClientRect();openShade(point,box.left+20,box.top+20)}
+  }
   const operate = (op: GridOperation, expectedToken?: string) => { if (!blocked) onOperate(op,expectedToken) }
   useEffect(()=>{
     if(busy)return // Unknown/rejected input is kept until a verified successful read.
-    const exists=(p:GridPoint)=>layout.rows.some(r=>r.id===p.row_id)&&layout.columns.some(c=>c.id===p.column_id)
-    if(selectedHeader&&!layout.columns.some(c=>c.id===selectedHeader))setSelectedHeader(null)
+    const exists=(p:GridPoint)=>(p.row_id===HEADER_ROW_ID||layout.rows.some(r=>r.id===p.row_id))&&layout.columns.some(c=>c.id===p.column_id)
     if(selected&&!exists(selected)){setSelected(null);setEnd(null);setRangeMode(false)}
     else if(end&&!exists(end))setEnd(null)
-    if(editing&&((editing.point&&!exists(editing.point))||(editing.column&&!layout.columns.some(c=>c.id===editing.column))))setEditing(null)
+    if(editing&&((editing.point&&!exists(editing.point))||(editing.column&&!layout.columns.some(c=>c.id===editing.column))||(editing.headerMerge&&!layout.header_merges?.some(m=>m.id===editing.headerMerge))))setEditing(null)
   },[layout,busy])
   function beginEdit(point: GridPoint | null, column?: string, inline=false) {
     if(blocked)return
-    const key=column?`column/${column}`:pointKey(point!)
+    const heading=column?headings.find(h=>h.column.id===column):undefined
+    const key=heading?.merge?`header/${heading.merge.id}`:column?`column/${column}`:pointKey(point!)
     const cell=point?cells.get(pointKey(point)):undefined, merge=point?merged.get(pointKey(point)):undefined
     if(cell?.kind==='registration')return
-    const value=column?columnTitle(layout.columns.find(c=>c.id===column)!):merge?.text??(cell?.kind==='text'?cell.text:'')
+    const value=heading?heading.title:merge?.text??(cell?.kind==='text'?cell.text:'')
     if(point)select(point)
-    else if(column)selectHeader(column)
-    setText(textDrafts[key]??value);setEditing({key,point:point??undefined,column,inline,original:textDrafts[key]??value,persisted:value})
+    else if(column)select({row_id:HEADER_ROW_ID,column_id:column})
+    setText(textDrafts[key]??value);setEditing({key,point:point??undefined,column,headerMerge:heading?.merge?.id,inline,original:textDrafts[key]??value,persisted:value})
   }
   function commitText(){
     if(!editing||blocked||composing.current||textPending.current!==null)return
     if(text===editing.persisted){setEditing(null);return}
     textPending.current=confirmedGrid?.request_id??''
-    operate(editing.column?{action:'column_title',column_id:editing.column,text}:{action:'text',target:editing.point!,text})
+    operate(editing.headerMerge?{action:'header_text',merge_id:editing.headerMerge,text}:editing.column?{action:'column_title',column_id:editing.column,text}:{action:'text',target:editing.point!,text})
   }
   function cancelEdit(){if(blocked){setEditing(null);return}if(editing)onTextDraft(editing.key,editing.original);setEditing(null)}
   useEffect(()=>{
-    if(textPending.current!==null&&confirmedGrid&&['text','column_title'].includes(confirmedGrid.action)&&textPending.current!==confirmedGrid.request_id){textPending.current=null;setEditing(null)}
+    if(textPending.current!==null&&confirmedGrid&&['text','column_title','header_text'].includes(confirmedGrid.action)&&textPending.current!==confirmedGrid.request_id){textPending.current=null;setEditing(null)}
   },[confirmedGrid])
   useEffect(()=>{if(!busy)textPending.current=null},[busy])
   useEffect(()=>{
     const undoKey=(e:KeyboardEvent)=>{
       const target=e.target as HTMLElement
-      if(e.key.toLowerCase()!=='z'||!(e.ctrlKey||e.metaKey)||e.shiftKey||e.altKey||e.isComposing||target.closest('input,textarea,select,[contenteditable="true"],dialog'))return
-      if(!readonly){e.preventDefault();if(!blocked&&canUndo)onUndo()}
+      const command=e.ctrlKey||e.metaKey
+      const key=e.key.toLowerCase()
+      const undo=command&&key==='z'&&!e.shiftKey
+      const redo=command&&(key==='y'||key==='z'&&e.shiftKey)
+      if((!undo&&!redo)||e.altKey||e.isComposing||e.key==='Process'||e.keyCode===229||composing.current||target.closest('input,textarea,select,[contenteditable="true"],dialog'))return
+      if(!readonly){e.preventDefault();if(!blocked){if(undo&&canUndo)onUndo();else if(redo&&canRedo)onRedo()}}
     }
     document.addEventListener('keydown',undoKey);return()=>document.removeEventListener('keydown',undoKey)
-  },[readonly,blocked,canUndo,onUndo])
+  },[readonly,blocked,canUndo,onUndo,canRedo,onRedo])
   useEffect(()=>{
     const reset=(e:PointerEvent)=>{consumeOutsideClick.current=false;if(!(e.target as HTMLElement).closest('.cell-name'))playerClicks.current=null}
     const consume=(e:MouseEvent)=>{if(consumeOutsideClick.current){consumeOutsideClick.current=false;e.preventDefault();e.stopImmediatePropagation()}}
@@ -210,20 +244,20 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
     onCompositionStart={()=>{composing.current=true}} onCompositionEnd={()=>{composing.current=false}} onChange={e=>{setText(e.target.value);if(editing)onTextDraft(editing.key,e.target.value)}} onClick={e=>e.stopPropagation()}
     onKeyDown={e=>{if(e.nativeEvent.isComposing)return;if(e.key==='Enter'){e.preventDefault();commitText()}if(e.key==='Escape'){e.preventDefault();cancelEdit()}}}/>
   return <>
-    {!readonly&&<div className="grid-selection-tools" role="toolbar" aria-label="表格編輯工具">
-      <button className="secondary" disabled={blocked||!canUndo} title="復原（Ctrl+Z／Command+Z）" onClick={onUndo}>復原</button>
-      <fieldset className="cell-shade-toolbar"><legend>儲存格底色</legend><ShadePalette local value={selectedShades.size===1?[...selectedShades][0]:undefined} disabled={blocked||(!selection&&!selectedHeader)} onChoose={applyShade}/></fieldset>
-      <button className="secondary" disabled={blocked||(!selected&&!selectedHeader)||selectionCell?.kind==='registration'} onClick={()=>selectedHeader?beginEdit(null,selectedHeader):selected&&beginEdit(selected)}>編輯文字</button>
-      <button className="secondary grid-touch-range" disabled={blocked||!selected} aria-pressed={rangeMode} onClick={()=>setRangeMode(!rangeMode)}>{rangeMode?'點選範圍另一角':'範圍選取'}</button>
-      <button className="secondary" disabled={blocked||!selected||!end||!!selectionMerge||selectionHasPlayer} onClick={()=>selected&&end&&operate({action:'merge',start:selected,end})}>合併儲存格</button>
-      <button className="secondary" disabled={blocked||!selectionMerge} onClick={()=>selectionMerge&&operate({action:'unmerge',merge_id:selectionMerge.id})}>解除合併儲存格</button>
-      <button className="secondary" disabled={!selected&&!selectedHeader} onClick={()=>{setSelectedHeader(null);setSelected(null);setEnd(null);setRangeMode(false)}}>取消選取</button>
-    </div>}
     <div className={`arrangement-table-scroll ${drag ? 'is-dragging' : ''}`} tabIndex={0} role="region" aria-label="級數表格，可水平捲動">
+      {!readonly&&<button className="grid-menu-trigger secondary" type="button" disabled={blocked} aria-label="開啟儲存格操作" title="儲存格操作" onClick={e=>{const box=e.currentTarget.getBoundingClientRect();setShadePanel({left:box.right-250,top:box.bottom+4})}}>⋯</button>}
       <div className="grid-canvas" style={{minWidth:Math.max(1100,layout.columns.length*110)}}>
       {!readonly&&<GridInsertControls layout={layout} table={tableRef} stateToken={stateToken} disabled={blocked} onOperate={operate}/>}
       <table ref={tableRef} className="arrangement-table grid-table" aria-label="當次級數表" style={{ minWidth: layout.columns.length * 110 }}>
-        <tbody>{layout.rows.map((r,ri) => <Fragment key={r.id}>{r.role==='body'&&(ri===0||layout.rows[ri-1].role==='header')&&<tr className="grid-level-head">{layout.columns.map(c=><th scope="col" key={c.id} data-column-id={c.id} data-grid-header={c.id} data-header-shade={c.header_shade??c.shade??0} className={selectedHeader===c.id?'grid-selected':''} style={{background:shades[c.header_shade??c.shade??0]}} onContextMenu={e=>{if(!blocked){e.preventDefault();selectHeader(c.id)}}}>{editing?.inline&&editing.column===c.id?inlineEditor():<button className="grid-column-title" disabled={blocked} aria-pressed={selectedHeader===c.id} onDoubleClick={()=>beginEdit(null,c.id,true)} aria-label={`選取第 ${layout.columns.indexOf(c)+1} 欄表頭`} onClick={()=>selectHeader(c.id)}>{columnTitle(c)}</button>}</th>)}</tr>}<tr data-row-id={r.id} data-row-role={r.role}>{layout.columns.map((c,ci) => {
+        <colgroup>{layout.columns.map(c=><col key={c.id} data-column-id={c.id}/>)}</colgroup>
+        <tbody>{layout.rows.map((r,ri) => <Fragment key={r.id}>{r.role==='body'&&(ri===0||layout.rows[ri-1].role==='header')&&<tr className="grid-level-head">{headings.map(h=>{
+          if(!h.anchor)return null
+          const c=h.column,p={row_id:HEADER_ROW_ID,column_id:c.id}
+          return <th scope="col" key={c.id} colSpan={h.right-h.left+1} data-column-id={c.id} data-grid-header={c.id} data-grid-cell={pointKey(p)} data-drop-row={HEADER_ROW_ID} data-drop-column={c.id} data-drop-enabled={false} data-header-shade={h.shade} className={selectedRange(p)?'grid-selected':''} style={{background:shades[h.shade]}}
+            onContextMenu={e=>{if(!blocked){e.preventDefault();openShade(p,e.clientX,e.clientY)}}} onPointerDown={e=>startSelection(e,p)} onKeyDown={e=>menuKeyboard(e,p)} onDoubleClick={()=>beginEdit(null,c.id,true)}>
+            {editing?.inline&&editing.column===c.id?inlineEditor():<button className="grid-column-title" disabled={blocked} aria-pressed={selectedRange(p)} aria-label={`選取第 ${h.index+1} 欄表頭`} onClick={e=>select(p,e.shiftKey)}>{h.title}</button>}
+          </th>
+        })}</tr>}<tr data-row-id={r.id} data-row-role={r.role}>{layout.columns.map((c,ci) => {
           const point = { row_id:r.id,column_id:c.id }, k=pointKey(point), merge=merged.get(k)
           if (merge && merge.anchor !== k) return null
           const cell=cells.get(k), row=cell?.kind==='registration' ? rowMap.get(cell.registration_id) : undefined
@@ -234,9 +268,9 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
           const isTarget=drag?.target&&pointKey(drag.target)===k
           const textChanged=knownLayout && baselineLayout && ((cell?.kind==='text' ? cell.text : '') !== (oldText.get(k) ?? ''))
           return <td key={c.id} rowSpan={merge?.rowSpan} colSpan={merge?.colSpan} data-drop-row={r.id} data-drop-column={c.id} data-drop-level={c.level ?? undefined} data-drop-enabled={dropEnabled}
-            data-drop-registration={row?.registration_id} data-drop-name={match?row?.member_name:undefined} data-shade={shade} style={{background:shades[shade]}} data-grid-cell={k} className={`${selectedRange(point) ? 'grid-selected' : ''} ${isTarget ? `drop-${drag!.target!.mode} ${drag!.target!.side??''}` : ''} ${textChanged ? 'net-position' : ''}`}
+            data-drop-registration={row?.registration_id} data-drop-name={match?row?.member_name:undefined} data-shade={shade} style={{background:shades[shade]}} data-grid-cell={k} className={`${selectedRange(point) ? 'grid-selected' : ''} ${locatedCell(point) ? 'grid-located' : ''} ${isTarget ? `drop-${drag!.target!.mode} ${drag!.target!.side??''}` : ''} ${textChanged ? 'net-position' : ''}`}
             onContextMenu={event=>{if(blocked)return;event.preventDefault();event.stopPropagation();openShade(point,event.clientX,event.clientY)}}
-            onPointerDown={event=>startSelection(event,point)} onDoubleClick={event=>{if(!(event.target as HTMLElement).closest('.cell-name,.cell-grip'))beginEdit(point,undefined,true)}}
+            onKeyDown={e=>menuKeyboard(e,point)} onPointerDown={event=>startSelection(event,point)} onDoubleClick={event=>{if(!(event.target as HTMLElement).closest('.cell-name,.cell-grip'))beginEdit(point,undefined,true)}}
             onClick={event => { if ((event.target as HTMLElement).closest('.cell-name,.cell-grip')) return; select(point,event.shiftKey) }}>
             {editing?.inline&&editing.point&&pointKey(editing.point)===k?inlineEditor():row ? <div data-draggable={!blocked} data-registration-id={row.registration_id} className={`arrangement-cell ${drag?.card.id===row.registration_id ? 'is-drag-source' : ''} ${change ? `net-${change.kind}` : ''} ${!match ? 'search-hidden' : search.trim() ? 'search-match' : ''} ${vegetarian && row.diet==='vegetarian' ? 'diet-highlight' : ''}`}>
               {!match ? <span className="search-occupied" aria-label="搜尋隱藏，已占用">已占用</span> : <>
@@ -254,11 +288,17 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
       </table>
       </div>
     </div>
-    {shadePanel&&<CellShadeMenu panel={shadePanel} disabled={blocked} onClose={()=>setShadePanel(null)} onChoose={shade=>{
-      if(blocked)return
-      shadePending.current=confirmedGrid?.request_id??''
-      operate({action:'shade_cells',start:shadePanel.start,end:shadePanel.end,shade},shadePanel.token);setShadePanel(null)
-    }}/>}
+    {shadePanel&&<CellShadeMenu panel={shadePanel} value={selectedShades.size===1?[...selectedShades][0]:undefined} disabled={blocked||!selection} onClose={()=>setShadePanel(null)} onChoose={applyShade}>
+      <div className="cell-menu-actions">
+        <button className="secondary" disabled={blocked||!selected||selectionCell?.kind==='registration'} onClick={()=>menuAction(()=>selectedHeader?beginEdit(null,selectedHeader):selected&&beginEdit(selected))}>編輯文字</button>
+        <button className="secondary" disabled={blocked||!selected} aria-pressed={rangeMode} onClick={()=>menuAction(()=>setRangeMode(true))}>範圍選取</button>
+        <button className="secondary" disabled={blocked||!multiple||hasMerge||!!mergeReason} onClick={()=>menuAction(()=>selection&&operate(headerOnly?{action:'merge_header',start_column_id:selection.start.column_id,end_column_id:selection.end.column_id}:{action:'merge',start:selection.start,end:selection.end},stateToken))}>合併儲存格</button>
+        <button className="secondary" disabled={blocked||(!headerMerge&&!selectionMerge)} onClick={()=>menuAction(()=>headerMerge?operate({action:'unmerge_header',merge_id:headerMerge.id},stateToken):selectionMerge&&operate({action:'unmerge',merge_id:selectionMerge.id},stateToken))}>解除合併儲存格</button>
+        <button className="secondary" disabled={blocked||!selected} onClick={()=>menuAction(()=>{setSelected(null);setEnd(null);setRangeMode(false)})}>取消選取</button>
+      </div>
+      {mergeReason&&<small>{mergeReason}</small>}
+      <div className="cell-menu-global" role="group" aria-label="整張表格"><strong>整張表格</strong><button className="secondary" disabled={blocked||!canUndo} title="復原上一個動作（Ctrl+Z／Command+Z）" onClick={()=>menuAction(onUndo)}>復原上一個動作</button><button className="secondary" disabled={blocked||!canRedo} title="重做上一個復原（Ctrl+Shift+Z／Command+Shift+Z；Ctrl+Y）" onClick={()=>menuAction(onRedo)}>重做</button></div>
+    </CellShadeMenu>}
     {drag&&createPortal(<div className="level-drag-ghost" aria-hidden="true" style={{width:drag.width,height:drag.height,left:Math.max(8,Math.min(drag.x+12,window.innerWidth-drag.width-8)),top:Math.max(8,Math.min(drag.y+(drag.touch?-drag.height-16:16),window.innerHeight-drag.height-8))}}><strong>{drag.card.name}</strong>{drag.card.note&&<small>{drag.card.note}</small>}</div>,document.body)}
     {drag?.target&&createPortal(<div className="drag-intent" role="status" data-drag-intent={drag.target.mode} style={{left:Math.max(8,Math.min(drag.x-80,window.innerWidth-240)),top:Math.max(8,Math.min(drag.y+(drag.touch?20:drag.height+24),window.innerHeight-48))}}>{drag.target.label}</div>,document.body)}
     {detail&&<dialog ref={detailDialog} className="arrangement-dialog" aria-labelledby="cell-detail-title" onCancel={()=>setDetailId(null)} onPointerDown={e=>{outsideDetail.current=beyond(e)}} onPointerUp={e=>{if(outsideDetail.current&&beyond(e))setDetailId(null);outsideDetail.current=false}}><button className="dialog-close secondary" aria-label="關閉" title="關閉" onClick={()=>setDetailId(null)}>×</button><h3 id="cell-detail-title">{detail.member_name}</h3><p>{detail.distinguishing_note || '無辨識註記'}</p>

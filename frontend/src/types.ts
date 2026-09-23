@@ -140,13 +140,18 @@ export interface GridLayout {
   columns: { id: string; kind: 'level' | 'text'; level: number | null; title?: string | null; shade?: number; header_shade?:number|null }[]
   cells: GridCell[]
   cell_shades?: (GridPoint & { shade: number })[]
+  header_merges?: {id:string;start_column_id:string;end_column_id:string;title?:string|null}[]
   merges: GridMerge[]
 }
 export type GridOperation = { action: 'move'; registration_id: string; target: GridPoint }
   | { action: 'undo'; target_request_id: string }
+  | { action: 'redo'; target_request_id: string }
   | { action: 'swap'; registration_id: string; target_registration_id: string }
   | { action: 'insert'; registration_id: string; target: GridPoint; side: 'before' | 'after' }
   | { action: 'move_empty'; registration_id: string; target: GridPoint }
+  | { action: 'merge_header'; start_column_id:string; end_column_id:string }
+  | { action: 'unmerge_header'; merge_id:string }
+  | { action: 'header_text'; merge_id:string; text:string }
   | { action: 'shade_header'; column_id:string; shade:number }
   | { action: 'shade_cells'; start: GridPoint; end: GridPoint; shade: number }
   | { action: 'shade_row' | 'shade_column'; axis_id: string; shade: number }
@@ -158,4 +163,4 @@ export type GridOperation = { action: 'move'; registration_id: string; target: G
   | { action: 'merge'; start: GridPoint; end: GridPoint }
   | { action: 'unmerge'; merge_id: string }
 export type GridRequest = { request_id: string; state_token: string; operation: GridOperation }
-export type GridReceipt = { state_token?: string | null; undo_head?: string | null; request_id: string; competition_id: string; revision: number; operation: GridOperation; layout: GridLayout }
+export type GridReceipt = { state_token?: string | null; undo_head?: string | null; redo_head?: string | null; request_id: string; competition_id: string; revision: number; operation: GridOperation; layout: GridLayout }

@@ -11,6 +11,7 @@ from .schemas import StrictInput
 
 MAX_ROWS = 500
 MAX_COLUMNS = 50
+HEADER_ROW_ID = "column-headers"
 
 class CellAddress(StrictInput):
     row_id: str = Field(min_length=1, max_length=36)
@@ -57,6 +58,10 @@ class UndoOperation(StrictInput):
     action: Literal["undo"]
     target_request_id: str = Field(min_length=8, max_length=64)
 
+class RedoOperation(StrictInput):
+    action: Literal["redo"]
+    target_request_id: str = Field(min_length=8, max_length=64)
+
 class MoveBottom(StrictInput):
     action: Literal["move_bottom"]
     registration_id: str = Field(min_length=1, max_length=36)
@@ -90,7 +95,21 @@ class UnmergeCells(StrictInput):
     action: Literal["unmerge"]
     merge_id: str = Field(min_length=1, max_length=36)
 
-Operation = Annotated[MoveCell | SwapCells | InsertPlayer | MoveEmpty | SetShade | ShadeHeader | ShadeCells | UndoOperation | MoveBottom | InsertAxis | DeleteAxis | SetText | ColumnTitle | MergeCells | UnmergeCells, Field(discriminator="action")]
+class HeaderRange(StrictInput):
+    action: Literal["merge_header"]
+    start_column_id: str = Field(min_length=1, max_length=36)
+    end_column_id: str = Field(min_length=1, max_length=36)
+
+class UnmergeHeader(StrictInput):
+    action: Literal["unmerge_header"]
+    merge_id: str = Field(min_length=1, max_length=36)
+
+class HeaderText(StrictInput):
+    action: Literal["header_text"]
+    merge_id: str = Field(min_length=1, max_length=36)
+    text: str = Field(max_length=500)
+
+Operation = Annotated[MoveCell | SwapCells | InsertPlayer | MoveEmpty | SetShade | ShadeHeader | ShadeCells | UndoOperation | RedoOperation | MoveBottom | InsertAxis | DeleteAxis | SetText | ColumnTitle | MergeCells | UnmergeCells | HeaderRange | UnmergeHeader | HeaderText, Field(discriminator="action")]
 
 class GridMutation(StrictInput):
     request_id: str = Field(min_length=8, max_length=64)
@@ -109,7 +128,7 @@ class LayoutColumn(BaseModel):
     level: int | None
     title: str | None = None
     shade: int = Field(default=0, ge=0, le=3, strict=True)
-    header_shade: int | None = Field(default=None, ge=1, le=3, strict=True)
+    header_shade: int | None = Field(default=None, ge=0, le=3, strict=True)
 
 class PlayerCell(CellAddress):
     kind: Literal["registration"]
@@ -125,7 +144,13 @@ class LayoutMerge(BaseModel):
     end: CellAddress
 
 class CellShade(CellAddress):
-    shade: int = Field(ge=1, le=3, strict=True)
+    shade: int = Field(ge=0, le=3, strict=True)
+
+class HeaderMerge(BaseModel):
+    id: str
+    start_column_id: str
+    end_column_id: str
+    title: str | None = None
 
 class GridLayout(BaseModel):
     schema_version: Literal[1] = 1
@@ -133,6 +158,7 @@ class GridLayout(BaseModel):
     columns: list[LayoutColumn]
     cells: list[Annotated[PlayerCell | TextCell, Field(discriminator="kind")]]
     merges: list[LayoutMerge]
+    header_merges: list[HeaderMerge] = Field(default_factory=list, max_length=MAX_COLUMNS//2)
     cell_shades: list[CellShade] = Field(default_factory=list, max_length=MAX_ROWS * MAX_COLUMNS)
 
     @model_validator(mode="after")
@@ -154,6 +180,7 @@ class GridReceipt(BaseModel):
     layout: GridLayout
     state_token: str | None = None
     undo_head: str | None = None
+    redo_head: str | None = None
 
 
 def fail(message):
@@ -214,6 +241,8 @@ def default_layout(rows):
 def encode(layout):
     # Cell insertion order is not part of the persisted spatial meaning.
     normalized = {**layout, "cells": sorted(layout["cells"], key=key), "merges": sorted(layout["merges"], key=lambda m:m["id"])}
+    if "header_merges" in layout:
+        normalized["header_merges"] = sorted(layout["header_merges"], key=lambda m:m["id"])
     if "cell_shades" in layout:
         normalized["cell_shades"] = sorted(layout["cell_shades"], key=key)
     return json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -221,7 +250,7 @@ def encode(layout):
 
 def signature(layout):
     # Merge UUIDs are bookkeeping: merge->unmerge->same merge restores the same meaning.
-    return {**layout, "cell_shades": sorted(layout.get("cell_shades", []), key=key), "rows": [{**r, "shade":r.get("shade",0)} for r in layout["rows"]], "columns": [{**c, "shade":c.get("shade",0), "header_shade":c.get("header_shade"), "title": c.get("title") if c.get("title") is not None else (str(c["level"]) + " 級" if c["kind"] == "level" else "文字／備註")} for c in layout["columns"]], "cells": sorted(layout["cells"], key=key),
+    return {**layout, "header_merges": sorted(({"start_column_id":m["start_column_id"], "end_column_id":m["end_column_id"], "title":m.get("title")} for m in layout.get("header_merges",[])), key=lambda m:(m["start_column_id"],m["end_column_id"])), "cell_shades": sorted(layout.get("cell_shades", []), key=key), "rows": [{**r, "shade":r.get("shade",0)} for r in layout["rows"]], "columns": [{**c, "shade":c.get("shade",0), "header_shade":c.get("header_shade"), "title": c.get("title") if c.get("title") is not None else (str(c["level"]) + " 級" if c["kind"] == "level" else "文字／備註")} for c in layout["columns"]], "cells": sorted(layout["cells"], key=key),
         "merges": sorted(({"start": m["start"], "end": m["end"]} for m in layout["merges"]), key=lambda m: (key(m["start"]),key(m["end"])))}
 
 
@@ -374,7 +403,21 @@ def delete_axis(layout, op):
             new_merges.append({**merge,
                 "start": {"row_id": remaining[0][0], "column_id": remaining[0][1]},
                 "end": {"row_id": remaining[-1][0], "column_id": remaining[-1][1]}})
+    header_merges, header_moves = [], []
+    if axis == "columns":
+        ids = [c["id"] for c in layout["columns"]]
+        for merge in layout.get("header_merges",[]):
+            members = ids[ids.index(merge["start_column_id"]):ids.index(merge["end_column_id"])+1]
+            remaining = [cid for cid in members if cid != op["axis_id"]]
+            if merge.get("title") is not None and remaining and merge["start_column_id"] == op["axis_id"]:
+                target = next(c for c in layout["columns"] if c["id"] == remaining[0])
+                if target.get("title") not in (None,"",merge["title"]): fail("合併表頭文字無法明確保留，請先解除合併並整理標題")
+                header_moves.append((target,merge["title"]))
+            if len(remaining)>1: header_merges.append({**merge,"start_column_id":remaining[0],"end_column_id":remaining[-1]})
     # Mutation only after the full plan is checked; surviving IDs/coordinates never change.
+    if axis == "columns" and "header_merges" in layout:
+        layout["header_merges"] = header_merges
+        for target,title in header_moves: target["title"] = title
     layout[axis] = [v for v in layout[axis] if v["id"] != op["axis_id"]]
     layout["cells"] = [c for c in layout["cells"] if c[field] != op["axis_id"]]
     for source, target, old in moves:
@@ -411,30 +454,56 @@ def shade_region(layout, start, end):
 
 
 def set_cell_shades(layout, op):
-    points = shade_region(layout, op["start"], op["end"])
+    # The synthetic address is only an operation/selection coordinate; persisted
+    # rows and player coordinates remain unchanged.
+    rows = list(layout["rows"])
+    index = next(i for i,r in enumerate(rows) if r["role"] == "body")
+    rows.insert(index, {"id":HEADER_ROW_ID,"role":"header"})
+    merges = list(layout["merges"]) + [{"start":{"row_id":HEADER_ROW_ID,"column_id":m["start_column_id"]},"end":{"row_id":HEADER_ROW_ID,"column_id":m["end_column_id"]}} for m in layout.get("header_merges",[])]
+    points = shade_region({**layout,"rows":rows,"merges":merges}, op["start"], op["end"])
+    for column in layout["columns"]:
+        if (HEADER_ROW_ID,column["id"]) in points: column["header_shade"] = op["shade"]
+    points = {p for p in points if p[0] != HEADER_ROW_ID}
     colors = {key(c): c for c in layout.get("cell_shades", []) if key(c) not in points}
-    if op["shade"]:
-        colors.update({p: {"row_id": p[0], "column_id": p[1], "shade": op["shade"]} for p in points})
-    layout["cell_shades"] = sorted(colors.values(), key=key)
+    colors.update({p: {"row_id": p[0], "column_id": p[1], "shade": op["shade"]} for p in points})
+    if points: layout["cell_shades"] = sorted(colors.values(), key=key)
 
 
 def apply(layout, operation):
     op = operation.model_dump()
     action = op["action"]
+    if action == "merge_header":
+        ids = [c["id"] for c in layout["columns"]]
+        if op["start_column_id"] not in ids or op["end_column_id"] not in ids: fail("表頭欄位已不存在")
+        left,right = sorted((ids.index(op["start_column_id"]),ids.index(op["end_column_id"])))
+        if left == right: fail("請選取至少兩個表頭格")
+        for merge in layout.get("header_merges",[]):
+            if ids.index(merge["start_column_id"]) <= right and ids.index(merge["end_column_id"]) >= left: fail("表頭合併區重疊，請先解除合併")
+        layout.setdefault("header_merges",[]).append({"id":new_id(),"start_column_id":ids[left],"end_column_id":ids[right]})
+        return None
+    if action in {"unmerge_header","header_text"}:
+        merge = next((m for m in layout.get("header_merges",[]) if m["id"] == op["merge_id"]),None)
+        if merge is None: fail("表頭合併区已不存在")
+        if action == "unmerge_header": layout["header_merges"].remove(merge)
+        else:
+            # Editing the displayed merged label edits the first underlying title;
+            # unmerge keeps that edit and every other original column title.
+            merge["title"] = op["text"]
+            next(c for c in layout["columns"] if c["id"] == merge["start_column_id"])["title"] = op["text"]
+        return None
     if action == "shade_header":
         column = next((c for c in layout["columns"] if c["id"] == op["column_id"]), None)
         if column is None:
             fail("欄位已不存在，請重新讀取")
-        if op["shade"]:
-            column["header_shade"] = op["shade"]
-        else:
-            column.pop("header_shade", None)
+        column["header_shade"] = op["shade"]
         return None
     if action == "shade_cells":
         set_cell_shades(layout, op)
         return None
     if action == "undo":
         fail("復原必須由交易服務核對伺服器紀錄")
+    if action == "redo":
+        fail("重做必須由交易服務核對伺服器紀錄")
     if action in {"swap", "insert", "move_empty"}:
         explicit_move(layout, op)
         return None
@@ -519,7 +588,10 @@ def apply(layout, operation):
 
 
 def validate(layout, rows):
+    try: GridLayout.model_validate(layout)
+    except ValueError: fail("安排布局資料格式不合法")
     row_ids = [r["id"] for r in layout["rows"]]
+    if HEADER_ROW_ID in row_ids: fail("表頭選取識別不得作為資料列")
     columns = {c["id"]:c for c in layout["columns"]}
     if len(row_ids) != len(set(row_ids)) or len(columns) != len(layout["columns"]):
         fail("行列識別重複")
@@ -529,12 +601,12 @@ def validate(layout, rows):
         fail("安排大小或資料排不合法")
     for column in layout["columns"]:
         header_shade = column.get("header_shade")
-        if header_shade is not None and (type(header_shade) is not int or not 1 <= header_shade <= 3):
+        if header_shade is not None and (type(header_shade) is not int or not 0 <= header_shade <= 3):
             fail("表頭底色色階不合法")
     shaded = set()
     for cell in layout.get("cell_shades", []):
         address(layout, cell)
-        if key(cell) in shaded or type(cell.get("shade")) is not int or not 1 <= cell["shade"] <= 3:
+        if key(cell) in shaded or type(cell.get("shade")) is not int or not 0 <= cell["shade"] <= 3:
             fail("局部底色座標重複或色階不合法")
         shaded.add(key(cell))
     seen = set(); players = {}; merged = set()

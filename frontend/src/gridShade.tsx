@@ -23,8 +23,8 @@ export function expandedSelection(layout:GridLayout,start:GridPoint,end:GridPoin
   }}
   return {...box,start:{row_id:layout.rows[box.top].id,column_id:layout.columns[box.left].id},end:{row_id:layout.rows[box.bottom].id,column_id:layout.columns[box.right].id}}
 }
-export function ShadePalette({value,local=false,disabled=false,onChoose}:{value?:number;local?:boolean;disabled?:boolean;onChoose:(shade:number)=>void}) {
-  return <div className="shade-palette">{shades.slice(1).map((color,i)=><button key={i} type="button" aria-label={`淺灰 ${i+1}`} title={`淺灰 ${i+1}`} aria-pressed={value===i+1} disabled={disabled} style={{background:color}} onClick={()=>onChoose(i+1)}/>)}<button type="button" className="secondary" aria-label={local?'清除局部底色':'無底色'} title={local?'恢復排欄底色':'無底色'} aria-pressed={value===0} disabled={disabled} onClick={()=>onChoose(0)}><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" fill="white" stroke="#777"/><path d="M4 20L20 4" stroke="#a33" strokeWidth="2"/></svg></button></div>
+export function ShadePalette({value,disabled=false,onChoose}:{value?:number;local?:boolean;disabled?:boolean;onChoose:(shade:number)=>void}) {
+  return <div className="shade-palette">{shades.map((color,shade)=><button key={shade} type="button" aria-label={shade?`淺灰 ${shade}`:'白色'} title={shade?`淺灰 ${shade}`:'白色'} aria-pressed={value===shade} disabled={disabled} style={{background:color}} onClick={()=>{if(value!==shade)onChoose(shade)}}/>)}</div>
 }
 // SVG is foreground content, so PDF/print retains gray when background graphics are off.
 export function PrintedShade({shade}:{shade:number}) {

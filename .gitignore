@@ -265,3 +265,11 @@ deploy/docker/*.zip
 /frontend/dist-grid-header/
 
 /frontend/dist-grid-panels/
+
+/frontend/dist-grid-export/
+
+/frontend/dist-grid-recovery/
+
+/frontend/dist-grid-shade/
+
+/frontend/dist-grid-menu/
