@@ -18,7 +18,7 @@ Windows 原生 B 預覽另更新至 `data/grid-public-runtime/releases/grid-v020
 powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1 -CheckOnly -AppOnly
 ```
 
-需停止時另依已授權維護程序移除 `-CheckOnly`，並保留 ngrok／DB/session。rollback 備份與舊 source/static/helper 皆保留；不得以舊資料庫覆蓋新服務寫入，也未執行回退。E2E C3/C5 的留存 `.last-run.json` 有失敗項，詳[驗收紀錄](acceptance.md#v020-發布驗證2026-09-23)；不得把全套 E2E 描述為全綠。
+需停止時另依已授權維護程序移除 `-CheckOnly`，並保留 ngrok／DB/session。rollback 備份與舊 source/static/helper 皆保留；不得以舊資料庫覆蓋新服務寫入，也未執行回退。E2E C3/C5 的留存 `.last-run.json` 仍是歷史失敗狀態；其四個原失敗 viewport 後有 scoped pass 證據，C6 為修正測試 locator 後的 2/2 通過。詳[驗收紀錄](acceptance.md#v020-發布驗證2026-09-23)；沒有單次全綠的完整 C 重跑。
 
 ## 前次 B grid-menu 版執行身份（2026-09-23，Windows 限定預覽）
 

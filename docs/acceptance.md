@@ -618,10 +618,18 @@ Windows Chromium E2E 使用合成資料與獨立輸出：
 | A-r2 | 30 passed，`.last-run.json` 為 passed | `data/release-playwright-0.2.0-competition-a-r2-results`；DB `data/comp-levels-release-0.2.0-a3-e2e.db`；port 8032 |
 | B3（含明確白色 desktop/mobile） | 10 passed，`.last-run.json` 為 passed | `data/release-playwright-0.2.0-competition-b3-results`；DB `data/comp-levels-release-0.2.0-b3-e2e.db`；port 8033 |
 | C2 | 14 passed，`.last-run.json` 為 passed | `data/release-playwright-0.2.0-competition-c2-results` |
-| C3 首輪 | 12 passed、4 failed；`.last-run.json` 為 failed | `data/release-playwright-0.2.0-competition-c3-results` |
-| C5 targeted | `.last-run.json` 為 failed，仍記錄 2 個失敗案例 | `data/release-playwright-0.2.0-competition-c5-results` |
-| C6 targeted | 2 passed；`.last-run.json` 為 passed | `data/release-playwright-0.2.0-competition-c6-results` |
+| C3 首輪 | exit 1；12 passed、4 failed（16 個 desktop/mobile 測試）；52.5 秒 | `data/release-playwright-0.2.0-competition-c3-results`；DB `data/comp-levels-release-0.2.0-c3-e2e.db`；port 8033 |
+| C5 targeted（兩個色票案例） | exit 1；2 passed、2 failed；35.9 秒。八十人案例 desktop/mobile 通過；同色案例兩個 viewport 因測試 locator 失敗 | `data/release-playwright-0.2.0-competition-c5-results`；DB `data/comp-levels-release-0.2.0-c5-e2e.db`；port 8033 |
+| C6 targeted（同色案例，修正 locator 後） | exit 0；desktop/mobile 2 passed；14.3 秒 | `data/release-playwright-0.2.0-competition-c6-results`；DB `data/comp-levels-release-0.2.0-c6-e2e.db`；port 8033 |
 
-C3 的 4 個失敗案例中，C5 留存的 targeted rerun 仍有 2 個失敗；這與先前交接摘要所稱 C5/C6 修正後各 2 passed 不一致。上述輸出資料夾只留 `.last-run.json`，沒有詳細 HTML/trace 報告；本次沒有重跑這些 E2E，因此不能確認 C5 失敗原因、把它定性為產品或 fixture 問題，也不宣稱 C 系列全通過。A-r2、B3、C2 的留存狀態皆為 passed。自動測試與觸控均為 Windows Chromium／Playwright 模擬，不替代實體手機、其他 OS 或使用者人工驗收。
+三批都在 B worktree 的 `frontend/` 以 PowerShell 執行；共同設定為 `PYTHONUTF8=1`、`FUCHENG_E2E_PORT=8033`、`FUCHENG_E2E_STATIC_DIR=frontend/dist-release-0.2.0`，各自使用上表的獨立合成 DB。實際 Playwright 命令如下：
+
+```powershell
+npm run test:e2e -- e2e/competition-levels.spec.ts --grep '狀態精修：表格同高動態尺寸歷史重開與頁首對齊|狀態精修：非同步首載開歷史後定位最新|狀態精修：未知未送達後真實409可重新核對|色票故障：八十人正常連續點色生命週期|色票故障：同色白色與合併範圍不重送|色票故障：真實未變更回應自動讀回且不假造保存|色票邊界：未變更讀回失敗仍鎖定而不重送|色票邊界：一般422與未知請求不可自動解除' --output ../data/release-playwright-0.2.0-competition-c3-results
+npm run test:e2e -- e2e/competition-levels.spec.ts --grep '色票故障：八十人正常連續點色生命週期|色票故障：同色白色與合併範圍不重送' --output ../data/release-playwright-0.2.0-competition-c5-results
+npm run test:e2e -- e2e/competition-levels.spec.ts --grep '色票故障：同色白色與合併範圍不重送' --output ../data/release-playwright-0.2.0-competition-c6-results
+```
+
+C3 篩選 8 個測試標題、桌機與手機共 16 例。四個失敗實例是「色票故障：八十人正常連續點色生命週期」及「色票故障：同色白色與合併範圍不重送」各自的 desktop/mobile。C3 原錯誤分別顯示色票按鈕尚不存在，以及首次明確白色寫入被測試誤判為 no-op（預期 422、實收 200）。修正後 C5 重跑兩個標題：八十人案例 2/2 通過；同色案例兩例失敗，因測試把「表格底色」group 定位在安排區而非開啟的儲存格操作選單。僅修正測試操作／定位，保留 no-op 與保存斷言；產品程式與 `frontend/dist-release-0.2.0` 未變。C6 只重跑同色案例，在桌機／手機 2/2 通過。因此四個原失敗 viewport 均有後續 pass 證據；C3、C5 原始執行結果仍保留 failed，沒有單次全 16 例重跑，故不把 C 系列描述為單次全綠。A-r2、B3、C2 的留存狀態皆為 passed。自動測試與觸控均為 Windows Chromium／Playwright 模擬，不替代實體手機、其他 OS 或使用者人工驗收。
 
 公開 B 原生預覽 `data/grid-public-runtime/releases/grid-v020-20260923-200323` 的唯讀檢查：本機及 HTTPS health 為 `{"status":"ok"}`；首頁、JS、CSS HTTP 200／`no-store`，三個回應檔 SHA-256 與凍結 image static 相同。更新前後 SQLite Backup API 檢查 18/18 table row count/hash 不變，schema `0008_arrangement_grid`、integrity `ok`、FK errors 0；沒有 migration、reseed、業務寫入或管理員登入/session 變更。此為合成 B 預覽，不是正式資料庫或正式部署；公開 admin UI 操作沒有測試，人工驗收仍待進行。大型保存或重啟偶見尾端空白列的已知限制仍未重現、未修復。

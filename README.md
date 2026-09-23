@@ -12,7 +12,7 @@
 
 已推送 `main` commit `c9c4e0be1907cf6e6f2f2a54ffafba3ab4868e45` 與 Git tag `v0.2.0`。Linux/amd64 image 發布至 [Docker Hub](https://hub.docker.com/r/momonong/fucheng-players-system)，`0.2.0` 與 `latest` 指向相同 OCI index digest `sha256:bf522f2646caf936fd8c4b852789ed34367f85979a867511b3f3f5a7d2f70176`。B 原入口已更新為同一來源版本，備份、image 與服務身份見[部署紀錄](docs/deployment.md)及[驗收紀錄](docs/acceptance.md)。
 
-此版整合精確格位選單／表頭操作、復原與重做、Excel／列印，以及大型保存後穩定列位與目前／歷史側欄精修；無新增 migration，schema 維持 0008。E2E A、B3、C2 批次通過；C3／C5 留有失敗紀錄，與先前交接摘要中的 C5 通過說法不一致，完整 C 系列不列為全通過，詳[驗收紀錄](docs/acceptance.md#v020-發布驗證2026-09-23)。公開預覽只做 health、HTML 與靜態資產唯讀檢查，未登入或執行管理操作；人工驗收、實體手機及其他 OS 驗收仍待進行。**已知限制：大型保存或重啟後偶見尾端空白列；本輪未重現、未修復，使用者同意延後；沒有加入裁切或 fallback。**
+此版整合精確格位選單／表頭操作、復原與重做、Excel／列印，以及大型保存後穩定列位與目前／歷史側欄精修；無新增 migration，schema 維持 0008。E2E A、B3、C2 通過；C3 首輪 12/16，C5 targeted 2 passed／2 failed，C6 修正測試 locator 後 2/2 passed。原本 C3 的四個失敗 viewport 都有後續 scoped pass 證據，但 C3／C5 歷史執行仍為 failed，沒有單次全綠的 C 重跑；詳[驗收紀錄](docs/acceptance.md#v020-發布驗證2026-09-23)。公開預覽只做 health、HTML 與靜態資產唯讀檢查，未登入或執行管理操作；人工驗收、實體手機及其他 OS 驗收仍待進行。**已知限制：大型保存或重啟後偶見尾端空白列；本輪未重現、未修復，使用者同意延後；沒有加入裁切或 fallback。**
 
 前次灰階／雙區拖曳／歷次級數版：eb24 當時更新至 `grid-interaction-20260921-120352`，app／launcher **45560／41228**，ngrok **57728**。56 檔來源摘要 `c00f5937c00291c58819e2630387d965a0bf3951f0ae9cb1a73c631ae30f83c2`；歷史證據見 `data/grid-public-runtime/grid-interaction-update.json`。
 
