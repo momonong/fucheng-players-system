@@ -1,8 +1,26 @@
 # Windows Docker 部署、搬移與維運
 
-目前 B 公開版本為 F 表頭選取／右鍵選單／白色色票修正，入口為 [b021 管理頁](https://b021-140-116-158-107.ngrok-free.app/admin/competitions)。以下 A、interaction、axis 及較早預覽均為歷史證據，不用舊 PID／來源啟動目前 B。
+目前 B 公開合成預覽為 v0.2.0，入口為 [b021 管理頁](https://b021-140-116-158-107.ngrok-free.app/admin/competitions)。Docker Hub image 與 Windows 原生 B 預覽是兩項獨立驗證；下列舊 PID、release 與入口記錄均為歷史證據，不可用來啟動目前服務。
 
-## 目前 B grid-menu 版執行身份（2026-09-23，Windows 限定預覽）
+## v0.2.0 Docker image 與 B 預覽（2026-09-23）
+
+Git `main` 與 `origin/main` 已到 `c9c4e0be1907cf6e6f2f2a54ffafba3ab4868e45`；annotated tag `v0.2.0` 指向同一 commit，遠端 tag object 為 `453be22bf9e2211a29016baeb0124cc4afa54717`。Linux/amd64 Docker image 位於 [`momonong/fucheng-players-system`](https://hub.docker.com/r/momonong/fucheng-players-system)，公開標籤 `0.2.0` 與 `latest` 的 OCI index digest 相同：`sha256:bf522f2646caf936fd8c4b852789ed34367f85979a867511b3f3f5a7d2f70176`。image ID 相同，source manifest 為 `b1f55e47383b81796098c602541955ecf94a8ca73d49d1fcceacdc1349c3a826`，allowlist build context 60 檔。Hub tag/API 與 `buildx imagetools inspect` 核對紀錄見 `data/deployment-release-20260923-v0.2.0/dockerhub-verification.json`。
+
+image 以獨立 synthetic named volumes `fucheng-v020-20260923_data`／`fucheng-v020-20260923_backups` 驗證。fresh volume init 跑既有 migration 0001–0008；health、首頁、JS/CSS 靜態資產 HTTP 200，schema `0008_arrangement_grid`、18 tables、integrity `ok`、FK errors 0；重啟及 SQLite Backup API backup/verify 均通過，backup SHA-256 `2c5027a4991bd8b73c283770c90e49561fdb3721966956060eba4c25da01f3a2`。容器以 non-root UID 10001、`--network none`、read-only rootfs、無 host port 執行。容器與 named volumes 全部保留，容器目前停止；沒有清理或碰觸其他 Docker 工作負載。詳細 smoke／restart／backup 報告見 `data/deployment-release-20260923-v0.2.0/`。
+
+Windows 原生 B 預覽另更新至 `data/grid-public-runtime/releases/grid-v020-20260923-200323`，後端來源是上列 Git commit 的 135 檔 `git archive`，前端 static 直接從同版 image 擷取。app `45460`、launcher `5908`、原 ngrok `22148` 沿用，listener 綁 `127.0.0.1:8044`；WMI/AppOnly identity guard 在更新後通過。release identity、public smoke 與資料比對見該 release 的 `release-identity.json`、`public-smoke.json`、`grid-v020-update.json`。
+
+更新前停止 B app 後，SQLite Backup API 備份 `rollback/grid-public-before-v020.db`，SHA-256 `d581ffd34898109fed996fdba48bf41de86faefde7d9d5405980fd8880eb2aff`。啟動前後 18 張表的 row count 與 SHA-256 全相同；schema 仍為 `0008_arrangement_grid`、integrity `ok`、FK errors 0。沒有 migration、reseed、業務寫入、登入、session 清理或 ngrok 重啟。公開 HTTPS health、`/`、JS、CSS 均 HTTP 200 且 `Cache-Control: no-store`；HTML/JS/CSS SHA-256 與凍結 image static 相同。只做這些唯讀 smoke，沒有登入或測試 admin 操作；使用者人工驗收待進行。Docker image 的合成 volume 驗證與此 Windows 原生服務不是同一執行環境。
+
+目前服務停止方式（會先核對 B app、launcher、ngrok 與 8044 身分；`-CheckOnly` 不停止程序）：
+
+```powershell
+powershell -NoProfile -File data/grid-public-runtime/stop-preview.ps1 -CheckOnly -AppOnly
+```
+
+需停止時另依已授權維護程序移除 `-CheckOnly`，並保留 ngrok／DB/session。rollback 備份與舊 source/static/helper 皆保留；不得以舊資料庫覆蓋新服務寫入，也未執行回退。E2E C3/C5 的留存 `.last-run.json` 有失敗項，詳[驗收紀錄](acceptance.md#v020-發布驗證2026-09-23)；不得把全套 E2E 描述為全綠。
+
+## 前次 B grid-menu 版執行身份（2026-09-23，Windows 限定預覽）
 
 release `data/grid-public-runtime/releases/grid-menu-20260923-102847`。凍結 identity SHA256 `8c9b8879499e52a68e52cf1b63560d1d7391a22dcfc575fe0f4eda7131cf9589`；59 source aggregate `676db4866a50700147a641331bc416917b9ee8a3835fcc3ef50fa03a61a326cf`，3 static aggregate `5dabf888c310598cd30f887e17ff1f0f489a56b78ea61451068d8d7666600b5b`。public HTML `e155fca8bf7799fd62b68e8fe979b2d1dd880b659ede00ca9e204d96446ff916`、JS `index-BHRspbMV.js` SHA256 `6ce590cb20a6d811a4d96faacdd20fadfd939453652404832875147d21d8cdee`、CSS `index-BLYowlPJ.css` SHA256 `dc36d36295c72ad7a64502f4cf3b923dba33aa7876f46be980f2e9e3d1f8f5dd`，HTTP 200、no-store；local/public health 均 JSON200。完整證據 `data/grid-public-runtime/grid-menu-update.json`。
 

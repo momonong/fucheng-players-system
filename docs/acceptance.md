@@ -606,3 +606,22 @@ B worktree `feat/arrangement-export-print`，基底 commit `acacb876c90aad109af1
 歷史側欄標題「版本紀錄」與「目前安排」按鈕同列靠兩側；保留原凍結標頭、版本列表獨立捲動與分隔線。E2E 驗證目前／歷史點選、`aria-pressed` 及按鈕高度至少 44px；桌機及手機截圖已保存。`npm --prefix frontend run typecheck` 與獨立 build 通過；未新增 migration。沒有動真實／公開資料庫、既有服務或正式部署。
 
 先前一次探索性瀏覽器測試把保存後會合理消失的淨差文字標記納入整列 `innerText` 比對，也重複執行了桌機／手機回圈；它不是產品缺陷證據。最終斷言改比 stable row ID／role／格數／選手 ID；這項測試斷言修正不是產品修復，也不代表尾端空列已修好。尾端空列偶見於大型保存或重新啟動後的情況，本輪未重現、未修復，使用者同意延後；沒有新增裁切或 fallback，也沒有以修改保存流程掩蓋問題。沒有進行公開資料、正式服務、實體手機或其他作業系統驗收。Git、image 與 B 預覽的發布狀態見 `docs/deployment.md`。
+
+## v0.2.0 發布驗證（2026-09-23）
+
+來源 `main`／`origin/main` commit `c9c4e0be1907cf6e6f2f2a54ffafba3ab4868e45`，annotated Git tag `v0.2.0` 指向該 commit。Docker Hub 公開 repository 為 `momonong/fucheng-players-system`；`0.2.0` 與 `latest` 都是 Linux/amd64，OCI index digest 均為 `sha256:bf522f2646caf936fd8c4b852789ed34367f85979a867511b3f3f5a7d2f70176`。image synthetic volume 驗證另見[部署紀錄](deployment.md#v020-docker-image-與-b-預覽2026-09-23)。
+
+Windows Chromium E2E 使用合成資料與獨立輸出：
+
+| 批次 | 結果 | 保留證據 |
+| --- | --- | --- |
+| A-r2 | 30 passed，`.last-run.json` 為 passed | `data/release-playwright-0.2.0-competition-a-r2-results`；DB `data/comp-levels-release-0.2.0-a3-e2e.db`；port 8032 |
+| B3（含明確白色 desktop/mobile） | 10 passed，`.last-run.json` 為 passed | `data/release-playwright-0.2.0-competition-b3-results`；DB `data/comp-levels-release-0.2.0-b3-e2e.db`；port 8033 |
+| C2 | 14 passed，`.last-run.json` 為 passed | `data/release-playwright-0.2.0-competition-c2-results` |
+| C3 首輪 | 12 passed、4 failed；`.last-run.json` 為 failed | `data/release-playwright-0.2.0-competition-c3-results` |
+| C5 targeted | `.last-run.json` 為 failed，仍記錄 2 個失敗案例 | `data/release-playwright-0.2.0-competition-c5-results` |
+| C6 targeted | 2 passed；`.last-run.json` 為 passed | `data/release-playwright-0.2.0-competition-c6-results` |
+
+C3 的 4 個失敗案例中，C5 留存的 targeted rerun 仍有 2 個失敗；這與先前交接摘要所稱 C5/C6 修正後各 2 passed 不一致。上述輸出資料夾只留 `.last-run.json`，沒有詳細 HTML/trace 報告；本次沒有重跑這些 E2E，因此不能確認 C5 失敗原因、把它定性為產品或 fixture 問題，也不宣稱 C 系列全通過。A-r2、B3、C2 的留存狀態皆為 passed。自動測試與觸控均為 Windows Chromium／Playwright 模擬，不替代實體手機、其他 OS 或使用者人工驗收。
+
+公開 B 原生預覽 `data/grid-public-runtime/releases/grid-v020-20260923-200323` 的唯讀檢查：本機及 HTTPS health 為 `{"status":"ok"}`；首頁、JS、CSS HTTP 200／`no-store`，三個回應檔 SHA-256 與凍結 image static 相同。更新前後 SQLite Backup API 檢查 18/18 table row count/hash 不變，schema `0008_arrangement_grid`、integrity `ok`、FK errors 0；沒有 migration、reseed、業務寫入或管理員登入/session 變更。此為合成 B 預覽，不是正式資料庫或正式部署；公開 admin UI 操作沒有測試，人工驗收仍待進行。大型保存或重啟偶見尾端空白列的已知限制仍未重現、未修復。
