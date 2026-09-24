@@ -259,7 +259,7 @@ def test_upgrade_phase2_preserves_every_original_column_and_backup(tmp_path, mon
                 assert db.execute(f"SELECT {','.join(columns[table])} FROM {table} ORDER BY 1").fetchall()==before[table]
             assert db.execute("SELECT id FROM competition_registrations WHERE status='waitlisted' ORDER BY queue_sequence").fetchall()==[('r2',),('r4',)]
             assert db.execute('SELECT competition_level,hard_level_snapshot FROM competition_registrations').fetchall()==([(8,3)] + [(3,3)]*4 if source_revision == '0006_competition_level' else [(3,3)]*5)
-            assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0008_arrangement_grid'
+            assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0009_announcement_media'
             assert db.execute('SELECT count(*) FROM arrangement_versions').fetchone()[0] == 0
 
 

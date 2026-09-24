@@ -273,3 +273,8 @@ deploy/docker/*.zip
 /frontend/dist-grid-shade/
 
 /frontend/dist-grid-menu/
+/frontend/dist-admin-news/
+/frontend/dist-admin-news-final/
+/frontend/dist-admin-news-v2/
+/frontend/dist-security-stage/
+/frontend/dist-mobile-ux/

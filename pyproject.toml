@@ -1,13 +1,16 @@
 [project]
 name = "fucheng-players-system"
-version = "0.2.0"
+version = "0.3.0"
 description = "府城球館會員管理系統"
 readme = "README.md"
 requires-python = ">=3.14.6,<3.15"
 dependencies = [
   "alembic==1.20.0",
+  "bleach>=6.4.0",
   "fastapi==0.141.1",
+  "pillow>=12.3.0",
   "pydantic==2.13.5",
+  "python-multipart>=0.0.32",
   "sqlalchemy==2.0.53",
   "uvicorn==0.41.0",
 ]

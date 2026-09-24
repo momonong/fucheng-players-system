@@ -5,6 +5,9 @@ import type { Diet } from './types'
 type Competition = { id: string; name: string; competition_date: string; registration_deadline: string; notes: string | null; capacity: number; confirmed: number; waitlisted: number; remaining: number }
 type Candidate = { id: string; name: string; distinguishing_note: string | null }
 type Result = { status: string; member_name: string; distinguishing_note: string | null; diet: Diet }
+type RegistrationSession = { csrf_token: string; turnstile_sitekey: string | null }
+type TurnstileApi = { render: (element: HTMLElement, options: Record<string, unknown>) => string; reset: (id: string) => void; remove: (id: string) => void }
+declare global { interface Window { turnstile?: TurnstileApi } }
 type Audit = { id: string; action: string; actor_kind: string; actor_name: string; created_at: string; registration_id: string; member_name: string; distinguishing_note: string | null; queue_sequence: number; reason: string | null; changes: Record<string, {before: unknown; after: unknown}> }
 const diets: Record<Diet, string> = { omnivore: '葷食', vegetarian: '素食', unset: '未設定' }
 const mealOptions = ['omnivore', 'vegetarian'] as const
@@ -12,10 +15,13 @@ const states: Record<string, string> = { confirmed: '正取', waitlisted: '候�
 const time = (value: string) => new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Taipei' }).format(new Date(value))
 
 async function publicRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...options.headers } })
+  let response: Response
+  try { response = await fetch(url, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...options.headers } }) }
+  catch { throw new Error('連線暫時中斷，請檢查網路後重試') }
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: '連線失敗，請稍後再試' }))
-    throw new Error(body.detail ?? '操作失敗，請稍後再試')
+    const body = response.headers.get('content-type')?.includes('application/json') ? await response.json().catch(() => null) : null
+    const message = typeof body?.detail === 'string' ? body.detail : '安全檢查或連線暫時無法完成，請稍後重試'
+    throw Object.assign(new Error(message), { status: response.status })
   }
   return response.json()
 }
@@ -24,6 +30,7 @@ export function PublicRegistrationPortal() {
   const [items, setItems] = useState<Competition[]>([])
   const [selected, setSelected] = useState<Competition | null>(null)
   const [csrf, setCsrf] = useState('')
+  const [turnstileSitekey, setTurnstileSitekey] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
@@ -32,11 +39,11 @@ export function PublicRegistrationPortal() {
     let active = true
     setLoading(true); setError('')
     Promise.all([
-      publicRequest<{ csrf_token: string }>('/api/public/registration-session'),
+      publicRequest<RegistrationSession>('/api/public/registration-session'),
       publicRequest<Competition[]>('/api/public/competitions'),
     ]).then(([session, competitions]) => {
       if (!active) return
-      setCsrf(session.csrf_token); setItems(competitions)
+      setCsrf(session.csrf_token); setTurnstileSitekey(session.turnstile_sitekey); setItems(competitions)
       if (routeId) {
         const match = competitions.find(c => c.id === routeId)
         if (match) setSelected(match)
@@ -46,11 +53,11 @@ export function PublicRegistrationPortal() {
     return () => { active = false }
   }, [retry, routeId])
   return <>
-    <header className="admin-header"><div><p className="eyebrow">府城球館</p><h1>比賽報名</h1></div><a href="/admin">管理員入口</a></header>
+    <header className="admin-header registration-header"><div><p className="eyebrow">府城球館</p><h1>比賽報名</h1></div><a href="/admin">管理員入口</a></header>
     <main className="public-registration">
       <p className="registration-intro">找到自己的名字，就能報名。不用帳號、不用密碼。</p>
       {loading ? <p role="status">載入比賽中…</p> : error ? <div className="notice error" role="alert">{error}<button onClick={() => setRetry(r => r + 1)}>重新載入</button></div> : selected ?
-        <RegistrationForm key={selected.id} competition={selected} csrf={csrf} /> : <>
+        <RegistrationForm key={selected.id} competition={selected} csrf={csrf} turnstileSitekey={turnstileSitekey} /> : <>
           <h2>1. 選擇比賽</h2>
           {!items.length && <div className="panel"><p>目前沒有開放報名的比賽。</p><p>如需協助，請洽球館管理員。</p></div>}
           <div className="public-competitions">{items.map(c => <article className="panel" key={c.id}>
@@ -70,7 +77,7 @@ function CompetitionInfo({ competition: c }: { competition: Competition }) {
     {c.waitlisted > 0 && c.remaining > 0 && <p>空缺由管理員依序確認候補，新報名會加入候補。</p>}</>
 }
 
-function RegistrationForm({ competition: c, csrf }: { competition: Competition; csrf: string }) {
+function RegistrationForm({ competition: c, csrf, turnstileSitekey }: { competition: Competition; csrf: string; turnstileSitekey: string | null }) {
   const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [member, setMember] = useState<Candidate | null>(null)
@@ -81,8 +88,37 @@ function RegistrationForm({ competition: c, csrf }: { competition: Competition; 
   const [submitError, setSubmitError] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<Result | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const [turnstileError, setTurnstileError] = useState('')
   const lock = useRef(false)
   const pending = useRef<{ signature: string; key: string } | null>(null)
+  const widget = useRef<HTMLDivElement>(null)
+  const widgetId = useRef<string | null>(null)
+  useEffect(() => {
+    if (!turnstileSitekey || !member || !widget.current) return
+    let active = true
+    const scriptId = 'fucheng-turnstile-script'
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script')
+      script.id = scriptId
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+      script.async = true
+      script.onerror = () => { if (active) setTurnstileError('安全驗證暫時無法載入，請檢查連線後重試') }
+      document.head.append(script)
+    }
+    const timer = window.setInterval(() => {
+      if (!active || !widget.current || !window.turnstile || widgetId.current) return
+      window.clearInterval(timer)
+      widgetId.current = window.turnstile.render(widget.current, {
+        sitekey: turnstileSitekey, action: 'public_registration', appearance: 'interaction-only',
+        callback: (token: string) => { setTurnstileToken(token); setTurnstileError('') },
+        'expired-callback': () => setTurnstileToken(''),
+        'error-callback': () => { setTurnstileToken(''); setTurnstileError('安全驗證暫時無法完成，請稍後重試') },
+      })
+    }, 100)
+    return () => { active = false; window.clearInterval(timer); if (widgetId.current && window.turnstile) window.turnstile.remove(widgetId.current); widgetId.current = null; setTurnstileToken('') }
+  }, [turnstileSitekey, !!member])
+  function resetTurnstile() { setTurnstileToken(''); if (widgetId.current && window.turnstile) window.turnstile.reset(widgetId.current) }
   useEffect(() => {
     let active = true
     setSearched(false); setSearchError('')
@@ -99,16 +135,24 @@ function RegistrationForm({ competition: c, csrf }: { competition: Competition; 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     if (!member || lock.current) return
+    if (turnstileSitekey && !turnstileToken) { setSubmitError('請稍候，完成安全驗證後再送出'); return }
     lock.current = true; setBusy(true); setSubmitError('')
     const signature = `${member.id}:${diet}`
     if (pending.current?.signature !== signature) pending.current = { signature, key: crypto.randomUUID() }
     try {
       const receipt = await publicRequest<Result>(`/api/public/competitions/${c.id}/registrations`, {
         method: 'POST', headers: { 'X-CSRF-Token': csrf },
-        body: JSON.stringify({ member_id: member.id, diet, request_id: pending.current.key }),
+        body: JSON.stringify({ member_id: member.id, diet, request_id: pending.current.key,
+          ...(turnstileSitekey ? { turnstile_token: turnstileToken } : {}) }),
       })
       setResult(receipt)
-    } catch (e) { setSubmitError((e as Error).message) }
+    } catch (e) {
+      const failure = e as Error & { status?: number }
+      setSubmitError(failure.message)
+      // Network uncertainty keeps the same token/key for receipt readback;
+      // a definite challenge failure gets a fresh token and keeps the key.
+      if (failure.status === 422 || failure.status === 503) resetTurnstile()
+    }
     finally { lock.current = false; setBusy(false) }
   }
   if (result) return <section className="panel registration-receipt" aria-label="報名結果">
@@ -134,6 +178,7 @@ function RegistrationForm({ competition: c, csrf }: { competition: Competition; 
         <h2>3. 選擇這次的葷素</h2>
         <fieldset className="meal-options"><legend>當次餐食</legend>{mealOptions.map(value => <label key={value}><input type="radio" name="meal" value={value} checked={diet === value} disabled={busy} onChange={() => setDiet(value)} />{diets[value]}</label>)}</fieldset>
         <div className="registration-confirm"><h2>4. 確認報名</h2><p>姓名：<strong>{member.name}</strong>{member.distinguishing_note && `（${member.distinguishing_note}）`}</p><p>餐食：{diets[diet]}</p><p>請確認選到自己的名字，同名時請核對註記。</p></div>
+        {turnstileSitekey && <div className="registration-security"><div ref={widget} aria-label="安全驗證" />{turnstileError && <p role="alert">{turnstileError}</p>}</div>}
         {submitError && <div className="notice error" role="alert">{submitError}<p>姓名與餐食已保留。若已送出但不確定結果，可再試一次或洽管理員確認。</p></div>}
         <button className="registration-submit" disabled={busy}>{busy ? '報名中，請稍候…' : `確認以 ${member.name} 報名`}</button>
       </>}

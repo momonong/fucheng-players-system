@@ -130,6 +130,37 @@ footer { border-top: 1px solid var(--line); padding: 2rem 1rem; text-align: cent
 .candidate small { color: #66706c; }
 .roster-filters { display: grid; grid-template-columns: 2fr 1fr auto; align-items: end; gap: .8rem; border-top: 1px solid var(--line); padding-top: 1rem; }
 .roster-filters p { font-weight: 700; color: #56625d; }
+.admin-roster-layout { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 1rem; margin-top: 1rem; }
+.admin-roster-grid { overflow-x: auto; }
+.admin-roster-grid table { width: 100%; min-width: 740px; table-layout: fixed; border-collapse: collapse; }
+.admin-roster-grid th { background: #e6f0ed; text-align: center; padding: .4rem; border: 1px solid var(--line); }
+.admin-roster-grid td { width: 10%; height: 2.7rem; padding: .15rem; border: 1px solid var(--line); vertical-align: top; }
+.admin-roster-grid tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+.admin-roster-grid td.occupied { background: #f5f8f6; }
+.admin-roster-grid td.vegetarian { background: #e4f2dc; }
+.admin-roster-grid td button { display: block; width: 100%; min-height: 2.3rem; text-align: left; padding: .2rem .35rem; color: #183d34; background: transparent; border: 0; border-radius: 4px; font-size: .88rem; overflow-wrap: anywhere; }
+.admin-roster-grid td button:hover, .admin-roster-grid td button:focus-visible { background: #d5e9df; }
+.admin-roster-grid td button small, .admin-roster-sidebar small { display: block; font-size: .72rem; }
+.admin-roster-grid .occupied-mask { display: block; min-height: 2.3rem; }
+.admin-roster-grid .supplemental th { background: #f6eee0; text-align: left; }
+.admin-roster-grid .supplemental.cancelled th { background: #f3e9e7; }
+.admin-roster-grid .supplemental-collapsed { display: none; }
+.status-tag { display: block; font-size: .7rem; color: #63523b; }
+.rich-toolbar { display: flex; gap: .35rem; flex-wrap: wrap; margin: .4rem 0; }
+.rich-toolbar button { min-height: 2rem; padding: .25rem .5rem; font-size: .82rem; }
+.rich-input { min-height: 12rem; padding: .8rem; border: 1px solid var(--line); border-radius: 8px; background: white; line-height: 1.6; overflow-wrap: anywhere; }
+.rich-input:empty::before { content: attr(data-placeholder); color: #75807b; }
+.rich-input:focus { outline: 2px solid var(--teal); }
+.rich-body h2, .rich-body h3, .rich-body h4 { margin: .75em 0 .35em; }
+.rich-body p, .rich-body ul, .rich-body ol { margin: .4em 0; }
+.announcement-photo { display: block; max-width: 100%; max-height: 30rem; object-fit: contain; border-radius: 8px; margin-top: .75rem; }
+.announcement-photo.preview { max-height: 14rem; }
+.admin-roster-sidebar { display: flex; flex-direction: column; gap: .5rem; align-self: start; }
+.admin-roster-sidebar > button { text-align: left; }
+.admin-roster-sidebar ol { list-style: none; margin: 0; padding: 0; max-height: 24rem; overflow: auto; }
+.admin-roster-sidebar li button { display: block; width: 100%; text-align: left; margin: .15rem 0; padding: .3rem; background: #f2f6f3; color: #183d34; }
+.admin-registration-detail { margin-top: 1rem; border-top: 1px solid var(--line); padding-top: .8rem; }
+.registration-detail-actions { display: flex; gap: .6rem; align-items: end; flex-wrap: wrap; }
 .roster-section { margin-top: 1.2rem; }
 .roster-section h3 { border-bottom: 3px solid var(--teal); margin: 0; padding: .55rem 0; display: flex; justify-content: space-between; }
 .roster-section h3 span { font-size: .9rem; color: #66706c; align-self: center; }
@@ -186,6 +217,9 @@ button.danger { background: #8c3026; }
   .competition-layout { width: min(100% - 1rem, 1500px); }
   .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filters.compact, .roster-filters { grid-template-columns: 1fr; }
+  .admin-roster-layout { grid-template-columns: 1fr; }
+  .admin-roster-sidebar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-roster-sidebar ol { grid-column: 1 / -1; }
   .candidate { grid-template-columns: 1fr auto; }
   .candidate span:last-child { grid-column: 2; }
   .roster-section table, .roster-section tbody, .roster-section tr, .roster-section td { display: block; }
@@ -227,6 +261,12 @@ button.danger { background: #8c3026; }
   .competition-print .summary-grid { grid-template-columns: repeat(5, 1fr); gap: 2mm; }
   .competition-print .summary-card { padding: 1.5mm; border-color: #555; }
   .competition-print .summary-card strong { font-size: 11pt; }
+  .competition-print .admin-roster-layout { display: block; }
+  .competition-print .admin-roster-grid { overflow: visible; }
+  .competition-print .admin-roster-grid table { min-width: 0; font-size: 8pt; }
+  .competition-print .admin-roster-grid .supplemental-collapsed { display: table-row-group; }
+  .competition-print .admin-roster-grid td { height: 7mm; }
+  .competition-print .admin-roster-grid td button { display: none; }
   .competition-print .roster-section { break-inside: avoid; margin-top: 3mm; }
   .competition-print .roster-section h3 { font-size: 11pt; padding: 1mm 0; }
   .competition-print .roster-section table { display: table; font-size: 8pt; }
@@ -315,6 +355,61 @@ button.danger { background: #8c3026; }
 .announcement-row:hover { background:#d8e7dc; }
 .announcement-row span { font-size:.85rem; font-weight:500; }
 .history-button { margin-top:1rem; }
+/* The public pages and the three admin workspaces share a fluid outer width. */
+main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, calc(100% - 2rem)); }
+.site-nav, .club-hero, .admin-header { padding-left: max(1rem, calc((100vw - 2800px) / 2)); padding-right: max(1rem, calc((100vw - 2800px) / 2)); }
+.admin-main, .competition-layout, .announcement-main { min-width: 0; }
+.admin-main > *, .competition-layout > *, .announcement-workspace > * { min-width: 0; }
+.competition-layout { width: min(2800px, calc(100% - 2rem)); grid-template-columns: minmax(250px, .55fr) minmax(0, 2fr); }
+.admin-main { grid-template-columns: minmax(250px, .65fr) minmax(0, 1.65fr); }
+.announcement-workspace { grid-template-columns: minmax(250px, .55fr) minmax(0, 1.6fr); }
+.home-columns { grid-template-columns: minmax(0, 1.25fr) minmax(0, .8fr); }
+.news-card .news-body, .schedule-card p, .club-help p { max-width: 72ch; }
+.rich-body { white-space: normal; }
+.rich-body figure { margin: 1rem 0; width: fit-content; max-width: 100%; }
+.rich-body figure[data-align=center] { margin-inline: auto; }
+.rich-body figure[data-align=right] { margin-left: auto; }
+.rich-body figure img { display: block; max-width: 100%; max-height: 40rem; object-fit: contain; border-radius: 8px; }
+.rich-input figure { cursor: pointer; border: 2px solid transparent; }
+.rich-input figure:hover, .rich-input figure:focus-within { border-color: var(--teal); }
+.rich-toolbar { align-items: stretch; gap: .5rem; }
+.rich-group { display: grid; align-content: start; gap: .2rem; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: .3rem; background: #f9faf7; }
+.rich-group-title { display: block; padding: 0 .2rem; color: #385449; font-size: .75rem; font-weight: 800; letter-spacing: .06em; }
+.rich-group-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; min-width: 0; }
+.rich-group select { min-width: 8rem; min-height: 2.3rem; padding: .25rem; }
+.rich-group button { min-height: 2.3rem; background: white; border: 1px solid #bfcac2; color: var(--green); }
+.rich-group button[aria-pressed=true] { background: var(--teal); color: white; }
+.rich-file-input { display: none; }
+.rich-link { display: flex; align-items: end; gap: .5rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.rich-link label { flex: 1 1 16rem; }
+.rich-link button { min-height: 48px; }
+.legacy-photo { border: 1px solid var(--line); border-radius: 8px; padding: .7rem; background: #faf9f5; }
+.legacy-photo summary { cursor: pointer; font-weight: 800; }
+.legacy-photo p { margin: .6rem 0; font-size: .9rem; color: #46534e; }
+.legacy-photo-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.editor-hint { font-size: .85rem; color: #57645d; }
+.admin-header-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .7rem 1.2rem; }
+.admin-nav, .admin-account { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; }
+.admin-nav a, .admin-account a { color: white; text-decoration: none; padding: .55rem .75rem; border-radius: 8px; font-weight: 700; }
+.admin-nav a:hover, .admin-account a:hover { background: #ffffff24; }
+.admin-nav a[aria-current=page] { background: #f4c17d; color: #292016; }
+.admin-account > span { font-weight: 700; padding: .5rem; }
+.admin-backup { padding: .35rem .6rem; color: #fff; background: #ffffff20; border-radius: 7px; }
+.admin-backup.failed, .admin-backup.stale { color: #2c2115; background: #ffd391; }
+@media (max-width: 900px) {
+  .admin-main, .competition-layout { grid-template-columns: 1fr; }
+  .announcement-workspace { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  main:not(.arrangement-main):not(.arrangement-print-page) { width: calc(100% - 1rem); }
+  .home-columns, .home-shortcuts { grid-template-columns: 1fr; }
+  .admin-header-controls { justify-content: flex-start; width: 100%; }
+  .admin-nav { width: 100%; }
+  .admin-nav a { flex: 1 1 auto; text-align: center; }
+  .admin-account { width: 100%; }
+  .rich-group { width: 100%; }
+}
 @media(max-width:700px) {
   .site-nav { flex-direction:column; align-items:stretch; gap:.5rem; padding:.8rem 1rem; }
   .site-brand span { display:none; }
@@ -718,3 +813,59 @@ button.danger { background: #8c3026; }
 .arrangement-table-scroll { position: relative; }
 .grid-menu-trigger { position: sticky; top: 4px; left: calc(100% - 36px); z-index: 7; display: block; width: 32px; height: 28px; min-height: 28px; margin-bottom: -28px; padding: 0; font-size: 1.25rem; }
 @media print { .grid-menu-trigger, .cell-shade-menu { display: none !important; } }
+
+/* Mobile pages keep the common actions in the first viewport. */
+.competition-list-toggle, .mobile-toolbar-hint, .mobile-image-actions { display: none; }
+.competition-editor > summary { cursor: pointer; list-style: none; min-height: 44px; margin-bottom: 0; }
+.competition-editor > summary::-webkit-details-marker { display: none; }
+.competition-editor[open] > summary { margin-bottom: 1rem; }
+.roster-shortcut { display: inline-flex; align-items: center; min-height: 44px; padding: .4rem .7rem; border-radius: 8px; background: #e5f2eb; color: #173e2e; font-weight: 800; }
+.rich-input figure[data-selected=true] { outline: 3px solid #256b57; outline-offset: 3px; }
+
+@media screen and (max-width: 900px) {
+  .competition-list { position: static; }
+  .competition-list-toggle { display: block; min-height: 44px; cursor: pointer; font-weight: 800; }
+  .competition-list:not([open]) { padding-block: .6rem; }
+  .competition-list:not([open]) .competition-list-toggle { display: flex; align-items: center; }
+  .competition-list[open] .competition-list-toggle { margin-bottom: .65rem; }
+  .competition-editor > summary::after { content: '展開'; margin-left: auto; color: var(--teal); font-size: .85rem; white-space: nowrap; }
+  .competition-editor[open] > summary::after { content: '收合'; }
+}
+
+@media screen and (max-width: 700px) {
+  .admin-header { gap: .35rem; padding: .65rem 1rem; }
+  .admin-header .eyebrow { display: none; }
+  .admin-header h1 { font-size: 1.4rem; }
+  .admin-header-controls { display: grid; width: 100%; gap: .3rem; }
+  .admin-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .25rem; }
+  .admin-nav a { min-height: 44px; display: grid; place-items: center; padding: .35rem .25rem; font-size: .9rem; }
+  .admin-account { display: flex; width: 100%; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: .25rem; }
+  .admin-account > span { min-width: 0; padding: .25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; }
+  .admin-account a { min-height: 44px; display: grid; place-items: center; padding: .3rem; font-size: .8rem; white-space: nowrap; }
+  .admin-account button { min-height: 44px; padding: .35rem .55rem; }
+  .admin-backup { font-size: .8rem; }
+  .registration-header { flex-direction: row; align-items: center; }
+  .registration-header > a { display: none; }
+  .public-registration { font-size: 1rem; padding-top: .65rem; }
+  .public-registration .panel { padding: .9rem; }
+  .registration-intro, .registration-help { font-size: 1rem; line-height: 1.5; margin: .45rem 0; }
+  .public-competition-info, .registration-form { margin-top: .65rem; }
+  .public-competition-info h2 { font-size: 1.25rem; line-height: 1.35; margin: 0 0 .5rem; overflow-wrap: anywhere; }
+  .public-competition-info p { margin: .35rem 0; }
+  .self-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .25rem; padding: .5rem; }
+  .self-counts span { min-width: 0; gap: 0; font-size: .78rem; }
+  .self-counts strong { font-size: 1.08rem; }
+  .registration-form h2 { font-size: 1.2rem; margin: .8rem 0 .5rem; }
+  .competition-mode { width: calc(100% - 1rem); }
+  .competition-mode button { min-height: 44px; }
+  .roster-shortcut { margin-left: auto; }
+  .rich-toolbar { display: flex; flex-wrap: nowrap; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; scroll-snap-type: x proximity; padding-bottom: .35rem; }
+  .rich-group { flex: 0 0 auto; width: auto; scroll-snap-align: start; }
+  .rich-group-controls { flex-wrap: nowrap; }
+  .rich-group button, .rich-group select { min-height: 44px; }
+  .rich-group button { min-width: 44px; }
+  .mobile-toolbar-hint { display: block; margin: .15rem 0 0; color: #52645a; font-size: .85rem; }
+  .mobile-image-actions { position: fixed; z-index: 20; bottom: max(.5rem, env(safe-area-inset-bottom)); left: .5rem; right: .5rem; display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; padding: .5rem; border: 1px solid #46735c; border-radius: 12px; background: #fffef7; box-shadow: 0 8px 30px #0003; }
+  .mobile-image-actions span { width: 100%; font-size: .85rem; font-weight: 800; }
+  .mobile-image-actions button { flex: 1 1 auto; min-height: 44px; padding: .4rem; font-size: .85rem; }
+}

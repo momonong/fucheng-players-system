@@ -58,6 +58,7 @@ async function drag(page:Page,info:TestInfo,from:any,to:any,cancel=false,fractio
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:a.x+a.width/2,y:a.y+a.height/2}]})
     await expect(page.locator('.level-drag-ghost')).toBeVisible()
     await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:b.x+b.width/2,y:b.y+b.height*fraction}]})
+    if(fraction===.1) await expect(to).toHaveClass(/drop-insert before/)
     await cdp.send('Input.dispatchTouchEvent',{type:cancel?'touchCancel':'touchEnd',touchPoints:[]})
     await cdp.detach()
   } else {
@@ -85,6 +86,7 @@ test('格位八十人：搜尋不壓縮、真實插入觸控、素食與欄底�
   await page.getByRole('dialog').getByRole('button',{name:'關閉',exact:true}).click()
   // Viewing a player does not enter cell-range selection or leave editing tools over the grip.
   await page.evaluate(()=>{(window as any).trusted=[];window.addEventListener('pointerdown',e=>(window as any).trusted.push(`${e.pointerType}:${e.isTrusted}`))})
+  await s.slot(target).scrollIntoViewIfNeeded()
   await drag(page,info,s.cell(0).locator('.cell-grip'),s.slot(target),true,.1)
   expect((await s.state()).layout).toEqual(before.layout)
   await drag(page,info,s.cell(0).locator('.cell-grip'),s.slot(target),false,.1)

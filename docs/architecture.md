@@ -10,6 +10,8 @@
 
 首頁是球館公告與比賽時程入口，公開候選搜尋僅含姓名、辨識註記與選取 ID，不提供級數、預設餐食、原會員編號或報名名單。分級完整名單在 `/members` 免登入公開，`/api/public/members` 僅提供 id／name／distinguishing_note／level。公開與管理 API 使用不同且明確的回應 schema。
 
+公告 `body_format` 區分舊純文字與新版受限 HTML。服務端清理只保留標題、段落、列點、編號、粗斜體、底線、安全 http(s) 連結與受限對齊；舊純文字由 React 當文字渲染。內文圖片以 `<figure data-media-id="UUID" data-align="…"></figure>` 保留段落順序，最多 20 個不重複媒體 ID；`img` 原始 src、base64 與外站圖片均不保存。上傳先要求已儲存草稿，媒體 UUID 須屬於該公告，版本／CSRF／request_id／稽核仍受同一交易保護。照片解碼與正規化後以伺服器 UUID 檔名放在 `FUCHENG_DATA_DIR/announcement-media`，DB 的 `announcement_media` 保存 MIME、大小、SHA-256 與公告關聯；舊式文末照片仍由 `photo_id` 指向。公開媒體路由每次核對公告已發布且仍在內文或文末引用，管理媒體路由另需 session。舊檔保持不可變，以免備份與併發讀取失去來源。Docker snapshot 同時封存 DB 和媒體，匯入/還原先驗 hash 與 DB 關聯，再切換 active pointer。schema 仍為 `0009_announcement_media`，須與新版前後端和 runtime 同批更新。
+
 ## 一致性與安全
 
 - `members.id` 是系統 UUID；姓名可重複，辨識註記獨立，原會員編號選填且有值時唯一。

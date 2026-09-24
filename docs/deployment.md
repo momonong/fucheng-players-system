@@ -1,6 +1,38 @@
 # Windows Docker 部署、搬移與維運
 
-目前 B 公開合成預覽為 v0.2.0，入口為 [b021 管理頁](https://b021-140-116-158-107.ngrok-free.app/admin/competitions)。Docker Hub image 與 Windows 原生 B 預覽是兩項獨立驗證；下列舊 PID、release 與入口記錄均為歷史證據，不可用來啟動目前服務。
+## Linux 使用者家目錄與公開安全（工作樹待交付）
+
+本節是 2026-09-25 的 Docker／Linux 交付設定，**尚未部署到正式服務**。獨立 8052 合成預覽已換用新版 app 與手機版前端；8044、其 ngrok 及資料保持原狀。8052 缺真實 Cloudflare Turnstile 金鑰，明確設定 `disabled`；下述 Cloudflare profile 仍須金鑰，缺少時拒絕啟動。公開入口維持免登入「找名字→選葷素→確認」；選名不驗證本人，也不對每筆報名加人工審核。
+
+建議在 Linux 的服務帳號家目錄放置 `~/service/fucheng/{compose.yaml,compose.cloudflare.yaml,.env,secrets/,backup/}`。將同一 release 的 Compose 檔與 `release.env.example` 複製進此目錄，填入固定版本的 image、唯一 HTTPS origin、Cloudflare origin-network 位址及公開 Turnstile sitekey；受保護的 `secrets/cloudflare-token.txt` 與 `secrets/turnstile-secret.txt` 分別放 token／secret，不放入 Git、image、`.env` 或備份 metadata。以此目錄為工作目錄執行 `docker compose --env-file .env -f compose.yaml -f compose.cloudflare.yaml --profile cloudflare up -d --wait app backup cloudflared`。操作前要核對套件 manifest、現有 Docker project／volume／port、secret 權限及 `backup/` 對容器 UID 10001 可寫；新部署先用獨立 project／volume 合成資料驗證，不指向現有預覽或正式 volume。Docker 的 `restart: unless-stopped` 使容器在 daemon 重啟後恢復；rootless Docker 另須在該服務帳號啟用 linger 並核對 daemon 啟動。此處沒有自動安裝系統服務的腳本或球館 Linux 實機證據。
+
+Cloudflare profile 的 app 只開 origin internal network 與 Siteverify 所需的對外 HTTPS 網路，不發布 host port；cloudflared 使用指定的唯一 proxy IP 連到 app。對外網路本身**沒有**目的地防火牆白名單，部署主機若要求只連 Siteverify，需另設 egress 規則。必須把 Turnstile widget 的允許 hostname 設為 `FUCHENG_PUBLIC_ORIGIN` 的 hostname，正式模式缺 sitekey、secret 或 HTTPS origin 會拒絕啟動。前端只在選定姓名後載入 Managed、`interaction-only` widget，使用者無須建立帳號；後端在資料庫寫入前驗 Siteverify 的 success、hostname、action 與 5 分鐘時限，3 秒連線逾時會以中文提示稍後重試。已提交且 actor／request_id／payload 完全相符的 receipt 先讀回，避免一次性 token 已消耗時重送造成重複報名。Siteverify 需真正的 Cloudflare 網域與密鑰才能驗收；本機僅使用 fake／[官方測試金鑰](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) 合成驗證。[Siteverify 契約](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)與[SPA explicit render](https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/)為設定依據。
+
+可先在 Cloudflare Free WAF 對 `/api/public/` 加一條計數規則，依實際共享 Wi-Fi 流量設寬鬆門檻，觀察 429／誤攔；再用少量自訂規則擋明顯異常路徑／方法。Free 方案目前提供 [5 條自訂規則](https://developers.cloudflare.com/waf/custom-rules/)與 [1 條 rate limiting rule](https://developers.cloudflare.com/waf/rate-limiting-rules/)；不要依賴付費 bot score、regex 或對 API 套回 HTML 的 Managed Challenge。app 自身另有重啟即清空的有限記憶體入站節流、64 個並發上限、查詢長度與 body／傳送時間上限；既有 SQLite 限流、CSRF、session、version、request_id 及稽核仍保留。共享 IP 可能碰到 429；這不是身分驗證，也不保證抵禦分散式攻擊。正式門檻應在實際流量觀察後調整，不能把合成測試當成誤攔率證據。
+
+`backup` 容器每分鐘依 `Asia/Taipei` 曆法檢查：每週一 04:00 到期，啟動時補做一次最新漏跑週次；維護中或失敗會重試，同週已驗證成組備份不重做。`FUCHENG_BACKUP_KEEP=8` 可調，僅成功完成且 hash 可核對的 `weekly-*.db/.json/.media.tar` 成組計入並刪除超額週備份；手動、更新前、還原前及舊每日檔不受此 retention 影響。`backup/` 是 host bind，只有 backup／ops 掛載；一般 app 看不到備份。每組以 SQLite Backup API 複製 DB，再核對資料庫完整性／外鍵、媒體檔、archive hash，metadata 保存 image ref、schema、manifest hash 與公開 origin／proxy 種類，不保存 secret。管理員頁只顯示最近成功、失敗或逾期；失敗不清理已完成備份。`docker compose --env-file .env -f compose.yaml -f compose.cloudflare.yaml run --rm ops backup` 是額外手動 checkpoint，不能取代週排程。單一主機備份受同機故障影響，最壞資料損失可能接近一週；需另行規劃異地加密匯出。真正災難還原仍未在球館環境演練。
+
+還原只經 runtime 的受鎖 `restore` 操作：驗 `.db/.json/.media.tar` 與相符 image/schema，在新目標 DB 還原、再次跑 integrity／FK、核對媒體後才切換 active pointer；舊 DB／故障資料保留，舊管理員 session 在新目標失效，稽核 actor 歷史保留。不得直接覆蓋 named volume、以舊 app 開新 schema 或把備份 bind 掛回普通 app。人工部署／切換入口、真實資料遷移、正式密鑰與外部網域均需另外的交付授權。
+
+目前 B 公開合成預覽為 v0.2.0，入口為 [b021 管理頁](https://b021-140-116-158-107.ngrok-free.app/admin/competitions)。另一個獨立的 8052 [手機合成預覽](https://29e0-140-116-158-107.ngrok-free.app/) 已於 2026-09-25 切換新版；兩者資料、程序與 ngrok 彼此獨立。Docker Hub image、Windows 原生預覽和正式 Linux 部署分別驗收；下列舊 PID、release 與入口記錄均為歷史證據。
+
+## 待交付：公告媒體 schema 0009（2026-09-24 工作樹）
+
+舊式文末照片與新版多張內文圖片共用 0009 媒體表和成組 DB／媒體備份；內文功能未新增 migration。公開路由只供已發布且仍被公告引用的圖片讀取。
+
+此工作樹新增 `0009_announcement_media` 與 `FUCHENG_DATA_DIR/announcement-media`；**尚未套到 B 公開入口或任何正式資料**。照片以伺服器檔名、最多 5 MB、PNG/JPEG/WebP 解碼後重存；DB 保存 SHA-256／大小／關聯。新的 runtime 備份每組包含 `.db`、`.json`、`.media.tar`，metadata 存 DB 與 media 各自 SHA-256；ExportBackups 全部封存，ImportBackup/Restore 拒絕缺失或 hash 不符的媒體，還原先寫不可變媒體檔並核對 DB 指向，最後才切換 active pointer。舊 schema 備份沒有 `media_file` 時照原契約還原，但須使用與該備份 schema 匹配的 image。排程保留政策同時移除過期組的三檔。舊照片檔不立即刪除，以維持備份與併發讀取一致；容量需由資料負責人監控。
+
+部署必須先停寫，依現有 writer/maintenance guard 做完整 DB＋媒體前備份、明確 `Migrate`、同批換新版 app/static/runtime，再驗圖片重啟可讀與獨立目標還原；不能用舊版 app 對 0009 DB 啟動。Windows 原生開發命令 `fucheng backup/restore` 只含 DB，不是這版公告照片的完整備份；要保護照片應使用 Docker runtime 的成組 Backup/ExportBackups 或等效停寫封存。這些流程目前只有 Windows 合成 helper 測試，沒有 Docker 容器演練或公開服務升級證據。
+
+### C 真實名單待執行清單（唯讀盤點；尚未匯入）
+
+正式目標與入口仍待使用者選定：建立獨立正式 Docker volume，或將現有公開合成預覽改作正式入口。選定之前不遷移、覆寫、清理任何真實／預覽資料，也不更新公開服務。下列數字是本機來源盤點的核對目標，不是新系統已匯入的結果。
+
+1. **核定來源與範圍。** 原 `data/fucheng.db` 為 schema 0001、327 位會員。候選 `data/club-preview.db`（0004）及 `data/club-delete-preview.db`（0005）保留原 327 位會員 ID 與共同欄位、另有 15 位會員；兩候選的共同業務資料列一致。需明定採哪一份候選作為來源，並以既有匯入決策／回執對照，預期正式會員共 **342 位**、9/20 比賽 **80 筆 confirmed 報名**。
+2. **先界定排除項目。** 候選另有明確測試用途的 9/26 比賽與 1 筆報名、預覽用途的兩則使用說明公告、既有 sessions／auth attempts；不得把它們當正式資料。若新增 15 位會員或 9/20 紀錄的稽核仍參照預覽管理員，保留該 actor 的 ID 供歷史關聯但停用登入，不複製其有效 session。
+3. **保全與隔離。** 核對來源與目標的當下身份、schema、hash、writer/maintenance 狀態及既有服務 owner；停寫後分別備份來源與選定目標，媒體與 DB 成組保存，先在獨立目標驗證備份可還原。不得以預覽 DB 直接覆蓋未知正式 volume，也不以舊版 app 啟動 0009 DB。
+4. **執行與驗收。** 在選定目標套用 0009 與相容的新版 app/static/runtime，以白名單保留真實列的 ID、外鍵、快照與稽核關聯；驗 `integrity_check=ok`、`foreign_key_check` 無錯、原 327 ID/共同欄位相同、新增 15 ID、9/20 的 80 筆狀態／會員關聯，以及測試比賽／預覽公告／舊 session 未進正式目標。再從成組備份向另一獨立目標還原，核對 DB／照片 hash 與登入、管理／公開讀取。
+5. **入口切換另行驗收。** 先完成隔離 Docker 容器的 0009 遷移、重啟、備份與回退演練；正式入口選擇、公開切換、真實資料寫入及人工驗收均須依當次授權執行。本工作樹目前只完成唯讀盤點和合成驗證，這份清單沒有任何已執行的正式資料步驟。
 
 ## v0.2.0 Docker image 與 B 預覽（2026-09-23）
 

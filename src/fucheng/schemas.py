@@ -208,6 +208,7 @@ class PublicRegistrationCreate(StrictInput):
     member_id: str = Field(min_length=1, max_length=36)
     diet: Literal["omnivore", "vegetarian"]
     request_id: str = Field(min_length=8, max_length=64)
+    turnstile_token: str | None = Field(default=None, max_length=2048)
 
 
 class PublicCandidate(BaseModel):

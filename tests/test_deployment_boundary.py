@@ -70,7 +70,10 @@ def test_http_cookie_is_not_https_session(app, admin_password):
 
 def deployed(app, *, peer="172.30.98.3", kind="local"):
     settings = replace(app.state.settings, public_origin="https://club.example", session_cookie_secure=True,
-                       trusted_proxy="172.30.98.3", proxy_kind=kind)
+                       trusted_proxy="172.30.98.3", proxy_kind=kind,
+                       **({"turnstile_mode": "enabled", "turnstile_sitekey": "synthetic-sitekey",
+                           "turnstile_secret": "synthetic-secret", "turnstile_hostname": "club.example"}
+                          if kind == "cloudflare" else {}))
     application = create_app(settings)
     return TestClient(application, base_url="https://club.example", client=(peer, 12345))
 
@@ -117,3 +120,15 @@ def test_cloudflare_does_not_use_spoofed_xff(app):
     with app.state.session_factory() as db:
         assert db.get(AuthAttempt, token_hash("admin-login:ip:192.0.2.3"))
         assert not db.get(AuthAttempt, token_hash("admin-login:ip:198.51.100.99"))
+
+
+def test_cloudflare_guard_uses_distinct_verified_clients(app):
+    with deployed(app, kind="cloudflare") as client:
+        client.app.state.ingress_guard.limits = dict(client.app.state.ingress_guard.limits,
+            **{"public-read": (1, 0, 100, 0)})
+        def headers(ip):
+            return {"CF-Connecting-IP": ip, "X-Forwarded-For": "198.51.100.99",
+                    "X-Forwarded-Proto": "https"}
+        assert client.get("/api/public/members", headers=headers("192.0.2.3")).status_code == 200
+        assert client.get("/api/public/members", headers=headers("192.0.2.4")).status_code == 200
+        assert client.get("/api/public/members", headers=headers("192.0.2.3")).status_code == 429

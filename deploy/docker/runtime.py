@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import shutil
 import sqlite3
@@ -21,11 +22,14 @@ import sys
 import tarfile
 import time
 import uuid
+from fucheng.backup_schedule import latest_weekly_due
 
 DATA = Path(os.getenv("FUCHENG_DATA_DIR", "/data"))
 BACKUPS = Path(os.getenv("FUCHENG_BACKUP_DIR", "/backups"))
 ACTIVE = DATA / "active.json"
 MAINTENANCE = DATA / "maintenance.json"
+MEDIA = DATA / "announcement-media"
+MEDIA_NAME = re.compile(r"[0-9a-f-]{36}\.(?:jpg|png)\Z")
 
 
 def stamp():
@@ -90,7 +94,7 @@ def inspect_db(path, *, match=False, full=True, read_only=True):
         return {"revision": revision[0][0], "integrity": "ok", "foreign_key_errors": 0}
 
 
-def snapshot(source, prefix):
+def snapshot(source, prefix, *, scheduled_for=None):
     BACKUPS.mkdir(exist_ok=True)
     target = BACKUPS / f"{prefix}-{stamp()}-{uuid.uuid4().hex[:8]}.db"
     tmp = target.with_suffix(".partial")
@@ -102,10 +106,78 @@ def snapshot(source, prefix):
             if dst.execute("PRAGMA journal_mode=DELETE").fetchone() != ("delete",):
                 raise SystemExit("Unable to finalize standalone backup journal mode")
     info = inspect_db(tmp)
+    with closing(sqlite3.connect(f"file:{tmp}?mode=ro", uri=True)) as db:
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='announcement_media'").fetchone():
+            for filename, sha256, size in db.execute("SELECT filename, sha256, size FROM announcement_media"):
+                path = MEDIA / filename
+                if not MEDIA_NAME.fullmatch(filename) or not path.is_file() or path.stat().st_size != size or hashlib.sha256(path.read_bytes()).hexdigest() != sha256:
+                    raise SystemExit("Announcement media does not match database; backup stopped")
+    media_archive = target.with_suffix(".media.tar")
+    media_tmp = media_archive.with_suffix(".partial")
+    with tarfile.open(media_tmp, "w") as bundle:
+        if MEDIA.is_dir():
+            for path in sorted(MEDIA.iterdir()):
+                if not path.is_file() or not MEDIA_NAME.fullmatch(path.name):
+                    raise SystemExit("Unexpected announcement media path; backup stopped")
+                bundle.add(path, arcname=path.name, recursive=False)
+    media_tmp.replace(media_archive)
     tmp.replace(target)
-    info.update(file=target.name, sha256=hashlib.sha256(target.read_bytes()).hexdigest(), created_at=time.time())
+    info.update(file=target.name, sha256=hashlib.sha256(target.read_bytes()).hexdigest(),
+                media_file=media_archive.name, media_sha256=hashlib.sha256(media_archive.read_bytes()).hexdigest(),
+                created_at=time.time(), scheduled_for=scheduled_for,
+                restore_config={"image_ref": os.getenv("FUCHENG_IMAGE_REF"),
+                                "public_origin": os.getenv("FUCHENG_RESTORE_PUBLIC_ORIGIN") or os.getenv("FUCHENG_PUBLIC_ORIGIN"),
+                                "proxy_kind": os.getenv("FUCHENG_RESTORE_PROXY_KIND") or os.getenv("FUCHENG_PROXY_KIND", "local"),
+                                "source_manifest_sha256": hashlib.sha256(Path("/app/source-manifest.json").read_bytes()).hexdigest()
+                                if Path("/app/source-manifest.json").is_file() else None})
     atomic_json(target.with_suffix(".json"), info)
     return info
+
+
+def verified_media_archive(db_path, metadata):
+    name = metadata.get("media_file")
+    if not name:
+        return None
+    if name != db_path.with_suffix(".media.tar").name:
+        raise SystemExit("Media archive name does not match backup")
+    path = db_path.with_suffix(".media.tar")
+    if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != metadata.get("media_sha256"):
+        raise SystemExit("Media archive checksum mismatch")
+    with tarfile.open(path, "r") as bundle:
+        for member in bundle.getmembers():
+            if not member.isfile() or not MEDIA_NAME.fullmatch(member.name) or member.size > 5 * 1024 * 1024:
+                raise SystemExit("Invalid media archive member")
+    return path
+
+
+def restore_media(archive):
+    if archive is None:
+        return
+    MEDIA.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(archive, "r") as bundle:
+        for member in bundle.getmembers():
+            target = MEDIA / member.name
+            source = bundle.extractfile(member)
+            if source is None:
+                raise SystemExit("Missing media archive member")
+            content = source.read()
+            if target.exists():
+                if target.read_bytes() != content:
+                    raise SystemExit("Existing media filename has different bytes")
+            else:
+                with target.open("xb") as stream:
+                    stream.write(content)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+
+
+def expire_restored_sessions(database):
+    # The archive preserves forensic state, but a newly restored live database
+    # must never make old administrator browser cookies valid again.
+    with closing(sqlite3.connect(database)) as restored:
+        restored.execute("PRAGMA foreign_keys=ON")
+        restored.execute("DELETE FROM login_sessions")
+        restored.commit()
 
 
 def migrate(path):
@@ -124,19 +196,83 @@ def record(action, **details):
     atomic_json(directory / f"{stamp()}-{action}.json", dict(action=action, **details))
 
 
-def backup_once(*, automatic=False):
+def completed_weekly(due):
+    prefix = f"weekly-{due:%Y%m%d}-"
+    for metadata in sorted(BACKUPS.glob(prefix + "*.json"), reverse=True):
+        try:
+            info = json.loads(metadata.read_text())
+            database = metadata.with_suffix(".db")
+            if (info.get("scheduled_for") != due.isoformat() or info.get("file") != database.name
+                    or not database.is_file() or hashlib.sha256(database.read_bytes()).hexdigest() != info.get("sha256")):
+                continue
+            verified_media_archive(database, info)
+            inspect_db(database)
+            return info
+        except (OSError, ValueError, KeyError, SystemExit):
+            continue
+    return None
+
+
+def newest_completed_weekly():
+    for metadata in sorted(BACKUPS.glob("weekly-*.json"), reverse=True):
+        try:
+            due = datetime.fromisoformat(json.loads(metadata.read_text())["scheduled_for"])
+            if completed_weekly(due):
+                return due
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return None
+
+
+def backup_failure():
+    path = DATA / "backup-status.json"
+    try:
+        previous = json.loads(path.read_text())
+    except (OSError, ValueError):
+        previous = {}
+    atomic_json(path, {"ok": False, "failed_at": time.time(),
+                       "last_success_at": previous.get("last_success_at"),
+                       "last_schedule": previous.get("last_schedule")})
+
+
+def backup_once(*, automatic=False, due=None):
     with lock("backup.lock"):
         if MAINTENANCE.exists():
             raise SystemExit("Maintenance active; scheduled backup postponed")
-        result = snapshot(active_path(), "scheduled" if automatic else "manual")
-        # Only automatic backups are retained/deleted; pre-update/manual checkpoints persist.
-        keep = int(os.getenv("FUCHENG_BACKUP_KEEP", "14"))
+        keep = int(os.getenv("FUCHENG_BACKUP_KEEP", "8"))
         if keep < 2:
-            raise SystemExit("Retention must keep at least two automatic backups")
-        for old in (sorted(BACKUPS.glob("scheduled-*.db"), reverse=True)[keep:] if automatic else []):
-            old.unlink()
-            old.with_suffix(".json").unlink(missing_ok=True)
-        atomic_json(DATA / "backup-status.json", dict(ok=True, timestamp=time.time(), **result))
+            raise SystemExit("Retention must keep at least two weekly backups")
+        if automatic and due is None:
+            raise SystemExit("Scheduled backup requires a calendar due time")
+        if automatic:
+            previous = completed_weekly(due)
+            if previous:
+                return previous
+        prefix = f"weekly-{due:%Y%m%d}" if automatic else "manual"
+        result = snapshot(active_path(), prefix, scheduled_for=due.isoformat() if due else None)
+        # Only verified weekly groups are retained/deleted. Manual, pre-update,
+        # pre-restore, exports, and historical daily archives are untouched.
+        if automatic:
+            complete = []
+            for candidate in sorted(BACKUPS.glob("weekly-*.db"), reverse=True):
+                try:
+                    info = json.loads(candidate.with_suffix(".json").read_text())
+                    if (info.get("file") == candidate.name and
+                            hashlib.sha256(candidate.read_bytes()).hexdigest() == info.get("sha256")):
+                        verified_media_archive(candidate, info)
+                        complete.append(candidate)
+                except (OSError, ValueError, KeyError, SystemExit):
+                    continue
+            for old in complete[keep:]:
+                metadata = old.with_suffix(".json")
+                if not metadata.is_file() or not old.with_suffix(".media.tar").is_file():
+                    continue
+                old.unlink()
+                old.with_suffix(".media.tar").unlink()
+                metadata.unlink()
+        if automatic:
+            atomic_json(DATA / "backup-status.json", dict(ok=True, timestamp=time.time(),
+                last_success_at=time.time(), last_schedule=due.isoformat(), **result))
         print(json.dumps(result), flush=True)
 
 
@@ -174,8 +310,9 @@ def main():
         return
     if args.action == "backup-health":
         value = json.loads((DATA / "backup-status.json").read_text())
-        interval = int(os.getenv("FUCHENG_BACKUP_INTERVAL", "86400"))
-        if not value["ok"] or time.time() - value["timestamp"] > interval + 300:
+        due = latest_weekly_due(datetime.now(UTC))
+        last_schedule = value.get("last_schedule")
+        if not value["ok"] or not last_schedule or datetime.fromisoformat(last_schedule) < due:
             raise SystemExit("Backup failed or stale; inspect backup logs/status")
         return
     if args.action == "backup":
@@ -189,6 +326,7 @@ def main():
             meta = json.loads(source.with_suffix(".json").read_text())
             if meta["file"] != source.name or hashlib.sha256(source.read_bytes()).hexdigest() != meta["sha256"]:
                 raise SystemExit("Backup import checksum/metadata mismatch")
+            media_source = verified_media_archive(source, meta)
             if any(Path(str(source) + suffix).exists() for suffix in ("-wal", "-shm")):
                 raise SystemExit("Import requires a standalone consistency backup, without WAL/SHM files")
             target = BACKUPS / source.name
@@ -208,6 +346,9 @@ def main():
             if hashlib.sha256(temporary.read_bytes()).hexdigest() != meta["sha256"]:
                 raise SystemExit("Backup bytes changed during validation; import stopped")
             temporary.replace(target)
+            if media_source:
+                shutil.copyfile(media_source, target.with_suffix(".media.tar"))
+                verified_media_archive(target, meta)
             atomic_json(metadata, meta)
             print(json.dumps({"imported": target.name, "sha256": meta["sha256"], "revision": meta["revision"]}))
         return
@@ -227,7 +368,8 @@ def main():
                     info = json.loads(metadata.read_text())
                     if hashlib.sha256(path.read_bytes()).hexdigest() != info["sha256"]:
                         raise SystemExit("Backup checksum mismatch; export stopped")
-                    for item in (path, metadata):
+                    media_archive = verified_media_archive(path, info)
+                    for item in (path, metadata, *((media_archive,) if media_archive else ())):
                         entries[item.name] = hashlib.sha256(item.read_bytes()).hexdigest()
                         bundle.add(item, arcname=item.name, recursive=False)
             temporary.replace(archive)
@@ -237,16 +379,26 @@ def main():
             print(json.dumps(result))
         return
     if args.action == "backup-loop":
-        interval = int(os.getenv("FUCHENG_BACKUP_INTERVAL", "86400"))
-        if interval < 5:
-            raise SystemExit("Backup interval must be at least 5 seconds")
+        completed = newest_completed_weekly()
         while True:
-            try:
-                backup_once(automatic=True)
-            except (Exception, SystemExit):
-                atomic_json(DATA / "backup-status.json", {"ok": False, "timestamp": time.time()})
-                print("BACKUP FAILED: inspect maintenance state, disk, and volume permissions", file=sys.stderr, flush=True)
-            time.sleep(interval)
+            now = datetime.now(UTC)
+            due = latest_weekly_due(now)
+            if completed is None or due > completed:
+                previous = completed_weekly(due)
+                if previous:
+                    completed = due
+                    atomic_json(DATA / "backup-status.json", dict(ok=True, timestamp=time.time(),
+                        last_success_at=previous["created_at"], last_schedule=due.isoformat(), **previous))
+                else:
+                    try:
+                        backup_once(automatic=True, due=due)
+                        completed = due
+                    except (Exception, SystemExit):
+                        backup_failure()
+                        print("BACKUP FAILED: inspect maintenance state, disk, and volume permissions", file=sys.stderr, flush=True)
+            # Recompute civil time at least once per minute. A clock jump,
+            # restart, or busy maintenance cannot defer a due week indefinitely.
+            time.sleep(60)
     with lock("writer.lock"):
         if args.action == "serve":
             if MAINTENANCE.exists():
@@ -307,6 +459,7 @@ def main():
                 meta = json.loads(source.with_suffix(".json").read_text())
                 if meta["file"] != source.name or hashlib.sha256(source.read_bytes()).hexdigest() != meta["sha256"]:
                     raise SystemExit("Restore backup checksum/metadata mismatch")
+                media_archive = verified_media_archive(source, meta)
                 # /backups is our locked, local archive copy, not the external source.
                 # A writable connection lets SQLite remove legacy empty WAL sidecars.
                 inspect_db(source, match=True, read_only=False)
@@ -333,6 +486,15 @@ def main():
                 if hashlib.sha256(source.read_bytes()).hexdigest() != meta["sha256"]:
                     raise SystemExit("Restore source bytes changed; maintenance remains active")
                 info = inspect_db(target, match=True)
+                expire_restored_sessions(target)
+                inspect_db(target, match=True)
+                restore_media(media_archive)
+                with closing(sqlite3.connect(f"file:{target}?mode=ro", uri=True)) as check:
+                    if check.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='announcement_media'").fetchone():
+                        for filename, digest, size in check.execute("SELECT filename, sha256, size FROM announcement_media"):
+                            path = MEDIA / filename
+                            if not path.is_file() or path.stat().st_size != size or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+                                raise SystemExit("Restored announcement media validation failed")
                 atomic_json(ACTIVE, {"database": target.name})
                 record("restore", database=target.name, previous=previous.name if previous else None, backup=source.name, **info)
             MAINTENANCE.unlink()

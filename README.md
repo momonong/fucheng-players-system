@@ -1,5 +1,7 @@
 # 府城球館會員管理系統
 
+> 2026-09-25 手機介面與公開入口限流已更新到獨立 8052 合成預覽：[手機驗收入口](https://29e0-140-116-158-107.ngrok-free.app/)。Cloudflare Turnstile 因尚無真實金鑰，在此預覽明確停用；Cloudflare 正式設定仍要求金鑰才可啟動。每週成組備份與 Linux 使用者家目錄部署設定只在 Docker 交付工作樹，不代表 Windows 預覽已有排程或正式服務已部署。證據與限制見[部署手冊](docs/deployment.md)及[驗收紀錄](docs/acceptance.md)。
+
 部署準備採 **Windows Docker Desktop／WSL2：單一app image＋SQLite named volume**，備份／維護共用image，正式HTTPS主方案為Cloudflare named tunnel。離線包、source manifest、PowerShell工具與現場清單見[部署手冊](docs/deployment.md)。本機容器證據不代表球館實機、公開入口、正式資料或人工驗收已完成；以下開發／預覽命令保留原用途。
 
 目前提供會員／比賽管理、免登入選名報名，以及管理員的當次比賽級數安排。使用者選比賽、搜尋並確認自己的名字、選當次葷素就能報名；取消、更正及遞補由管理員處理。沒有會員帳號、密碼或啟用連結。
@@ -165,7 +167,7 @@ uv run --locked uvicorn fucheng.app:app --host 127.0.0.1 --port 8032 --no-access
 
 首頁提供已發布公告、置頂公告與比賽時程，所有公共頁面共用導覽。草稿比賽不公開；open 比賽在到達截止時間後顯示報名已截止，也不能再報名。尚未開放的預告可透過公告發布，本版沒有新增自動開放報名排程欄位。
 
-公告由管理員在 `/admin/announcements` 新增／修改，預設未發布；勾選「發布到首頁」後立即公開，取消勾選即下架，保留紀錄。支援置頂、版本衝突、重送防重與修改歷史。內容是純文字，保留換行，不執行 HTML。
+公告由管理員在 `/admin/announcements` 新增／修改，預設未發布；勾選「發布到首頁」後立即公開，取消勾選即下架，保留紀錄。支援置頂、版本衝突、重送防重與修改歷史。圖文編輯器可設定標題 1–3、正文、粗斜體、底線、列點、編號、對齊與安全連結；儲存草稿後可在段落間插入多張照片，選取圖片可替換或移除，區塊可上移／下移。舊純文字與舊式文末單張照片維持可讀。後端僅保存允許的 HTML 與本站媒體 ID，照片放在 `FUCHENG_DATA_DIR/announcement-media`，不進 image／Git；schema `0009_announcement_media` 與媒體備份需同批部署。此工作樹尚未更新公開服務。
 
 已授權建立的本機預覽：[首頁](http://127.0.0.1:8032/)、[會員分級](http://127.0.0.1:8032/members)、[管理後台](http://127.0.0.1:8032/admin)。資料庫是 `data/club-preview.db`，由 `data/competition-case.db` 以 SQLite Backup API 建立副本後升級，保留 327 位原會員、2 位原管理員與既有比賽／稽核，另加本機預覽管理員及使用說明公告。沒有編造正式比賽或參賽名單。
 

@@ -1,6 +1,41 @@
 # 驗收證據與限制
 
-最後更新：2026-09-23。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+最後更新：2026-09-25。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+
+2026-09-25 最新安全階段結果：[公開安全、Turnstile 與週備份工作樹](#security-stage)；最終後端全套 190 passed，先前失敗紀錄仍保留於下方。
+
+## 8052 手機介面合成預覽（2026-09-25；待人工驗收）
+
+獨立 8052 [手機驗收入口](https://29e0-140-116-158-107.ngrok-free.app/) 已換成凍結的 `data/admin-news-preview-releases/mobile-v5-20260925/source/src` 與 `static`；目前身份見忽略的 `data/admin-news-preview-identity.json`。只停止並更新 8052 app，原 ngrok PID 19552 與 8044 listener 45460 保留；新版 listener 48248、launcher 51336。停寫後以 SQLite Backup API 建立 `rollback/pre-upgrade.db`，19 張表及 5 個媒體檔與原庫逐項 hash 一致，schema 仍為 0009、integrity `ok`、FK 錯誤 0。新版啟動前後同一批表及媒體 hash 完全相同，既有 admin/session/公告與圖片未被重建或清除。
+
+公開 ngrok HTTPS `/api/health` 為 200，首頁 HTML、JS、CSS 三檔與凍結成品 SHA-256 相同，兩張已發布公告圖片 HTTPS 200。本機可信代理路徑驗證既有管理員帳密登入與 `/api/auth/me` 均 200、Secure cookie；外部 HTTPS 管理登入自動檢查因工具自動審核拒絕將本機保存的帳密傳到 ngrok 而未執行，須由使用者在手機親自驗收。預覽的 Turnstile 明確 `disabled`，沒有真實 Cloudflare sitekey/secret；Windows 原生預覽沒有 Docker 的每週備份排程，正式 Cloudflare 模式仍拒絕缺密鑰啟動。
+
+手機改善包含精簡報名頁抬頭、管理比賽清單與設定折疊、報名名單捷徑、公告工具列橫向滑動與觸控圖片操作。獨立合成 Chromium 寬度 360／390／430／768px 的首頁、報名、比賽管理、公告頁均無整頁水平溢位；360px 報名名單頂端約 784px（舊版約 1886px），公告工具列約 83px（舊版約 384px）。圖片上傳後觸控選取／完成、HTTPS 公開圖片載入已核對。`npm run typecheck`、獨立 build、手機流程 E2E 1 passed、公告／免登入報名／比賽管理既有 E2E 6 passed、後端全套 190 passed。寬度 E2E 採固定窄版 viewport 加觸控事件；實體手機與人工操作仍待驗收。先前 `isMobile` 模擬的儲存鍵點擊因 Chromium 測試布局 viewport 高於視覺 viewport 而逾時，保留在忽略的診斷輸出，未當作產品失敗或成功證據。
+
+## 公告工具列分類與文末照片入口最終修正（2026-09-24；8052 本機合成預覽 v4）
+
+v3 將公告工具列五組加上可見的「樣式／文字／段落／插入／區塊」標籤。相同靜態成品在獨立 8053 合成環境的公告定向 Playwright 為 **5 passed、1 skipped**；手機實際通過插圖、圖片上／下移、H2、儲存重載與公開讀回。唯一 skip 是只在 desktop project 擷取 390／768／1440／3840px 頁面矩陣的案例，不是手機核心操作。
+
+最終 v4 移除新公告下方常駐的舊式原生照片選檔列；新增公告先儲存草稿，才可從工具列插入內文圖片，不新增自動儲存。原本有 `photo_id` 的公告才顯示「既有文末照片」折疊區，可查看、替換、移除，並保留原照片直到儲存成功。`npm run typecheck`、`npm run build -- --outDir ../data/admin-news-preview-static-v4` 通過；隔離 8053 合成環境的 `announcement-editor.spec.ts` 與 `website.spec.ts` 桌面／手機定向 **9 passed、1 skipped**，含新公告工具列插圖、舊文末照片替換／移除、格式與發布下架。唯一 skip 仍為上述桌面專用四寬度截圖；本次未重跑無關的 178 項後端全套。
+
+核對 8052 身份與既有備份後只切換 static 至 `data/admin-news-preview-static-v4`，前版 v3／v2 成品與 `backups/admin-news-preview-v2-pre/` 保留。實際 8052 首頁 HTTP 200、health=ok、v4 bundle 已載入；切換前後 17 張業務表及 5 個媒體檔逐項摘要一致，integrity=ok、FK0，未更動既有公告、admin 或媒體，未清理既有 session。實際新公告／舊文末圖 390／1440px 截圖與合成段落圖、超寬截圖在 ignored `data/admin-news-evidence/legacy-entry-v4/`；身份見 `data/admin-news-preview-identity.json`。8052 仍僅本機合成預覽，正式資料、Docker 與公開入口未操作；未 stage／commit／merge／push。
+
+## 公告內文多圖、管理導覽與流式版面（2026-09-24；8052 本機合成預覽）
+
+沿用 `aaa3` 工作樹與 schema `0009_announcement_media`，未新增 migration。公告內文可使用標題 1–3、粗斜體／底線、清單、對齊、安全連結與多張本站圖片；圖片依段落次序保存，區塊上／下移、圖片替換／移除與舊文末照片並存。內文圖上傳要求既存公告及 version／CSRF／request_id，資料與稽核同交易；公開媒體只對已發布且仍被引用的圖片開放。管理三頁共用固定導覽，十級表最後一列下框線限定修於行政表，頁面在 390／768／1440／3840px 採流式寬度而內文保持閱讀行寬。
+
+- Windows/CPython 3.14.6：全套 `uv run --locked pytest -q -p no:cacheprovider --basetemp .test-tmp` **178 passed、2 第三方 deprecation warnings**。`npm run build -- --outDir ../frontend/dist-admin-news-v2` 包含 TypeScript typecheck 並通過；未更動依賴，沿用先前 npm audit 結果。
+- 獨立 `8053`、`data/admin-news-v2-e2e.db`、`frontend/dist-admin-news-v2` 的 Playwright 定向桌面／手機 **7 passed、1 skipped**（四寬度截圖僅桌面專案）。涵蓋多圖插入、排序、替換、移除、連結、保存後公開讀回、舊文末照片、409 輸入保留、行政格線與四寬度無整頁橫向溢位。截圖與列印 PDF 保存在 ignored `data/admin-news-evidence/v2-final/`，已目視檢查 390／768／3840px。
+- 8052 更新前核對 listener／launcher 身份，線上與停寫備份至 `backups/admin-news-preview-v2-pre/`，停寫備份 integrity=ok、FK 無錯、5 筆媒體與 5 個檔案逐檔 SHA-256 相同。更新後 `data/admin-news-preview-identity.json` 指向 v2 static；health 與首頁 HTTP 200、管理員登入及公告清單 200、兩張公開引用媒體均 200，DB integrity=ok。實際首頁／公告編輯器 390／1440px 截圖同存證據目錄。8052 仍僅本機合成預覽，正式資料、Docker、公開入口及 8044／8045／8047 未操作；未 stage／commit／merge／push。
+
+## 行政名單與公告圖文工作樹驗證（2026-09-24；未部署）
+
+工作樹 `aaa3` 自 `ef147253ca1604fc8c4c74175b3f9f7fe08894a6` 起；行政名單使用固定十級、`hard_level_snapshot` 分欄，搜尋保留占用格位，候補／已取消以原順位分區及側欄展收；全場摘要與管理列印不受搜尋改寫。公告 schema 新增 `0009_announcement_media`，舊純文字保留、新內容以服務端 allowlist 清理，照片正規化後放持久 data dir，匿名僅能取目前已發布照片。DB＋媒體備份 helper 已涵蓋封存、雜湊、還原與竄改拒絕；Docker 實際容器重啟／還原演練尚未執行。
+
+- Windows/CPython 3.14.6：`uv run --locked pytest -q -p no:cacheprovider --basetemp .test-tmp` **175 passed、2 第三方 deprecation warnings**。首輪 170 passed／5 failed 均為舊 schema head `0008` 斷言；修正後受影響 29 passed，再完成全套 175 passed。此後追加照片替換案例，`tests/test_website.py` 定向 **7 passed**；追加後未重跑全套。migration 0008→0009 在舊純文字公告上核原文、integrity 與 FK；媒體 helper 用隔離合成資料驗 DB/照片配對及 tamper 拒絕。
+- `frontend/npm run typecheck` 與最終 `npm run build -- --outDir ../frontend/dist-admin-news-final` 通過，`npm audit --audit-level=high` 0 vulnerabilities。最終成品在隔離 Chromium 8051／`data/admin-news-e2e.db` 的桌面／手機 **6/6 passed**：行政報名與列印、公告格式／照片／發布下架、原排級數 80 人搜尋／格位基本回歸。截圖與管理 PDF 在 ignored `frontend/test-results/`。
+- 曾誤選 `competition-levels.spec.ts` 整檔，Playwright 列出 94 案並在執行到第 12 案時主動 Ctrl+C，中止碼 1；不宣稱全 94 通過。最終成品一次定向六案曾為 5 passed／1 failed，手機拖曳目標格當時在 viewport 下方（目標 y=900、viewport 高844），測試事件未落入目標。測試先將目標格捲入視窗並等候插入預告顯示才放手後，手機定向重跑通過，最後桌機／手機六案單次全通過；未修改既有格位產品邏輯。
+- 本機唯讀盤點確認原 `fucheng.db` 327 會員在兩候選庫保留同 ID/共同欄位，候選多 15 會員、9/20 的 80 confirmed 與一場明確測試賽 1 筆；兩候選所有共同業務列一致。`docs/acceptance.md` 既有 8032 紀錄指出候選另有預覽管理員及兩則使用說明公告。正式目標／入口仍待使用者決策，真實資料未寫入、未清理，現用 8044/8045/8047 未更新。新建 `8052` 本機合成預覽來自測試庫獨立副本，DB／媒體／static/帳密在 ignored 路徑；身份見 `data/admin-news-preview-identity.json`。
 
 ## B F 表頭選取／右鍵選單／白色色票公開更新（2026-09-23，待人工驗收）
 
@@ -633,3 +668,16 @@ npm run test:e2e -- e2e/competition-levels.spec.ts --grep '色票故障：同色
 C3 篩選 8 個測試標題、桌機與手機共 16 例。四個失敗實例是「色票故障：八十人正常連續點色生命週期」及「色票故障：同色白色與合併範圍不重送」各自的 desktop/mobile。C3 原錯誤分別顯示色票按鈕尚不存在，以及首次明確白色寫入被測試誤判為 no-op（預期 422、實收 200）。修正後 C5 重跑兩個標題：八十人案例 2/2 通過；同色案例兩例失敗，因測試把「表格底色」group 定位在安排區而非開啟的儲存格操作選單。僅修正測試操作／定位，保留 no-op 與保存斷言；產品程式與 `frontend/dist-release-0.2.0` 未變。C6 只重跑同色案例，在桌機／手機 2/2 通過。因此四個原失敗 viewport 均有後續 pass 證據；C3、C5 原始執行結果仍保留 failed，沒有單次全 16 例重跑，故不把 C 系列描述為單次全綠。A-r2、B3、C2 的留存狀態皆為 passed。自動測試與觸控均為 Windows Chromium／Playwright 模擬，不替代實體手機、其他 OS 或使用者人工驗收。
 
 公開 B 原生預覽 `data/grid-public-runtime/releases/grid-v020-20260923-200323` 的唯讀檢查：本機及 HTTPS health 為 `{"status":"ok"}`；首頁、JS、CSS HTTP 200／`no-store`，三個回應檔 SHA-256 與凍結 image static 相同。更新前後 SQLite Backup API 檢查 18/18 table row count/hash 不變，schema `0008_arrangement_grid`、integrity `ok`、FK errors 0；沒有 migration、reseed、業務寫入或管理員登入/session 變更。此為合成 B 預覽，不是正式資料庫或正式部署；公開 admin UI 操作沒有測試，人工驗收仍待進行。大型保存或重啟偶見尾端空白列的已知限制仍未重現、未修復。
+<a id="security-stage"></a>
+
+## 公開安全、Turnstile 與週備份工作樹（2026-09-24～25）
+
+此段只記錄本工作樹的合成工程驗證，**未部署到 8052、8044 或任何正式入口**。起始與目前 HEAD 均為 `ef147253ca1604fc8c4c74175b3f9f7fe08894a6`（detached）；原有公告／編輯器／schema 0009 等未提交工作保留，本階段未 stage、commit、merge、push、部署、修改真實資料或操作舊服務。Windows／PowerShell、Python 3.14、Node 24、Chromium Playwright；Linux 容器與真正 Cloudflare 網域／金鑰尚未驗證。
+
+- 後端目標：`tests/test_security_stage.py tests/test_deployment_boundary.py tests/test_weekly_backup.py tests/test_announcement_media_backup.py`，**29 passed**。覆蓋請求入站上限、信任代理 IP、Turnstile 回應失敗／錯 hostname／action／時限、一次性 token 後同 receipt 讀回、週一 04:00 曆法、八週 retention、失敗保留舊備份，以及新目標還原後舊 session 失效／稽核 actor 保留。皆為合成／fake Siteverify，不是 Cloudflare 真實連線。
+- 既有公開報名、網站、名單匯入後端回歸：`tests/test_public_registration.py tests/test_website.py tests/test_roster_import.py`，**31 passed**。全後端 `pytest` 首輪 **186 passed／1 failed**；失敗為新並發上限 32 拒絕既有 50 個同時公開讀取的測試。修為有限上限 64 後，受影響的 `tests/test_concurrency.py tests/test_security_stage.py tests/test_deployment_boundary.py` **27 passed**。首輪失敗作為歷史紀錄保留；2026-09-25 新增下述合成情境、修正 slow trickle 總時限後，以 `uv run --locked pytest -q -p no:cacheprovider --basetemp .test-tmp-security-full-final` 在最終後端程式碼 **190 passed、2 個第三方棄用警告、exit 0（100.62 秒）**。
+- 共享 Wi-Fi 合成：六個獨立瀏覽器 visit 同用一個經 Cloudflare 可信 proxy 驗證的 `192.0.2.77`，各自建 session、搜尋一位合成會員、送出一次報名，**6/6 為 201**，6 個 visit cookie 不同，6 筆報名及稽核均成立。預設入站配額為每 client `public-read` 120 容量／每秒回補 2、`public-write` 40／每秒回補 0.7；此案例使用預設值，沒有 429。攻擊突發另用**縮小的測試配額** read 每 IP 2／0.5 每秒、全局 4／1 每秒：同 IP 前 2 次成功、第 3 次 429 且 `AuthAttempt` 計數未增；另一 IP 同時成功；模擬 2 秒回補後原 IP 再成功。非可信 socket 偽造 `CF-Connecting-IP`／XFF 回 400，未寫 `AuthAttempt`。這驗證機制與一組有限家人情境，不代表真實共享 Wi-Fi 的誤攔率或分散式攻擊容量。
+- 原 body 接收迴圈每個 chunk 重新給 5 秒，已改為**整個 body 共用 5 秒 deadline**。slow trickle 合成每 2 秒到一小塊，第三塊已越過總時限時回 408；下游 app 不執行、並發 slot 釋放。`tests/test_security_stage.py tests/test_deployment_boundary.py` 變更後聚焦 **29 passed**，隨後納入上述最終全後端 190 passed。
+- `npm run typecheck` 與 `npm run build -- --outDir ../frontend/dist-security-stage` 通過，建置成品隔離在新目錄。第一次建置受沙箱的 Vite 設定路徑讀取拒絕，核准的重跑成功。Compose Cloudflare overlay 的 `docker compose config --no-interpolate --no-path-resolution --format json` 通過；僅解析設定，未啟動 Docker、Cloudflare 或主機服務。
+- `frontend/e2e/self-registration.spec.ts` 最終在桌機／390×844 手機模擬 **2 passed**（`data/security-stage-e2e-followup/.last-run.json` 為 passed），使用獨立 `data/security-stage-e2e.db`、port 8031、`frontend/dist-security-stage`，single worker。既有測試定位舊行政名單／稽核畫面造成先前失敗；改依目前十級名單與管理 API 驗證稽核後通過。此次再以 mock edge HTML 403 驗證匿名前端不把 HTML 當 JSON，顯示中文安全提示、姓名／葷素與同一 request_id 保留；另以本機 fake Turnstile script／session sitekey 模擬 Siteverify 503，驗 `interaction-only`、重置 widget、姓名／餐食與 request_id 在重試時不丟失。後端 timeout 到 503 的映射由 fake `urlopen` 測試驗證；沒有真實 widget／Cloudflare 連線。首次瀏覽器啟動 `spawn EPERM` 是沙箱限制；核准重跑後才實際執行。未測外部 WAF、真實共享 Wi-Fi 誤攔或 Linux 重啟恢復。
+- `git diff --check` 通過（有 Windows LF→CRLF 提示）。本機 8052 listener PID 2136、8044 listener PID 45460 仍在；直接 localhost health 因缺 ngrok proxy identity 回 400，符合既有邊界，不是透過公網的健康驗證。8031 E2E listener 測後未留存。未執行正式資料遷移、公開入口切換、異地備份或實際災難還原。

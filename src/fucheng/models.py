@@ -34,12 +34,25 @@ class Announcement(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     title: Mapped[str] = mapped_column(String(120))
     body: Mapped[str] = mapped_column(Text)
+    body_format: Mapped[str] = mapped_column(String(10), default="plain")
+    photo_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False)
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     version: Mapped[int] = mapped_column(Integer, default=1)
     published_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+
+
+class AnnouncementMedia(Base):
+    __tablename__ = "announcement_media"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    announcement_id: Mapped[str] = mapped_column(ForeignKey("announcements.id", ondelete="RESTRICT"), index=True)
+    filename: Mapped[str] = mapped_column(String(50), unique=True)
+    mime_type: Mapped[str] = mapped_column(String(20))
+    size: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
 
 
 class AnnouncementAudit(Base):

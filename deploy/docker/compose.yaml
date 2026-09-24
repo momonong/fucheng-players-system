@@ -1,4 +1,9 @@
 name: ${COMPOSE_PROJECT_NAME:-fucheng}
+x-runtime-env: &runtime-env
+  FUCHENG_IMAGE_REF: ${FUCHENG_IMAGE:?Set FUCHENG_IMAGE from the release manifest}
+  FUCHENG_BACKUP_KEEP: ${FUCHENG_BACKUP_KEEP:-8}
+  FUCHENG_RESTORE_PUBLIC_ORIGIN: ${FUCHENG_PUBLIC_ORIGIN:?Set HTTPS origin without trailing slash}
+  FUCHENG_RESTORE_PROXY_KIND: ${FUCHENG_PROXY_KIND:-cloudflare}
 x-app: &app
   image: ${FUCHENG_IMAGE:?Set FUCHENG_IMAGE from the release manifest}
   pull_policy: never
@@ -8,16 +13,9 @@ x-app: &app
   tmpfs: ["/tmp:size=16m,mode=1777"]
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
-  environment:
-    FUCHENG_PUBLIC_ORIGIN: ${FUCHENG_PUBLIC_ORIGIN:?Set HTTPS origin without trailing slash}
-    FUCHENG_COOKIE_SECURE: "true"
-    FUCHENG_TRUSTED_PROXY: ${FUCHENG_PROXY_IP:-172.30.98.3}
-    FUCHENG_PROXY_KIND: ${FUCHENG_PROXY_KIND:-cloudflare}
-    FUCHENG_BACKUP_INTERVAL: ${FUCHENG_BACKUP_INTERVAL:-86400}
-    FUCHENG_BACKUP_KEEP: ${FUCHENG_BACKUP_KEEP:-14}
+  environment: *runtime-env
   volumes:
     - data:/data
-    - backups:/backups
   logging:
     driver: json-file
     options: {max-size: "10m", max-file: "3"}
@@ -27,6 +25,13 @@ services:
     command: [serve]
     restart: unless-stopped
     stop_grace_period: 45s
+    environment:
+      <<: *runtime-env
+      FUCHENG_PUBLIC_ORIGIN: ${FUCHENG_PUBLIC_ORIGIN:?Set HTTPS origin without trailing slash}
+      FUCHENG_COOKIE_SECURE: "true"
+      FUCHENG_TRUSTED_PROXY: ${FUCHENG_PROXY_IP:-172.30.98.3}
+      FUCHENG_PROXY_KIND: ${FUCHENG_PROXY_KIND:-cloudflare}
+      FUCHENG_BACKUP_STATUS_FILE: /data/backup-status.json
     networks:
       origin: {ipv4_address: "${FUCHENG_APP_IP:-172.30.98.2}"}
   backup:
@@ -34,6 +39,9 @@ services:
     command: [backup-loop]
     restart: unless-stopped
     network_mode: none
+    volumes:
+      - data:/data
+      - ${FUCHENG_BACKUP_PATH:-./backup}:/backups
     depends_on:
       app: {condition: service_healthy}
     healthcheck:
@@ -47,6 +55,9 @@ services:
     profiles: [ops]
     restart: "no"
     network_mode: none
+    volumes:
+      - data:/data
+      - ${FUCHENG_BACKUP_PATH:-./backup}:/backups
     healthcheck: {disable: true}
   cloudflared:
     image: cloudflare/cloudflared@sha256:b269e8abd07a5bf6f3f4be65d5050b2174eca89c56a0241a8ff32a16aec454e4
@@ -96,7 +107,6 @@ services:
       options: {max-size: "10m", max-file: "3"}
 volumes:
   data:
-  backups:
 networks:
   origin:
     internal: true

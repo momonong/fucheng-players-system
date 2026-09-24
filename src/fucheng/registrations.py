@@ -357,6 +357,16 @@ def create_registration_service(db, auth, competition_id, payload):
     return _registration_response(registration)
 
 
+def public_registration_receipt(db, visit, competition_id, payload):
+    """Read a matching committed receipt before a one-use challenge is verified again."""
+    actor = actor_from_auth(visit)
+    duplicate = _idempotent_registration(db, payload.request_id, "create", competition_id,
+        actor=actor, fingerprint=request_fingerprint(competition_id, payload))
+    result = _registration_response(duplicate) if duplicate else None
+    db.rollback()
+    return result
+
+
 def _create_registration_in_transaction(db, competition, member, payload, actor, fingerprint):
     """Caller owns BEGIN IMMEDIATE, authorization, competition-state checks and commit."""
     competition_id = competition.id

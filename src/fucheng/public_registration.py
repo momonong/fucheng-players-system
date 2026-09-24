@@ -9,10 +9,11 @@ from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
 from .models import AuthAttempt, Competition, CompetitionRegistration, Member, PublicVisit, RegistrationAudit, now_utc
-from .registrations import _competition_response, create_registration_service
-from .schemas import (ActorAuditEntry, CsrfResponse, PublicCandidate, PublicCompetition,
+from .registrations import _competition_response, create_registration_service, public_registration_receipt
+from .schemas import (ActorAuditEntry, PublicCandidate, PublicCompetition,
                       PublicRegistrationCreate, PublicRegistrationResult, RegistrationCreate)
 from .security import hash_password, new_token, token_hash
+from .turnstile import verify_turnstile
 
 VISIT_COOKIE = 'fucheng_public_visit'
 DUMMY_HASH = hash_password('dummy-password-never-used-for-login')
@@ -50,6 +51,7 @@ def install_public_routes(app, get_db, current_admin):
     Db = Annotated[Session, Depends(get_db)]
     AdminAuth = Annotated[tuple, Depends(current_admin)]
     settings = app.state.settings
+    app.state.turnstile_verifier = verify_turnstile
     visit_cookie = "fucheng_http_preview_visit" if settings.local_http_preview else VISIT_COOKIE
 
     def current_visit(request: Request, db: Db):
@@ -71,7 +73,7 @@ def install_public_routes(app, get_db, current_admin):
 
     PublicWrite = Annotated[PublicVisit, Depends(public_write)]
 
-    @app.get('/api/public/registration-session', response_model=CsrfResponse)
+    @app.get('/api/public/registration-session')
     def browser_context(request: Request, response: Response, db: Db):
         # Automatic browser context: no name, account, password or user action required.
         rate_limit(db, request, 'public-session', request.client.host if request.client else 'unknown',
@@ -88,7 +90,8 @@ def install_public_routes(app, get_db, current_admin):
             response.set_cookie(visit_cookie, raw, max_age=43200, httponly=True,
                 secure=settings.session_cookie_secure, samesite='lax', path='/')
         db.commit()
-        return CsrfResponse(csrf_token=row.csrf_token)
+        return {"csrf_token": row.csrf_token,
+                "turnstile_sitekey": settings.turnstile_sitekey if settings.turnstile_mode == "enabled" else None}
 
     @app.get('/api/public/registration-members', response_model=list[PublicCandidate])
     def search_members(request: Request, db: Db, visit: Visit, search: str = Query(min_length=1, max_length=100)):
@@ -117,9 +120,16 @@ def install_public_routes(app, get_db, current_admin):
     @app.post('/api/public/competitions/{competition_id}/registrations', response_model=PublicRegistrationResult, status_code=201)
     def register(competition_id: str, payload: PublicRegistrationCreate, request: Request, db: Db, visit: PublicWrite):
         visit_id = visit.id
+        create_payload = RegistrationCreate(member_id=payload.member_id, diet=payload.diet,
+                                            request_id=payload.request_id)
+        receipt = public_registration_receipt(db, visit, competition_id, create_payload)
+        if receipt:
+            return PublicRegistrationResult(status=receipt.status, member_name=receipt.member_name,
+                distinguishing_note=receipt.distinguishing_note, diet=receipt.diet)
+        app.state.turnstile_verifier(payload.turnstile_token, settings,
+            request.client.host if request.client else 'unknown')
         rate_limit(db,request,'public-register',visit_id,identity_limit=20,ip_limit=600,global_limit=1800)
-        result = create_registration_service(db,visit,competition_id,
-            RegistrationCreate(member_id=payload.member_id,diet=payload.diet,request_id=payload.request_id))
+        result = create_registration_service(db,visit,competition_id,create_payload)
         # Do not expose another member's status on a duplicate or offer anonymous cancellation/history.
         return PublicRegistrationResult(status=result.status,member_name=result.member_name,
             distinguishing_note=result.distinguishing_note,diet=result.diet)

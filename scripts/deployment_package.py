@@ -41,7 +41,9 @@ def source_files():
 
 def make_manifest():
     files = source_files()
-    manifest = {"kind": "uncommitted-working-tree-snapshot", "head": run("git", "rev-parse", "HEAD", capture=True).strip(),
+    clean = not run("git", "status", "--porcelain", "--untracked-files=all", capture=True).strip()
+    manifest = {"kind": "committed-git-release" if clean else "uncommitted-working-tree-snapshot",
+                "head": run("git", "rev-parse", "HEAD", capture=True).strip(),
                 "branch": run("git", "branch", "--show-current", capture=True).strip(),
                 "files": {p.relative_to(ROOT).as_posix(): sha(p) for p in files}}
     path = ROOT / "deploy/docker/source-manifest.json"
@@ -82,7 +84,8 @@ def main():
             raise SystemExit(f"Build context mismatch: extra={set(actual)-set(wanted)}, missing={set(wanted)-set(actual)}")
         image_info = json.loads(run("docker", "image", "inspect", tag, capture=True))[0]
         release = {"image": tag, "image_id": image_info["Id"], "platform": "linux/amd64", "source_manifest_sha256": digest,
-                   "head_is_not_complete_source": True, "support_images": SUPPORT_IMAGES, "context_files": len(actual)}
+                   "head_is_not_complete_source": json.loads(manifest_path.read_text(encoding="utf-8"))["kind"] != "committed-git-release",
+                   "support_images": SUPPORT_IMAGES, "context_files": len(actual)}
         (out / "release.json").write_text(json.dumps(release, indent=2) + "\n", encoding="utf-8")
         (out / "source-manifest.json").write_bytes(manifest_path.read_bytes())
         print(json.dumps(release))
@@ -119,7 +122,7 @@ def main():
             if sha(archive) != release["archive_sha256"]:
                 raise SystemExit("Image archive changed; cannot refresh kit")
         # Save/load preserves tags; use those local tags in the portable compose to avoid implicit pulls.
-        for name in ["compose.yaml", "compose.ngrok.yaml", "nginx-test.conf", "release.env.example", "ngrok.yml.example",
+        for name in ["compose.yaml", "compose.cloudflare.yaml", "compose.ngrok.yaml", "nginx-test.conf", "release.env.example", "ngrok.yml.example",
                      "operate.ps1", "preflight.ps1", "load-images.ps1", "test-tls.ps1",
                      "compose.local-http.yaml", "local-http.ps1", "local-http.env.example"]:
             text = (ROOT / "deploy/docker" / name).read_text(encoding="utf-8")

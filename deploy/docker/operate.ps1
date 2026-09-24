@@ -9,6 +9,9 @@ $kitDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (!$EnvFile) { $EnvFile = Join-Path $kitDirectory 'release.env' }
 if (!(Test-Path -LiteralPath $EnvFile -PathType Leaf)) { throw 'Create release.env from release.env.example first' }
 $base = @('compose','--env-file',$EnvFile,'-f',(Join-Path $kitDirectory 'compose.yaml'),'-f',(Join-Path $kitDirectory 'compose.ngrok.yaml'))
+if (Select-String -LiteralPath $EnvFile -Pattern '^FUCHENG_PROXY_KIND=cloudflare\s*$' -Quiet) {
+    $base += @('-f',(Join-Path $kitDirectory 'compose.cloudflare.yaml'))
+}
 function Invoke-Compose([string[]]$Tail) {
     & docker @base @Tail
     if ($LASTEXITCODE -ne 0) { throw "Compose failed ($LASTEXITCODE); keep maintenance state and inspect logs" }
@@ -37,6 +40,11 @@ switch ($Action) {
         $metaPath = [IO.Path]::ChangeExtension($source.FullName,'.json')
         $metadata = Get-Content -LiteralPath $metaPath -Raw | ConvertFrom-Json
         if ($metadata.file -ne $source.Name -or (Get-FileHash -LiteralPath $source.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -ne $metadata.sha256) { throw 'Backup metadata/checksum mismatch' }
+        if ($metadata.media_file) {
+            $mediaPath = Join-Path $source.DirectoryName ($source.BaseName + '.media.tar')
+            if ($metadata.media_file -ne [IO.Path]::GetFileName($mediaPath) -or !(Test-Path -LiteralPath $mediaPath -PathType Leaf)) { throw 'Matching media archive is missing' }
+            if ((Get-FileHash -LiteralPath $mediaPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $metadata.media_sha256) { throw 'Media archive checksum mismatch' }
+        }
         Invoke-Compose @('run','--rm','--volume',"$($source.DirectoryName):/incoming:ro",'ops','import-backup',$source.Name)
     }
     'Migrate' { Invoke-Compose @('run','--rm','ops','migrate') }
@@ -52,8 +60,8 @@ switch ($Action) {
         $raw = & docker @base run --rm ops export
         if ($LASTEXITCODE -ne 0) { throw 'Consistent export failed; no successful export claimed' }
         $export = $raw | ConvertFrom-Json
-        $id = & docker @base ps -a -q app
-        if ($LASTEXITCODE -ne 0 -or !$id) { throw 'Create the app container first so the named backup volume can be exported' }
+        $id = & docker @base ps -a -q backup
+        if ($LASTEXITCODE -ne 0 -or !$id) { throw 'Create the backup container first so its archive can be exported' }
         New-Item -ItemType Directory -Path $destination | Out-Null
         $archive = Join-Path $destination $export.archive
         & docker cp "${id}:/backups/exports/$($export.archive)" $archive

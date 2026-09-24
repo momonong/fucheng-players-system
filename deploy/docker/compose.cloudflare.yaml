@@ -1,0 +1,16 @@
+# Add only for the Cloudflare profile. The app needs HTTPS egress solely for
+# Siteverify; it still has no host port, and only cloudflared owns the trusted
+# origin-network proxy address.
+services:
+  app:
+    environment:
+      FUCHENG_TURNSTILE_MODE: enabled
+      FUCHENG_TURNSTILE_SITEKEY: ${FUCHENG_TURNSTILE_SITEKEY:?Set the public Turnstile sitekey}
+      FUCHENG_TURNSTILE_SECRET_FILE: /run/secrets/turnstile_secret
+    secrets: [turnstile_secret]
+    networks:
+      origin: {ipv4_address: "${FUCHENG_APP_IP:-172.30.98.2}"}
+      egress: {}
+secrets:
+  turnstile_secret:
+    file: ${FUCHENG_TURNSTILE_SECRET_FILE:-./secrets/turnstile-secret.txt}

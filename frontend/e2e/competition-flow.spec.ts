@@ -38,17 +38,26 @@ test('管理員建立比賽、維護候補與列印名單', async ({ page }, tes
   await expect(page.locator('.summary-card').filter({ hasText: '正取／名額' })).toContainText('2/2')
   await expect(page.locator('.summary-card').filter({ hasText: '候補' })).toContainText('1')
 
-  const confirmedRow = page.getByRole('row').filter({ hasText: '合成會員一' })
-  await confirmedRow.getByRole('button', { name: '取消' }).click()
+  await page.locator('.admin-roster-grid').getByRole('button', { name: /合成會員一/ }).click()
+  await page.getByRole('button', { name: '取消報名' }).click()
   await expect(page.locator('.summary-card').filter({ hasText: '待遞補' })).toContainText('1')
   await expect(page.locator('.summary-card').filter({ hasText: '正取／名額' })).toContainText('1/2')
-  const waitingRow = page.getByRole('row').filter({ hasText: '合成會員三' })
-  await waitingRow.getByRole('button', { name: '確認遞補' }).click()
+  await page.locator('.admin-roster-sidebar').getByRole('button', { name: /候補 1 人 展開/ }).click()
+  await page.locator('.admin-roster-sidebar').getByRole('button', { name: /合成會員三/ }).click()
+  await page.getByRole('button', { name: '確認遞補' }).click()
   await expect(page.locator('.summary-card').filter({ hasText: '正取／名額' })).toContainText('2/2')
   await expect(page.locator('.summary-card').filter({ hasText: '葷／素／未設定' })).toContainText('1/1/0')
 
-  await page.getByLabel('篩選名單').fill('合成會員三')
-  await expect(page.getByText('篩選結果 1／全場 3 筆')).toBeVisible()
+  const finalCells = page.locator('.admin-roster-grid tbody tr:last-child td')
+  expect(await finalCells.count()).toBeGreaterThan(0)
+  for (const cell of await finalCells.all()) {
+    expect(await cell.evaluate(element => getComputedStyle(element).borderBottomWidth)).toBe('1px')
+  }
+  const occupied = await page.locator('.admin-roster-grid tbody:first-of-type td.occupied').count()
+  await page.getByLabel('搜尋行政姓名／辨識註記').fill('合成會員三')
+  await expect(page.getByText('符合 1／全場 3 筆')).toBeVisible()
+  await expect(page.locator('.admin-roster-grid tbody:first-of-type td.occupied')).toHaveCount(occupied)
+  await expect(page.locator('.admin-roster-grid').getByRole('button', { name: /合成會員二/ })).toHaveCount(0)
   await expect(page.locator('.summary-card').filter({ hasText: '正取／名額' })).toContainText('2/2')
 
   await page.route('**/api/admin/competitions/*', async route => {
@@ -66,6 +75,11 @@ test('管理員建立比賽、維護候補與列印名單', async ({ page }, tes
   expect(noOverflow).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('competition-roster.png'), fullPage: true })
   if (testInfo.project.name === 'desktop') {
+    for (const width of [390, 768, 1440, 3840]) {
+      await page.setViewportSize({ width, height: 900 })
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+      await page.screenshot({ path: testInfo.outputPath(`competition-roster-${width}.png`), fullPage: true })
+    }
     await page.emulateMedia({ media: 'print' })
     await expect(page.locator('.competition-print')).toBeVisible()
     await page.pdf({ path: testInfo.outputPath('competition-roster.pdf'), format: 'A4', landscape: true, printBackground: true, preferCSSPageSize: true })

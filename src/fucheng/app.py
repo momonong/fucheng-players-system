@@ -60,6 +60,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.settings = settings
+    from .public_guard import IngressLimiter, PublicGuard
+    app.state.ingress_guard = IngressLimiter()
+    app.add_middleware(PublicGuard, limiter=app.state.ingress_guard)
     if settings.public_origin:
         from .proxy import DeploymentBoundary
         app.add_middleware(DeploymentBoundary, settings=settings)
@@ -175,6 +178,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/auth/me", response_model=AuthResponse)
     def me(auth: Auth) -> AuthResponse:
         return AuthResponse(username=auth[0].username, csrf_token=auth[1].csrf_token)
+
+    @app.get("/api/admin/backup-status")
+    def backup_status(_auth: Auth):
+        from .backup_schedule import latest_weekly_due
+        path = settings.backup_status_file
+        if path is None:
+            return {"state": "not_configured", "last_success_at": None}
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+            success = value.get("last_success_at")
+            when = datetime.fromtimestamp(success, UTC).isoformat() if isinstance(success, (int, float)) else None
+            due = latest_weekly_due(datetime.now(UTC))
+            last_schedule = value.get("last_schedule")
+            current = bool(last_schedule) and datetime.fromisoformat(last_schedule) >= due
+            state = "failed" if value.get("ok") is False else "ok" if current else "stale"
+            return {"state": state, "last_success_at": when}
+        except (OSError, ValueError, OverflowError, TypeError):
+            return {"state": "stale", "last_success_at": None}
 
     @app.post("/api/auth/logout", status_code=204)
     def logout(response: Response, db: Db, auth: CsrfAuth) -> None:
