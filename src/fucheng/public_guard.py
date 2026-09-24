@@ -30,7 +30,7 @@ class IngressLimiter:
         "public-write": (40, 0.7, 240, 4.0),
         "login": (20, 0.35, 120, 2.0),
         "admin-read": (180, 3.0, 800, 16.0),
-        "admin-write": (80, 1.4, 320, 5.0),
+        "admin-write": (200, 1.4, 320, 5.0),
     }
 
     def __init__(self, *, max_clients: int = 4096, idle_seconds: float = 180):
