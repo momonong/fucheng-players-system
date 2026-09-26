@@ -1,8 +1,85 @@
 # Windows Docker 部署、搬移與維運
 
-## Linux 使用者家目錄與公開安全（工作樹待交付）
+## 0.3.0 球館 Windows 快速部署（Git Bash + Docker Desktop）
 
-本節是 2026-09-25 的 Docker／Linux 交付設定，**尚未部署到正式服務**。獨立 8052 合成預覽已換用新版 app 與手機版前端；8044、其 ngrok 及資料保持原狀。8052 缺真實 Cloudflare Turnstile 金鑰，明確設定 `disabled`；下述 Cloudflare profile 仍須金鑰，缺少時拒絕啟動。公開入口維持免登入「找名字→選葷素→確認」；選名不驗證本人，也不對每筆報名加人工審核。
+此流程使用 **Docker Desktop 的 WSL 2／Linux containers**；Git Bash 只提供 Git 與命令列，不取代 Linux 容器。以下先建立新 project、新 named volume 的合成預演；真實名單匯入、正式入口切換及場地電腦的斷電恢復驗收須另外執行。2026-09-26 已在開發電腦從 Docker Hub 拉取 0.3.0、以獨立 volume 還原合成資料、驗 HTTPS／圖片／重啟／週備份與新目標還原；**尚未在球館 Windows 主機驗收**。
+
+1. 從官方頁面安裝 [Git for Windows](https://git-scm.com/install/windows)（使用 Git Bash）及 [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/)；依 Docker 的系統需求核對 Windows／WSL 版本，在 Docker Desktop 啟用 WSL 2 backend、Linux containers，啟動 engine。確認 CPU 虛擬化、磁碟空間、Docker Desktop 登入／開機啟動與主機斷電後恢復方式。Docker Desktop「登入時啟動」不等於無人登入後自動恢復。
+2. 從 Git Bash 執行以下命令。使用已整合本部署文件的 repo 版本；核對 `git rev-parse HEAD`，不要將不相容的未來程式碼／Compose 與 0.3.0 image 混用。
+
+   ```bash
+   git clone https://github.com/momonong/fucheng-players-system.git
+   cd fucheng-players-system
+   git rev-parse HEAD
+   wsl.exe --version
+   docker info --format '{{.OSType}}/{{.Architecture}}'  # 預期 linux/x86_64
+   docker compose version
+   docker pull momonong/fucheng-players-system:0.3.0
+   docker image inspect momonong/fucheng-players-system:0.3.0 --format '{{json .RepoDigests}}'
+   docker pull ngrok/ngrok@sha256:14d80d083e5b53145f416bbbd36238336c9de4016c43fd950eb2eb845670583b
+   mkdir -p deploy/docker/secrets deploy/docker/backup
+   cp deploy/docker/release.env.example deploy/docker/release.env
+   cp deploy/docker/ngrok.yml.example deploy/docker/secrets/ngrok.yml
+   ```
+
+   0.3.0 的預期 OCI index digest 為 `sha256:339f35c9b4f251d41279e8db7070541c67bdfa93a03635933a85f4aa957463dd`（linux/amd64 manifest `sha256:bd667c154a2533d1102ff9cd98ac2d8b1e1a56e6f4befe0155f36dc16da1fcab`）；若拉取結果不同，先停止。新 project 名、`172.30.98.0/24` 範例網段及 host 備份路徑須先與現有 Docker networks／volumes／LAN／VPN 核對，不能沿用其他部署的 volume。`.env`、ngrok token、`backup/` 均不入 Git。
+3. 從 ngrok 帳號取得**此部署專用且已指定的 HTTPS domain** 與 authtoken；兩個值分別填到 `deploy/docker/release.env`、`deploy/docker/secrets/ngrok.yml`（不要貼在聊天、指令參數或提交）。[ngrok Docker agent 官方說明](https://ngrok.com/download/docker)可供核對安裝方式；`ngrok.yml` 的 upstream 保持 `http://app:8000`。`release.env` 至少設定：
+
+   ```dotenv
+   COMPOSE_PROJECT_NAME=fucheng-club
+   FUCHENG_IMAGE=momonong/fucheng-players-system@sha256:339f35c9b4f251d41279e8db7070541c67bdfa93a03635933a85f4aa957463dd
+   FUCHENG_PUBLIC_ORIGIN=https://YOUR_ASSIGNED_DOMAIN.ngrok-free.app
+   FUCHENG_PROXY_KIND=ngrok
+   FUCHENG_SUBNET=172.30.98.0/24
+   FUCHENG_APP_IP=172.30.98.2
+   FUCHENG_PROXY_IP=172.30.98.3
+   FUCHENG_BACKUP_PATH=./backup
+   FUCHENG_BACKUP_KEEP=8
+   FUCHENG_NGROK_CONFIG_FILE=./secrets/ngrok.yml
+   ```
+
+   在私密 `ngrok.yml` 中把 `agent.authtoken` 與 `endpoints[0].url` 的範例值換成自己的值。`FUCHENG_PUBLIC_ORIGIN` 與 endpoint URL 必須逐字相同且沒有尾端 `/`。此 ngrok 預演未設定真實 Cloudflare Turnstile 金鑰，app 使用 `disabled`；此設定不代表抗機器人驗收。不要將真實名單放入預演 volume。
+4. 先驗設定，再**只對全新空 volume** 初始化與建立管理員；管理員密碼由容器互動提示輸入，不放在命令列。Git Bash 若回報 `the input device is not a TTY`，只為 `admin` 那一行加 `winpty` 前綴。
+
+   ```bash
+   dc=(docker compose --env-file deploy/docker/release.env -f deploy/docker/compose.yaml -f deploy/docker/compose.ngrok.yaml)
+   "${dc[@]}" config --quiet
+   "${dc[@]}" run --rm ops init
+   "${dc[@]}" run --rm ops admin admin
+   "${dc[@]}" --profile ngrok up -d --wait --wait-timeout 120 app backup ngrok
+   "${dc[@]}" ps
+   curl --fail --show-error -H 'ngrok-skip-browser-warning: 1' https://YOUR_ASSIGNED_DOMAIN.ngrok-free.app/api/health
+   "${dc[@]}" exec -T backup python /app/runtime.py backup-health
+   ```
+
+   公開頁面、JS/CSS、公告圖片、免登入選名與管理員登入還要在手機 HTTPS 入口驗收。`app` 沒有 host port，只有 Docker 私有 origin network 的 ngrok 容器能以指定 proxy IP 到達；入口要求精確 Host／Origin、CSRF 與 Secure cookie。`backup` 每週一台北時間 04:00 備份，啟動時補做最近漏跑週次；`backup/` 是同機副本。手動 checkpoint 可執行 `"${dc[@]}" run --rm ops backup`，不取代週排程。使用**另一個受管理的磁碟**上的全新目錄執行成組匯出；此命令會核對 archive 與每個成員的 hash：
+
+   ```bash
+   powershell.exe -NoProfile -File deploy/docker/operate.ps1 -Action ExportBackups -EnvFile deploy/docker/release.env -Value 'E:\fucheng-export-YYYYMMDD'
+   ```
+5. 重啟後再執行 `"${dc[@]}" ps`、`"${dc[@]}" run --rm ops inspect`、`backup-health` 與手機 HTTPS smoke，確認 named volume 與媒體持久化。升級時先 `backup`／`ExportBackups`，保留舊 image 與原資料，停止此 project 的 app／backup／ngrok，拉取且核對新版 image，若有 schema 變更才以新版 `ops migrate` 明確遷移，再同批啟動。不可用舊 image 開新版 schema；回退要使用匹配 image/schema 的備份，在**另一個**新 project／volume `ImportBackup`→`Restore` 演練，保留故障庫。下文有鎖、備份與還原契約。
+
+   新目標還原時，先複製 `release.env` 為受忽略的 `restore.env`，改成**新的** `COMPOSE_PROJECT_NAME`、未衝突 subnet／IP、`FUCHENG_BACKUP_PATH` 與目標 HTTPS origin；不要啟動舊 project 的 app，也不要把舊 named volume 掛到新 app。從已驗證匯出目錄選**明確檔名**的 `.db`，確認同名 `.json`、`.media.tar` 一起存在，再執行：
+
+   ```bash
+   powershell.exe -NoProfile -File deploy/docker/operate.ps1 -Action ImportBackup -EnvFile deploy/docker/restore.env -Value 'E:\fucheng-export-YYYYMMDD\weekly-EXACT.db'
+   powershell.exe -NoProfile -File deploy/docker/operate.ps1 -Action Restore -EnvFile deploy/docker/restore.env -Value 'weekly-EXACT.db'
+   docker compose --env-file deploy/docker/restore.env -f deploy/docker/compose.yaml run --rm ops inspect
+   ```
+
+   `Restore` 會清除舊管理員 session；若要對外啟動新目標，先核對新 origin 的代理、完整功能及入口切換授權。此新目標演練只驗證備份可還原，不自動把它當成正式資料。
+
+### 既有 host ngrok agent 的 Docker 預覽入口
+
+若該電腦已有 ngrok agent 占用帳號 session，並且已轉發 `http://127.0.0.1:8052`，可改用 `compose.host-ngrok.yaml`：只載入 `compose.yaml`＋此 overlay，以 `app backup host-ngrok` 啟動，不啟動第二個 ngrok 容器。overlay 只把 nginx proxy 綁在 `127.0.0.1:8052`，app 仍無 host port，信任來源固定為私有網段的 proxy IP；先確認 8052、既有 ngrok 身分、公開 origin 與資料 owner，停寫並成組備份後才切換。此路徑於 2026-09-26 用 0.3.0 合成預覽驗證；ngrok 帳號對第二個 agent 回 `ERR_NGROK_108`，因此沿用原 agent。原生 8052 DB／媒體保留、原生 app 停止，Docker 使用新 volume；不可把原 DB 直接掛進 app。host proxy 將入站來源固定為 Docker host gateway，這條路徑的 app 內 IP 節流無法區分個別外部訪客；長期部署優先使用上方直接 ngrok sidecar，並在實際帳號／主機驗證可用性。
+
+本輪實測 project 為 `fucheng-docker-preview-20260926`，原生 8052 app 停寫後，以 SQLite Backup API 與媒體 tar 製作完整備份（DB SHA-256 `0268aa8196c632eca8683af7c747ed54abdbd3fcb0dda7dbcf402148416ad943`；媒體 tar `48e8883a1be701cf504ae3ec4c1f2d2584c94a35aa9f881b9a8ab23c17a88fb4`），runtime `import-backup`／`restore` 到新 volume；原 DB／5 張媒體未覆寫。新容器為 `0009_announcement_media`、165 位**合成**會員、3 則公告、5 張媒體，`integrity_check=ok`、FK error 0。Docker app／proxy 重啟後，同一 HTTPS [手機入口](https://29e0-140-116-158-107.ngrok-free.app/) 的 health、HTML、兩個資產、兩張公開公告圖片仍通過 TLS 驗證；本機可信代理的管理員登入、Secure cookie 通過，錯誤 Host 為 400、錯誤 Origin 為 403。舊管理員 session 在還原時失效，需重新登入。
+
+週備份容器於啟動時補做台北時間 `2026-09-21 04:00` 到期備份，DB SHA-256 `047e60db373e4302992b22f74786be24845f563c548ca371b904bcde0da6fdc7`，DB／媒體 hash、完整性、FK 與 `backup-health` 通過；`operate.ps1 ExportBackups` 的 archive／成員 hash 驗證通過。另以 `fucheng-docker-restore-20260926` 全新 volume 實走 `import-backup`→`restore`→`inspect`，並以 `operate.ps1 ImportBackup/Restore` 再驗一份匯出 checkpoint。8052 僅綁 localhost，app 沒有 host port；8044 listener 與六個 NeuroAI 容器仍在。本輪沒有真實名單匯入、球館主機測試、Cloudflare Turnstile 正式金鑰或正式部署。合成原資料、備份與兩個新 volume 保留供核對，測試用第二 ngrok 容器已移除。
+
+## Linux 使用者家目錄與公開安全（部署參考）
+
+本節是 Docker／Linux 交付設定，**尚未部署到正式服務或球館主機**。2026-09-26 獨立 8052 合成預覽改由已發布的 0.3.0 Docker image 提供 app／備份／本機代理，沿用原 ngrok HTTPS agent；8044、其 ngrok 及資料保持原狀。8052 缺真實 Cloudflare Turnstile 金鑰，明確為 `disabled`；下述 Cloudflare profile 仍須金鑰，缺少時拒絕啟動。公開入口維持免登入「找名字→選葷素→確認」；選名不驗證本人，也不對每筆報名加人工審核。
 
 建議在 Linux 的服務帳號家目錄放置 `~/service/fucheng/{compose.yaml,compose.cloudflare.yaml,.env,secrets/,backup/}`。將同一 release 的 Compose 檔與 `release.env.example` 複製進此目錄，填入固定版本的 image、唯一 HTTPS origin、Cloudflare origin-network 位址及公開 Turnstile sitekey；受保護的 `secrets/cloudflare-token.txt` 與 `secrets/turnstile-secret.txt` 分別放 token／secret，不放入 Git、image、`.env` 或備份 metadata。以此目錄為工作目錄執行 `docker compose --env-file .env -f compose.yaml -f compose.cloudflare.yaml --profile cloudflare up -d --wait app backup cloudflared`。操作前要核對套件 manifest、現有 Docker project／volume／port、secret 權限及 `backup/` 對容器 UID 10001 可寫；新部署先用獨立 project／volume 合成資料驗證，不指向現有預覽或正式 volume。Docker 的 `restart: unless-stopped` 使容器在 daemon 重啟後恢復；rootless Docker 另須在該服務帳號啟用 linger 並核對 daemon 啟動。此處沒有自動安裝系統服務的腳本或球館 Linux 實機證據。
 
@@ -14,15 +91,15 @@ Cloudflare profile 的 app 只開 origin internal network 與 Siteverify 所需�
 
 還原只經 runtime 的受鎖 `restore` 操作：驗 `.db/.json/.media.tar` 與相符 image/schema，在新目標 DB 還原、再次跑 integrity／FK、核對媒體後才切換 active pointer；舊 DB／故障資料保留，舊管理員 session 在新目標失效，稽核 actor 歷史保留。不得直接覆蓋 named volume、以舊 app 開新 schema 或把備份 bind 掛回普通 app。人工部署／切換入口、真實資料遷移、正式密鑰與外部網域均需另外的交付授權。
 
-目前 B 公開合成預覽為 v0.2.0，入口為 [b021 管理頁](https://b021-140-116-158-107.ngrok-free.app/admin/competitions)。另一個獨立的 8052 [手機合成預覽](https://29e0-140-116-158-107.ngrok-free.app/) 已於 2026-09-25 切換新版；兩者資料、程序與 ngrok 彼此獨立。Docker Hub image、Windows 原生預覽和正式 Linux 部署分別驗收；下列舊 PID、release 與入口記錄均為歷史證據。
+先前 B 公開合成預覽的 v0.2.0 [b021 管理頁](https://b021-140-116-158-107.ngrok-free.app/admin/competitions) 為歷史紀錄；本輪只確認 8044 listener，未重驗 B 的版本或完整功能。獨立的 8052 [手機合成預覽](https://29e0-140-116-158-107.ngrok-free.app/) 已於 2026-09-26 切至 Docker 0.3.0 並完成公開 HTTPS smoke；兩者資料、程序與 ngrok 彼此獨立。Docker Hub image、開發電腦的合成預覽與球館主機部署分別驗收；下列舊 PID、release 與入口記錄均為歷史證據。
 
-## 待交付：公告媒體 schema 0009（2026-09-24 工作樹）
+## 公告媒體 schema 0009（0.3.0 已發布；以下保留原遷移約束）
 
 舊式文末照片與新版多張內文圖片共用 0009 媒體表和成組 DB／媒體備份；內文功能未新增 migration。公開路由只供已發布且仍被公告引用的圖片讀取。
 
-此工作樹新增 `0009_announcement_media` 與 `FUCHENG_DATA_DIR/announcement-media`；**尚未套到 B 公開入口或任何正式資料**。照片以伺服器檔名、最多 5 MB、PNG/JPEG/WebP 解碼後重存；DB 保存 SHA-256／大小／關聯。新的 runtime 備份每組包含 `.db`、`.json`、`.media.tar`，metadata 存 DB 與 media 各自 SHA-256；ExportBackups 全部封存，ImportBackup/Restore 拒絕缺失或 hash 不符的媒體，還原先寫不可變媒體檔並核對 DB 指向，最後才切換 active pointer。舊 schema 備份沒有 `media_file` 時照原契約還原，但須使用與該備份 schema 匹配的 image。排程保留政策同時移除過期組的三檔。舊照片檔不立即刪除，以維持備份與併發讀取一致；容量需由資料負責人監控。
+0.3.0 已包含 `0009_announcement_media` 與 `FUCHENG_DATA_DIR/announcement-media`；**尚未套到 B 公開入口或任何正式資料**。照片以伺服器檔名、最多 5 MB、PNG/JPEG/WebP 解碼後重存；DB 保存 SHA-256／大小／關聯。runtime 備份每組包含 `.db`、`.json`、`.media.tar`，metadata 存 DB 與 media 各自 SHA-256；ExportBackups 全部封存，ImportBackup/Restore 拒絕缺失或 hash 不符的媒體，還原先寫不可變媒體檔並核對 DB 指向，最後才切換 active pointer。舊 schema 備份沒有 `media_file` 時照原契約還原，但須使用與該備份 schema 匹配的 image。排程保留政策同時移除過期組的三檔。舊照片檔不立即刪除，以維持備份與併發讀取一致；容量需由資料負責人監控。
 
-部署必須先停寫，依現有 writer/maintenance guard 做完整 DB＋媒體前備份、明確 `Migrate`、同批換新版 app/static/runtime，再驗圖片重啟可讀與獨立目標還原；不能用舊版 app 對 0009 DB 啟動。Windows 原生開發命令 `fucheng backup/restore` 只含 DB，不是這版公告照片的完整備份；要保護照片應使用 Docker runtime 的成組 Backup/ExportBackups 或等效停寫封存。這些流程目前只有 Windows 合成 helper 測試，沒有 Docker 容器演練或公開服務升級證據。
+部署必須先停寫，依現有 writer/maintenance guard 做完整 DB＋媒體前備份、明確 `Migrate`、同批換新版 app/static/runtime，再驗圖片重啟可讀與獨立目標還原；不能用舊版 app 對 0009 DB 啟動。Windows 原生開發命令 `fucheng backup/restore` 只含 DB，不是這版公告照片的完整備份；要保護照片應使用 Docker runtime 的成組 Backup/ExportBackups 或等效停寫封存。2026-09-26 已在開發電腦以合成資料實走 Docker import/restore、app 重啟、週備份驗 hash 與另一新 volume 還原；未在球館主機或真實資料上演練。
 
 ### C 真實名單待執行清單（唯讀盤點；尚未匯入）
 

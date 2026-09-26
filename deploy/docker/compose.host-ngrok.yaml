@@ -1,0 +1,26 @@
+# Use only when an already running host ngrok agent forwards to 127.0.0.1.
+# The app remains on the private origin network and trusts this one proxy IP.
+services:
+  host-ngrok:
+    image: nginx@sha256:ef8676b33d681f272ba429b27658bdd7e640963279714c96bddf1dc76307f7b6
+    pull_policy: never
+    platform: linux/amd64
+    user: "10001:10001"
+    command: [nginx, -c, /etc/nginx/fucheng.conf, -g, "daemon off;"]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - "127.0.0.1:${FUCHENG_HOST_NGROK_PORT:-8052}:8000"
+    volumes:
+      - ./nginx-host-ngrok.conf:/etc/nginx/fucheng.conf:ro
+    networks:
+      origin: {ipv4_address: "${FUCHENG_PROXY_IP:-172.30.98.3}"}
+      egress: {}
+    depends_on:
+      app: {condition: service_healthy}
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

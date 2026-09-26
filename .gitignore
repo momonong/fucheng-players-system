@@ -242,8 +242,10 @@ frontend/dist-arrangement/
 # Deployment outputs and credentials (never part of source/build context)
 deploy/docker/source-manifest.json
 deploy/docker/release.env
+deploy/docker/restore.env
 deploy/docker/local-http.env
 deploy/docker/secrets/
+deploy/docker/backup/
 deploy/docker/*.tar
 deploy/docker/*.zip
 
