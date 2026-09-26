@@ -88,6 +88,30 @@ class LoginSession(Base):
     admin: Mapped[Admin] = relationship()
 
 
+class DeploymentReport(Base):
+    """The administrator's current host preflight report, stored in the backup DB."""
+    __tablename__ = "deployment_reports"
+    __table_args__ = (CheckConstraint("id = 1", name="ck_deployment_report_singleton"),
+                      CheckConstraint("version >= 1", name="ck_deployment_report_version"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version: Mapped[int] = mapped_column(Integer)
+    report_json: Mapped[str] = mapped_column(Text)
+    sha256: Mapped[str] = mapped_column(String(64))
+    uploaded_by_admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"))
+    uploaded_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class DeploymentReportAudit(Base):
+    __tablename__ = "deployment_report_audits"
+    __table_args__ = (CheckConstraint("version >= 1", name="ck_deployment_report_audit_version"),
+                      UniqueConstraint("version", name="uq_deployment_report_audit_version"))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    version: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+
+
 class Member(Base):
     __tablename__ = "members"
     __table_args__ = (

@@ -280,3 +280,4 @@ deploy/docker/*.zip
 /frontend/dist-admin-news-v2/
 /frontend/dist-security-stage/
 /frontend/dist-mobile-ux/
+/frontend/dist-deployment-report/

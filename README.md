@@ -1,8 +1,10 @@
 # 府城球館會員管理系統
 
-> 2026-09-25 手機介面與公開入口限流已更新到獨立 8052 合成預覽：[手機驗收入口](https://29e0-140-116-158-107.ngrok-free.app/)。Cloudflare Turnstile 因尚無真實金鑰，在此預覽明確停用；Cloudflare 正式設定仍要求金鑰才可啟動。每週成組備份與 Linux 使用者家目錄部署設定只在 Docker 交付工作樹，不代表 Windows 預覽已有排程或正式服務已部署。證據與限制見[部署手冊](docs/deployment.md)及[驗收紀錄](docs/acceptance.md)。
+> 2026-09-26 獨立 8052 [手機合成預覽](https://29e0-140-116-158-107.ngrok-free.app/)已改由 Docker 0.3.0 app／週備份提供，沿用既有 ngrok agent；Cloudflare Turnstile 因尚無真實金鑰，在此預覽明確停用。Windows Docker 主機健檢、Git Bash 安裝步驟與驗證邊界見[部署手冊](docs/deployment.md)。這不是球館實機、真實資料或正式服務驗收。
 
-部署準備採 **Windows Docker Desktop／WSL2：單一app image＋SQLite named volume**，備份／維護共用image，正式HTTPS主方案為Cloudflare named tunnel。離線包、source manifest、PowerShell工具與現場清單見[部署手冊](docs/deployment.md)。本機容器證據不代表球館實機、公開入口、正式資料或人工驗收已完成；以下開發／預覽命令保留原用途。
+0.3.1 候選新增管理後台「系統狀態 → 部署檢查報告」：管理員可上傳 Git Bash 主機健檢 JSON、查看最新結果、複製 Markdown 或下載報告。報告身份與內容由上傳檔宣稱，需對照目標主機；升級至 schema 0010 的備份／回退步驟見[部署手冊](docs/deployment.md#031-候選管理後台部署檢查報告)。
+
+部署準備採 **Windows Docker Desktop／WSL2：單一app image＋SQLite named volume**，備份／維護共用image。正式 HTTPS 入口先評估 Cloudflare Tunnel 直連 app 的條件，再依實測比較 ngrok 試用與直連 reverse proxy。離線包、source manifest、PowerShell工具與現場清單見[部署手冊](docs/deployment.md)。本機容器證據不代表球館實機、正式資料或人工驗收已完成；以下開發／預覽命令保留原用途。
 
 目前提供會員／比賽管理、免登入選名報名，以及管理員的當次比賽級數安排。使用者選比賽、搜尋並確認自己的名字、選當次葷素就能報名；取消、更正及遞補由管理員處理。沒有會員帳號、密碼或啟用連結。
 

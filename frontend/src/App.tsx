@@ -4,6 +4,7 @@ import type { AdminMember, AuditEntry, Diet, MemberDraft, PublicMember } from '.
 import { CompetitionManager } from './CompetitionManager'
 import { PublicRegistrationPortal } from './PublicRegistrationPortal'
 import { SiteNav, ClubHome, AnnouncementManager } from './ClubWebsite'
+import { DeploymentReportPage } from './DeploymentReport'
 import { AdminHeader } from './AdminHeader'
 
 const dietText: Record<Diet, string> = { unset: '未設定', omnivore: '葷食', vegetarian: '素食' }
@@ -117,6 +118,7 @@ function AdminPage() {
   if (checking) return <main><p>確認登入狀態中…</p></main>
   if (!username) return <Login onLogin={setUsername} />
   if (location.pathname === '/admin/announcements') return <AnnouncementManager username={username} onLogout={() => setUsername(null)} />
+  if (location.pathname === '/admin/system/deployment-report') return <DeploymentReportPage username={username} onLogout={() => setUsername(null)} />
   if (location.pathname === '/admin/roster') return <PublicPage />
   if (location.pathname.startsWith('/admin/competitions')) return <CompetitionManager username={username} onLogout={() => setUsername(null)} />
   return <MemberManager username={username} onLogout={() => setUsername(null)} />

@@ -1,6 +1,6 @@
 [project]
 name = "fucheng-players-system"
-version = "0.3.0"
+version = "0.3.1"
 description = "府城球館會員管理系統"
 readme = "README.md"
 requires-python = ">=3.14.6,<3.15"

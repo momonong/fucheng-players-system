@@ -1,5 +1,13 @@
 # Windows Docker 部署、搬移與維運
 
+## 0.3.1 候選：管理後台部署檢查報告
+
+此版新增 `0010_deployment_report` migration。在目標 Windows 主機的 Git Bash、已整合本版腳本的 repo 根目錄執行 `bash deploy/docker/host-preflight.sh data/host-preflight-club-YYYYMMDD`；需要測出站網路時另加 `-ProbeNetwork`，並改用新的輸出目錄。腳本不需要 Python、不執行容器、不修改主機網路設定；只在 ignored `data/` 下建立 `report.json` 和 `report.md`。舊離線 kit 的 `preflight.ps1 -Output` 維持原契約，不以本腳本取代。
+
+用管理員帳號登入後，依序開啟**系統狀態 → 部署檢查報告**，選擇 `report.json` 上傳。伺服器只接受 256 KiB 內且符合 schema v1 的 JSON；管理員 session、CSRF 與目前報告版本都必須通過，格式失敗或版本衝突會保留既有報告。頁面只顯示最新一份，可查看 35 項結果與入口建議、複製伺服器生成的 Markdown、下載 JSON/Markdown。所有內容都當純文字處理；報告不進 public API 或靜態檔，管理端回應使用 `no-store`。上傳者提供的主機名稱與檢查結果**未經伺服器獨立證實**，須現場核對目標主機身份與執行時間；超過七天及未來時間會提示風險。開發電腦的 Windows Enterprise 報告不可充作球館 Windows Pro 的驗收。
+
+最新報告與每次替換的版本、操作者和 SHA-256 稽核記在既有 SQLite 資料庫，隨資料庫成組備份及新目標 restore；沒有新的外部檔案或容器權限。升級前依下文 runtime lifecycle guard 停止舊 app 寫入、取得 `0009` 完整 DB＋媒體備份並核 hash，使用相容的新 image 明確執行 `ops migrate` 至 `0010`，再啟動 app/backup 並驗證登入、報告與照片。`start` 不會自動 migration。回退須保留故障庫，將**升級前**備份還原至另一個新 volume/project，配回 0.3.0／`0009` image；不可拿 0.3.0 app 寫 `0010` DB，也不可用 Alembic downgrade 清除報告稽核。公開預覽與正式服務的切換需另核對當次授權。
+
 ## 0.3.0 球館 Windows 快速部署（Git Bash + Docker Desktop）
 
 此流程使用 **Docker Desktop 的 WSL 2／Linux containers**；Git Bash 只提供 Git 與命令列，不取代 Linux 容器。以下先建立新 project、新 named volume 的合成預演；真實名單匯入、正式入口切換及場地電腦的斷電恢復驗收須另外執行。2026-09-26 已在開發電腦從 Docker Hub 拉取 0.3.0、以獨立 volume 還原合成資料、驗 HTTPS／圖片／重啟／週備份與新目標還原；**尚未在球館 Windows 主機驗收**。
@@ -12,6 +20,7 @@
    cd fucheng-players-system
    git rev-parse HEAD
    wsl.exe --version
+   bash deploy/docker/host-preflight.sh data/host-preflight-before-club -TestPort 8052 -DockerSubnet 172.30.98.0/24
    docker info --format '{{.OSType}}/{{.Architecture}}'  # 預期 linux/x86_64
    docker compose version
    docker pull momonong/fucheng-players-system:0.3.0
@@ -50,6 +59,7 @@
    "${dc[@]}" ps
    curl --fail --show-error -H 'ngrok-skip-browser-warning: 1' https://YOUR_ASSIGNED_DOMAIN.ngrok-free.app/api/health
    "${dc[@]}" exec -T backup python /app/runtime.py backup-health
+   bash deploy/docker/host-preflight.sh data/host-preflight-after-club -ComposeProject fucheng-club -Domain YOUR_ASSIGNED_DOMAIN.ngrok-free.app -PreviewOrigin https://YOUR_ASSIGNED_DOMAIN.ngrok-free.app -ProbeNetwork
    ```
 
    公開頁面、JS/CSS、公告圖片、免登入選名與管理員登入還要在手機 HTTPS 入口驗收。`app` 沒有 host port，只有 Docker 私有 origin network 的 ngrok 容器能以指定 proxy IP 到達；入口要求精確 Host／Origin、CSRF 與 Secure cookie。`backup` 每週一台北時間 04:00 備份，啟動時補做最近漏跑週次；`backup/` 是同機副本。手動 checkpoint 可執行 `"${dc[@]}" run --rm ops backup`，不取代週排程。使用**另一個受管理的磁碟**上的全新目錄執行成組匯出；此命令會核對 archive 與每個成員的 hash：
@@ -68,6 +78,18 @@
    ```
 
    `Restore` 會清除舊管理員 session；若要對外啟動新目標，先核對新 origin 的代理、完整功能及入口切換授權。此新目標演練只驗證備份可還原，不自動把它當成正式資料。
+
+### Git Bash 主機健檢的範圍與判讀
+
+`host-preflight.sh` 是 Git Bash 入口，呼叫**主機原生 PowerShell** 的 `host-preflight.ps1`；不需 Python，不修改路由、防火牆、Docker daemon 或現用服務。唯一預設寫入為使用者指定、位於 repo 忽略的 `data/` 下**尚不存在**的輸出目錄，其中固定產生 `report.md` 與 `report.json`；已存在的目錄一律拒絕覆寫。離線包舊 `preflight.ps1 -Output` 仍保留其原單檔契約，兩者勿混用。Git Bash 入口的 `-ExecutionPolicy Bypass` 僅作用於此次 PowerShell 程序，不修改主機長期政策；先確認 clone 來源與腳本內容。
+
+部署前使用不同的輸出目錄執行上述第一次命令；尚未 `docker pull` 時 `app_image=WARN` 屬預期。部署後使用第二次命令，將 `-ComposeProject` 限定至新 project，`-Domain` 與 `-PreviewOrigin` 換成實際 ngrok 名稱與精確 HTTPS origin。`-ProbeNetwork` 是**明確 opt-in**：只對所給 domain 與 Cloudflare、Docker Registry、ngrok 官方端點做限時 DNS／TCP／HTTPS 查詢，不傳 token、不執行 container，也不掃 LAN；預設沒有任何外部請求。任一命令逾時或缺失仍應產生 `PASS`／`WARN`／`FAIL`／`NOT_TESTED`、理由、證據與下一步；外部指令的原始 stdout/stderr 不進報告。`-TimeoutSeconds` 預設 5，可在 1–20 秒內調整。每次重跑選新的 `data/host-preflight-*` 目錄。
+
+報告只代表執行當下的**那部 Windows 主機**。Docker image/platform、指定 project 的狀態與 restart policy 是 Docker CLI 證據；不從容器推論 Windows 的 WSL、開機登入、休眠或防火牆。`docker_service` 即使存在也不是無人登入冷開機保證；`backup_write_and_restore` 必須靠隔離合成備份／新目標還原。TCP 7844 成功只支持 Cloudflare HTTP/2 的網路路徑，不證明 UDP/QUIC；HTTPS 成功也不證明 Tunnel agent、帳號金鑰或網域控制。當次沒有 Cloudflare domain/key 或外部手機探測時，相關項目保持 `NOT_TESTED`。本機私有 LAN IP 不足以判定 CGNAT；DNS 成功、本機 port 空閒或從主機連回公開 URL，也不等於外網入站可達。
+
+入口選型依據：[Cloudflare Tunnel](https://developers.cloudflare.com/tunnel/)與[7844 防火牆需求](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/tunnel-with-firewall/)是**出站公開入口**，可先評估是否直連既有單 app；ngrok 也是出站試用入口。[Caddy 自動 HTTPS](https://caddyserver.com/docs/automatic-https)與 nginx 是**reverse proxy**，可與 Tunnel 組合；若選公網直連，須另驗網域/DNS、入站 80／443、持久憑證與續期。Caddy 的 DNS-01 可免入站完成簽證，卻不使網站自動對公網可達；[原生 Windows nginx beta 限制](https://nginx.org/en/docs/windows.html)不可套用到 Docker Linux nginx。健檢只提出待驗證的推薦，不切換 Tunnel 或公開路由。
+
+本輪開發電腦實測報告位於忽略的 `data/host-preflight-delivery-20260926/`（預設唯讀）與 `data/host-preflight-network-delivery-20260926/`（外網 opt-in）：該電腦是 Windows Enterprise，不能當作預定球館 Windows Pro 的實機證據。外網 opt-in 從**此開發電腦**測得 Cloudflare 兩個 region 的 TCP 7844、HTTPS、Docker Registry 401（認證預期）、ngrok TCP 443、既有 8052 HTTPS health；UDP/QUIC、Cloudflare domain/key、外部入站與冷開機仍為 `NOT_TESTED`。另外用無 Docker、daemon 錯誤、1 秒逾時與假 token 輸出驗證結構化報告及遮罩；無需觸碰 live volume。Git Bash 本身未安裝在此開發電腦，入口 shell 尚待球館主機實跑；PowerShell 5.1 核心已在此機驗證。
 
 ### 既有 host ngrok agent 的 Docker 預覽入口
 

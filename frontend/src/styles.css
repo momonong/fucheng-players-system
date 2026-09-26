@@ -397,6 +397,29 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
 .admin-account > span { font-weight: 700; padding: .5rem; }
 .admin-backup { padding: .35rem .6rem; color: #fff; background: #ffffff20; border-radius: 7px; }
 .admin-backup.failed, .admin-backup.stale { color: #2c2115; background: #ffd391; }
+.deployment-report-page { width: min(100% - 2rem, 1200px); margin: 1.5rem auto 4rem; display: grid; gap: 1rem; }
+.deployment-report-page > h2 { margin: 0; }
+.deployment-report-page > p { margin: 0; }
+.deployment-upload { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem 1rem; }
+.deployment-upload h3, .deployment-upload p { flex-basis: 100%; margin: 0; }
+.deployment-upload input { max-width: 100%; }
+.deployment-summary h3 small { font-size: .7em; color: #57645d; }
+.deployment-counts, .deployment-actions { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.deployment-counts span { padding: .35rem .6rem; border-radius: 6px; font-weight: 750; }
+.report-pass { background: #e3efe6; color: #275b3b; }
+.report-warn { background: #fff1cf; color: #6d4c00; }
+.report-fail { background: #ffe2df; color: #8c2420; }
+.report-not_tested { background: #e8e9e7; color: #434a46; }
+.deployment-actions a { display: inline-flex; min-height: 42px; align-items: center; padding: .45rem .7rem; border-radius: 7px; background: #e3efe6; color: #183d34; font-weight: 700; text-decoration: none; }
+.deployment-actions a:hover { background: #cee2d5; }
+.deployment-recommendations { padding-left: 1.4rem; }
+.deployment-recommendations li { margin: .8rem 0; overflow-wrap: anywhere; }
+.deployment-recommendations p { margin: .3rem 0; }
+.deployment-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: .7rem; }
+.deployment-checks article { min-width: 0; padding: .7rem; border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
+.deployment-checks h4 { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: 0; }
+.deployment-checks h4 span { padding: .2rem .4rem; border-radius: 5px; font-size: .8rem; }
+.deployment-checks p { margin: .45rem 0 0; }
 @media (max-width: 900px) {
   .admin-main, .competition-layout { grid-template-columns: 1fr; }
   .announcement-workspace { grid-template-columns: 1fr; }
@@ -837,7 +860,7 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
   .admin-header .eyebrow { display: none; }
   .admin-header h1 { font-size: 1.4rem; }
   .admin-header-controls { display: grid; width: 100%; gap: .3rem; }
-  .admin-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .25rem; }
+  .admin-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .25rem; }
   .admin-nav a { min-height: 44px; display: grid; place-items: center; padding: .35rem .25rem; font-size: .9rem; }
   .admin-account { display: flex; width: 100%; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: .25rem; }
   .admin-account > span { min-width: 0; padding: .25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; }

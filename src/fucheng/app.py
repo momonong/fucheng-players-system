@@ -461,6 +461,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from .arrangements import install_arrangement_routes
     install_arrangement_routes(app, get_db, current_auth, require_csrf)
 
+    from .deployment_report import install_deployment_report_routes
+    install_deployment_report_routes(app, get_db, current_auth, require_csrf)
+
     static_dir = settings.static_dir
     assets_dir = static_dir / "assets"
     if assets_dir.exists():
