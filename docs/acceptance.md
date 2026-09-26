@@ -1,6 +1,16 @@
 # 驗收證據與限制
 
-最後更新：2026-09-25。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+最後更新：2026-09-26。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+
+## 0.3.1 部署檢查報告候選（2026-09-26；尚未公開交付）
+
+來源分支 `feat/mobile-security-release`、功能提交 `38552f8c86c70369c43f906ed35fabb9833fc7c5`；此段證據尚未代表 `main` 合併、遠端 push、tag、Docker Hub 發布或 8052 預覽切換。管理員專用 JSON 上傳以 schema v1／256 KiB 限制、CSRF／版本 CAS、同交易稽核保存最新報告至 SQLite；下載 Markdown 由伺服器按純文字重新產生。管理介面提供系統狀態導航、主機身份／時間風險提示、檢查與建議、複製和下載。報告內容是上傳者宣稱，沒有主機身份證明。Windows PowerShell 5.1 讀取上一輪健檢報告成功，Git Bash 尚待球館主機實跑。
+
+本機後端全套 `193 passed`（2 個既有 Starlette/httpx 警告）；先前全套首輪因 5 個測試仍斷言舊 migration `0009` 而有 `188 passed, 5 failed`，更新預期後相關 25 項與全套皆通過。前端 `typecheck`、0.3.1 `npm audit --audit-level=high`（0 vulnerabilities）、隔離 8046／`data/deployment-report-e2e.db` 的桌面與手機上傳、複製、下載 E2E `2 passed`。首次受限環境 Chromium spawn EPERM，提權後桌面通過；同 DB 的手機案例原先錯誤預期沒有報告，修正測試後 2 項通過。建置輸出 `dist-deployment-report` 不入來源。`uv lock --check --offline` 通過；本機 uv sync 因 sandbox 擋 PyPI 取 hatchling 未完成，實際 Linux 映像建置已以 locked lockfile 成功完成。
+
+`scripts/deployment_package.py build` 以提交來源產生 69 檔 allowlist context 並精確核對 context-audit，`source_manifest_sha256=11999679a1ded1fe541edb47ac00ebbbb25e321c6c992ad4908c0eaf0dd1b0e2`，本機 Linux/amd64 映像 `local/fucheng:snapshot-11999679a1ded1fe`，image ID `sha256:b6eb19a90fce1d28d53487d6de8428894ea8505eae939f8a840248194ba89438`。合成 `fucheng-report-drill-20260926`／`fucheng-report-restore-20260926` 使用獨立 project、volume、8054／8055 與網段，驗 0010 初始化、管理上傳、報告與公告照片、app 重啟後讀回、手動成組 DB／媒體備份的 hash、完整性及新目標 restore 後報告／照片可讀、匿名報告 API 401。停止兩組合成服務後 source/restore `ops inspect` 均為 `revision=0010_deployment_report`、integrity `ok`、FK 錯誤 0；保留測試 volume/備份供追溯，8054／8055 已釋放。忽略路徑 `data/deployment-report-drill-20260926/evidence.json` 保存不含帳密的摘要。合成 drill 首輪腳本因 httpx client 重入與週備份額外生成檔案的錯誤假設中斷；修正腳本並沿用同一合成資料後完成上述驗證。
+
+現用 8052 Docker 0.3.0 app／backup／host-ngrok 仍 healthy，8044 listener 與六個 NeuroAI 容器未碰。Windows Pro 球館實機、外部手機、正式資料、冷開機及新版 8052 預覽仍未驗收；正式升級要按[部署手冊](deployment.md)先停寫、備份、明確 migration 與新目標回退演練。
 
 2026-09-25 最新安全階段結果：[公開安全、Turnstile 與週備份工作樹](#security-stage)；最終後端全套 190 passed，先前失敗紀錄仍保留於下方。
 
