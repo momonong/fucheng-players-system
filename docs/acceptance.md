@@ -10,6 +10,8 @@
 
 `scripts/deployment_package.py build` 以提交來源產生 69 檔 allowlist context 並精確核對 context-audit，`source_manifest_sha256=11999679a1ded1fe541edb47ac00ebbbb25e321c6c992ad4908c0eaf0dd1b0e2`，本機 Linux/amd64 映像 `local/fucheng:snapshot-11999679a1ded1fe`，image ID `sha256:b6eb19a90fce1d28d53487d6de8428894ea8505eae939f8a840248194ba89438`。合成 `fucheng-report-drill-20260926`／`fucheng-report-restore-20260926` 使用獨立 project、volume、8054／8055 與網段，驗 0010 初始化、管理上傳、報告與公告照片、app 重啟後讀回、手動成組 DB／媒體備份的 hash、完整性及新目標 restore 後報告／照片可讀、匿名報告 API 401。停止兩組合成服務後 source/restore `ops inspect` 均為 `revision=0010_deployment_report`、integrity `ok`、FK 錯誤 0；保留測試 volume/備份供追溯，8054／8055 已釋放。忽略路徑 `data/deployment-report-drill-20260926/evidence.json` 保存不含帳密的摘要。合成 drill 首輪腳本因 httpx client 重入與週備份額外生成檔案的錯誤假設中斷；修正腳本並沿用同一合成資料後完成上述驗證。
 
+驗證紀錄提交後，從乾淨 `9a645719d7d84902a8923fc1a6308e8c12cb93f7` 再建最終本機候選 `local/fucheng:snapshot-ea23ce465e61dac2`，Linux/amd64 image ID `sha256:e2694b2ed9222bd91e3d2c1d79842f0c4a1432a1ab7960ab949a4fb5f5dcc8ec`，manifest SHA-256 `ea23ce465e61dac2c00059e59ef99f9d78ec82df7c57145fc0bba4cf5b86454a`。兩次 manifest 的 source file hash 集合相同，只有記錄的 Git HEAD 改變；最終映像另以 `network none`、read-only mount 讀取還原目標，schema `0010`、integrity `ok`、FK 錯誤 0。repo 的 `deploy/docker/source-manifest.json` 會與此最終候選一同保存；本機 image 尚未有 Docker Hub digest。
+
 現用 8052 Docker 0.3.0 app／backup／host-ngrok 仍 healthy，8044 listener 與六個 NeuroAI 容器未碰。Windows Pro 球館實機、外部手機、正式資料、冷開機及新版 8052 預覽仍未驗收；正式升級要按[部署手冊](deployment.md)先停寫、備份、明確 migration 與新目標回退演練。
 
 2026-09-25 最新安全階段結果：[公開安全、Turnstile 與週備份工作樹](#security-stage)；最終後端全套 190 passed，先前失敗紀錄仍保留於下方。
