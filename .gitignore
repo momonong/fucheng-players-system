@@ -281,3 +281,5 @@ deploy/docker/*.zip
 /frontend/dist-security-stage/
 /frontend/dist-mobile-ux/
 /frontend/dist-deployment-report/
+# Isolated runtime-prefix verification build; never source or image context.
+frontend/dist-base-path/

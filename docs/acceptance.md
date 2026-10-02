@@ -1,6 +1,20 @@
 # 驗收證據與限制
 
-最後更新：2026-09-26。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+最後更新：2026-10-03。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
+
+## 可設定部署前綴（2026-10-03；本機工程驗證）
+
+分支 `codex/fucheng-base-path`，基底 `84b0b3f9cda57d9524de5f9c90f724ccb8096eb6`，本輪來源為未提交 snapshot。`FUCHENG_BASE_PATH=/fucheng` 支援子路徑，空值或 `/` 保留根路徑；同一份前端成品／image 於啟動時決定前綴，無新增 migration。API、頁面／資產、管理及訪客 Cookie、CSRF／Origin、限流、公告媒體、下載及 health 均遵循相同設定。入口契約見 [deployment.md](deployment.md#部署前綴與根路徑相容)。
+
+- Python 3.14.6、專案 locked 依賴：後端全套 `211 passed`（2 個既有依賴警告）；前綴／部署邊界相關組 `38 passed`。前端 `typecheck`、build、`npm audit --audit-level=high` 通過，0 vulnerabilities。
+- 同一份 `frontend/dist-base-path`：`/fucheng` 使用 `8061`／`data/base-path-e2e.db`，桌面＋觸控手機 `6 passed`；根路徑使用 `8062`／`data/base-root-e2e.db`，10 個不同適用案例皆通過（初次 9 pass，修正舊手機測試未展開清單的操作後，該 1 案獨立重跑通過，非宣稱單次 10 pass）。涵蓋深層頁面重整、登入登出、分級／比賽導覽、免登入素食報名、安排初始化／Excel 下載、頁內跳轉、公告編輯／圖片及部署報告下載。瀏覽器案例檢查同源請求未跳出前綴，手機／桌面公告截圖人工檢視通過。
+- 首輪子路徑 E2E 發現框架 `request.base_url` 包含前綴，導致合法 Origin 比對失敗；修正為 scheme＋authority，新增錯誤 Origin／CSRF 拒絕及報名防重回歸後通過。`<base>` 影響頁內錨點的問題亦已修正並驗證。原根路徑手機測試的清單收合假設已更新，產品行為不因此放寬。
+- 正式 Compose 的 app／backup／ops 與獨立 local-http Compose 的 app／ops，在根路徑及 `/fucheng` 的設定解析皆通過，確認前綴一致傳入。Windows 健檢新增 `-BasePath`，本機沒有 PowerShell，僅完成程式檢視，未宣稱 Windows 實跑通過。
+- 以 `scripts/deployment_package.py build data/base-path-build-20261003` 建出 Linux/amd64 `local/fucheng:snapshot-8d776c65727ce0b3`，image ID `sha256:133f517859cafa44037782a1ba9e9d43a24d02291777a3a91ef25006912fd70b`，manifest SHA-256 `8d776c65727ce0b36213d07fa9569802546f64e7b0786e54e4c4dd102c093616`。71 檔 allowlist context audit 通過，70 份實作來源 hash 與工作目錄一致；snapshot 不含測試 DB、媒體、密碼或既有 static 成品。
+- 本機 native Engine 的 `fucheng-basepath-20261003-v2` 合成演練使用 `network none`、無 host port、全新 named volumes、read-only 容器及既有 runtime lifecycle guard。`/fucheng` 的登入／深層頁面／Cookie／公告照片／資產、重啟持久化通過；停止寫入後 DB＋媒體成組備份，使用同一 image 還原到另一個新 volume 的根路徑 `/`，會員 ID、媒體 ID／SHA-256 及前端 JS SHA-256 一致。source／restore 的 `ops inspect` 均為 schema `0010_deployment_report`、integrity `ok`、FK 錯誤 0。證據在 ignored `data/base-path-build-20261003/drill-evidence-v2.json`。
+- 首次 Docker drill 的測試設定誤將 `127.0.0.1` 同時作為可信代理與無 forwarding header 的 health 來源，觸發既有 400 守門；分開模擬代理 socket 來源為 `127.0.0.2` 後，於新 v2 volume 完成演練。原失敗證據保留在 `drill-evidence.json`，產品代理驗證沒有放寬。兩輪本次建立的容器皆已停止；合成 volumes、映像與備份保留供追溯，無持續 listener。
+
+本輪不包含 HP／ASUS 安裝、既有 Caddy／Tunnel／ngrok 修改、對外切換、真實資料、球館 Windows／WSL2／Docker Desktop 驗收或公開發布。瀏覽器合成測試不代表真實 Turnstile 或外網 ingress 驗收。
 
 ## 0.3.1 部署檢查報告候選（2026-09-26；尚未公開交付）
 

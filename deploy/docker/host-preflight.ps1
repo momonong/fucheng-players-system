@@ -12,11 +12,17 @@ param(
     [string]$ComposeProject,
     [string]$Domain,
     [string]$PreviewOrigin,
+    [string]$BasePath = '',
     [switch]$ProbeNetwork,
     [string]$DockerExecutable,
     [string]$ImageRef = 'momonong/fucheng-players-system:0.3.0'
 )
 $ErrorActionPreference = 'Stop'
+if ($BasePath -eq '/') { $BasePath = '' }
+if ($BasePath -and $BasePath -cnotmatch '^(?:/[A-Za-z0-9_-]+)+/?$') {
+    throw 'BasePath must be / or slash-separated letters, digits, _ and -'
+}
+$BasePath = $BasePath.TrimEnd('/')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if (!$InstallPath) { $InstallPath = $repo }
 $install = [IO.Path]::GetFullPath($InstallPath)
@@ -338,7 +344,7 @@ if ($ProbeNetwork) {
     if ($ngrok -eq 'connected') { Add-Check 'ngrok_tcp_443' 'PASS' 'Direct TCP to the ngrok agent endpoint succeeded.' 'connect.ngrok-agent.com:443; no auth or tunnel attempted.' 'Verify a real ngrok session within the account limit.' }
     else { Add-Check 'ngrok_tcp_443' 'WARN' 'Direct TCP to ngrok was not confirmed.' "tcp_result=$ngrok" 'Check site proxy/firewall policy before the trial.' }
     if ($PreviewOrigin) {
-        $preview = Https-Probe "$PreviewOrigin/api/health" $TimeoutSeconds
+        $preview = Https-Probe "$PreviewOrigin$BasePath/api/health" $TimeoutSeconds
         if ($preview -eq 200) { Add-Check 'preview_https' 'PASS' 'HTTPS health responded from this host with TLS verification.' 'HTTP 200; no credentials sent.' 'Verify again from a phone on a different network; this is not external ingress proof.' }
         else { Add-Check 'preview_https' 'WARN' 'Preview HTTPS health did not return 200.' "probe_result=$preview" 'Inspect only the named preview and tunnel owner.' }
     } else { Add-Check 'preview_https' 'NOT_TESTED' 'No PreviewOrigin was supplied.' 'No preview request sent.' 'After the authorized trial, rerun with the exact HTTPS origin.' }

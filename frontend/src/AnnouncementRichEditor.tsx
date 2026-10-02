@@ -1,3 +1,4 @@
+import { appUrl } from './paths'
 import { useEffect, useRef, useState } from 'react'
 
 export function hydrateAnnouncementImages(root: HTMLElement, scope: 'admin' | 'public') {
@@ -7,7 +8,7 @@ export function hydrateAnnouncementImages(root: HTMLElement, scope: 'admin' | 'p
     const id = figure.dataset.mediaId
     if (!id || !/^[0-9a-f-]{36}$/.test(id)) return
     const image = document.createElement('img')
-    image.src = `/api/${scope}/announcement-media/${id}`
+    image.src = appUrl(`/api/${scope}/announcement-media/${id}`)
     image.alt = '公告圖片'
     figure.replaceChildren(image)
   })

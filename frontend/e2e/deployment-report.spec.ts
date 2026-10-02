@@ -21,7 +21,7 @@ test('管理員在手機與桌面上傳、查看、複製及下載部署報告',
     recommendations: [{ candidate: 'Cloudflare Tunnel', status: 'NOT_TESTED', reason: 'No actual tunnel tested', next_action: 'Check on site' }],
     sources: ['https://example.org/synthetic'],
   }
-  await page.goto('/admin')
+  await page.goto(`${(process.env.FUCHENG_BASE_PATH ?? '').replace(/\/$/, '')}/admin`)
   await page.getByLabel('帳號', { exact: true }).fill('e2e-admin')
   await page.getByLabel('密碼', { exact: true }).fill(process.env.FUCHENG_E2E_ADMIN_PASSWORD!)
   await page.getByRole('button', { name: '登入', exact: true }).click()

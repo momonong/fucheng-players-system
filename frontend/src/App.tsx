@@ -1,3 +1,4 @@
+import { appUrl, appPathname } from './paths'
 import { useEffect, useMemo, useState } from 'react'
 import * as api from './api'
 import type { AdminMember, AuditEntry, Diet, MemberDraft, PublicMember } from './types'
@@ -17,8 +18,8 @@ const emptyDraft: MemberDraft = {
 }
 
 export function App() {
-  const adminPage = location.pathname.startsWith('/admin')
-  return <><SiteNav />{adminPage ? <AdminPage /> : location.pathname === '/members' ? <PublicPage /> : location.pathname === '/' ? <ClubHome /> : <PublicRegistrationPortal />}</>
+  const adminPage = appPathname().startsWith('/admin')
+  return <><SiteNav />{adminPage ? <AdminPage /> : appPathname() === '/members' ? <PublicPage /> : appPathname() === '/' ? <ClubHome /> : <PublicRegistrationPortal />}</>
 }
 
 function PublicPage() {
@@ -75,7 +76,7 @@ function PublicPage() {
   return <>
     <header className="hero">
       <div><p className="eyebrow">府城球館</p><h1>會員硬實力分級</h1><p>依級數查看目前啟用會員名單</p></div>
-      <a className="admin-link no-print" href="/admin">管理員登入</a>
+      <a className="admin-link no-print" href={appUrl("/admin")}>管理員登入</a>
     </header>
     <main>
       <section className="filters no-print" aria-label="搜尋與篩選">
@@ -117,10 +118,10 @@ function AdminPage() {
   useEffect(() => { api.restoreSession().then(setUsername).catch(() => {}).finally(() => setChecking(false)) }, [])
   if (checking) return <main><p>確認登入狀態中…</p></main>
   if (!username) return <Login onLogin={setUsername} />
-  if (location.pathname === '/admin/announcements') return <AnnouncementManager username={username} onLogout={() => setUsername(null)} />
-  if (location.pathname === '/admin/system/deployment-report') return <DeploymentReportPage username={username} onLogout={() => setUsername(null)} />
-  if (location.pathname === '/admin/roster') return <PublicPage />
-  if (location.pathname.startsWith('/admin/competitions')) return <CompetitionManager username={username} onLogout={() => setUsername(null)} />
+  if (appPathname() === '/admin/announcements') return <AnnouncementManager username={username} onLogout={() => setUsername(null)} />
+  if (appPathname() === '/admin/system/deployment-report') return <DeploymentReportPage username={username} onLogout={() => setUsername(null)} />
+  if (appPathname() === '/admin/roster') return <PublicPage />
+  if (appPathname().startsWith('/admin/competitions')) return <CompetitionManager username={username} onLogout={() => setUsername(null)} />
   return <MemberManager username={username} onLogout={() => setUsername(null)} />
 }
 
@@ -133,7 +134,7 @@ function Login({ onLogin }: { onLogin: (name: string) => void }) {
     event.preventDefault(); setBusy(true); setError('')
     try { onLogin(await api.login(username, password)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
-  return <main className="login-shell"><a href="/">← 返回首頁</a><form className="panel login" onSubmit={submit}>
+  return <main className="login-shell"><a href={appUrl("/")}>← 返回首頁</a><form className="panel login" onSubmit={submit}>
     <p className="eyebrow">府城球館</p><h1>管理員登入</h1>
     {error && <Notice kind="error">{error}</Notice>}
     <label>帳號<input autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required /></label>

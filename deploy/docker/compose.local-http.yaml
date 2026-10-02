@@ -10,6 +10,7 @@ x-preview: &preview
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
   environment:
+    FUCHENG_BASE_PATH: ${FUCHENG_BASE_PATH:-}
     FUCHENG_LOCAL_HTTP_PREVIEW: "true"
     FUCHENG_PUBLIC_ORIGIN: "http://localhost:${FUCHENG_HTTP_PORT:?Set an unused loopback port}"
     FUCHENG_COOKIE_SECURE: "false"

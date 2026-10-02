@@ -23,6 +23,7 @@ import tarfile
 import time
 import uuid
 from fucheng.backup_schedule import latest_weekly_due
+from fucheng.base_path import normalize_base_path
 
 DATA = Path(os.getenv("FUCHENG_DATA_DIR", "/data"))
 BACKUPS = Path(os.getenv("FUCHENG_BACKUP_DIR", "/backups"))
@@ -126,6 +127,7 @@ def snapshot(source, prefix, *, scheduled_for=None):
                 media_file=media_archive.name, media_sha256=hashlib.sha256(media_archive.read_bytes()).hexdigest(),
                 created_at=time.time(), scheduled_for=scheduled_for,
                 restore_config={"image_ref": os.getenv("FUCHENG_IMAGE_REF"),
+                                "base_path": normalize_base_path(os.getenv("FUCHENG_BASE_PATH", "")),
                                 "public_origin": os.getenv("FUCHENG_RESTORE_PUBLIC_ORIGIN") or os.getenv("FUCHENG_PUBLIC_ORIGIN"),
                                 "proxy_kind": os.getenv("FUCHENG_RESTORE_PROXY_KIND") or os.getenv("FUCHENG_PROXY_KIND", "local"),
                                 "source_manifest_sha256": hashlib.sha256(Path("/app/source-manifest.json").read_bytes()).hexdigest()
@@ -301,7 +303,7 @@ def main():
         import urllib.request
         from urllib.parse import urlsplit
         host = urlsplit(os.environ["FUCHENG_PUBLIC_ORIGIN"]).netloc
-        req = urllib.request.Request("http://127.0.0.1:8000/api/health", headers={"Host": host})
+        req = urllib.request.Request(f"http://127.0.0.1:8000{settings.base_path}/api/health", headers={"Host": host})
         with urllib.request.urlopen(req, timeout=5) as response:
             assert response.status == 200
         return

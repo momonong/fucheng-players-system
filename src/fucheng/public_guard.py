@@ -13,6 +13,7 @@ from threading import BoundedSemaphore, Lock
 from time import monotonic
 
 from starlette.responses import JSONResponse
+from starlette._utils import get_route_path
 
 
 @dataclass
@@ -101,7 +102,7 @@ class PublicGuard:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
-        path, method = scope["path"], scope["method"]
+        path, method = get_route_path(scope), scope["method"]
         category = self.limiter.category(path, method)
         if category is None:
             return await self.app(scope, receive, send)

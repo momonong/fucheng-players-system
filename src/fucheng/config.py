@@ -22,8 +22,11 @@ class Settings:
     turnstile_secret: str | None = field(default=None, repr=False)
     turnstile_hostname: str | None = None
     backup_status_file: Path | None = None
+    base_path: str = ""
 
     def __post_init__(self):
+        from .base_path import normalize_base_path
+        object.__setattr__(self, "base_path", normalize_base_path(self.base_path))
         if self.public_origin or self.local_http_preview:
             from .proxy import validate_ingress
             validate_ingress(self)
@@ -48,6 +51,7 @@ class Settings:
                             else os.getenv("FUCHENG_TURNSTILE_SECRET"))
         return cls(
             database_url=database_url,
+            base_path=os.getenv("FUCHENG_BASE_PATH", ""),
             session_cookie_secure=os.getenv("FUCHENG_COOKIE_SECURE", "true").lower()
             in {"1", "true", "yes"},
             session_hours=int(os.getenv("FUCHENG_SESSION_HOURS", "12")),

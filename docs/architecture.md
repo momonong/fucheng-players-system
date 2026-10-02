@@ -2,6 +2,8 @@
 
 ## 系統結構
 
+部署前綴由 `FUCHENG_BASE_PATH` 統一設定（預設空字串＝根路徑）。ASGI 入口要求代理保留完整 path，驗證前綴後設定 `root_path`；路由、靜態 mount、入站節流及健康檢查使用一致的相對路徑。前端 API／導覽／媒體共用 `paths.ts`，FastAPI 在 HTML 回應提供 `<base>` 與 metadata，Vite 產相對資產，因此同一份成品可在 `/` 與 `/fucheng/` 執行。Cookie Path 隨前綴設定，Origin 不含前綴；資料庫與公告 HTML 僅存既有 ID／資料，不保存部署網址，不需 migration。根路徑前端 Vite 開發流程保留；共用域名代理接入另依部署契約驗證。
+
 瀏覽器與 FastAPI 使用同一 origin。React/Vite 只在開發或image建置階段使用，正式由單一app runtime image的Uvicorn/FastAPI提供靜態成品與/api。SQLite存獨立Linux named volume；維護／備份復用app image，正式Cloudflare named tunnel直連app。nginx僅本機HTTPS test profile，不是正式依賴；沒有Redis、Celery或額外資料庫服務。Windows Docker Desktop/WSL2現場步驟見docs/deployment.md；本機驗證不代表球館實機與24小時可用性。
 
 容器入口持有writer.lock至服務終止，ops遷移/還原需相同獨占鎖，backup.lock保護備份/retention/export及維護；active.json選DB，maintenance.json讓失敗維護持續拒絕啟動。image schema必須與DB revision一致，start不升級；回退還原新DB並保留原DB/WAL/SHM及operations證據。來源以逐檔snapshot manifest辨識，不把HEAD當未提交內容的完整版本。
