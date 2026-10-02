@@ -2,6 +2,14 @@
 
 最後更新：2026-10-03。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
 
+## 0.3.2 發布映像來源核對（2026-10-03）
+
+從乾淨功能提交 `103ffbda2d1055dffa0f6daa0820524dc5225db3` 建出 Linux/amd64 候選 `local/fucheng:snapshot-9e8a1448677698d9`，image ID `sha256:585befc2f28a075467ce15ce32ab5d41f20134b34523cb6ae759e93da097ffe5`，source manifest SHA-256 `9e8a1448677698d9a237ba09ab21058dd4394cecdda2cbb7d8f1b915072ba962`。manifest 為 `committed-git-release`，71 檔 allowlist context audit 通過；後續記錄 manifest／驗證文件的提交不改變這 70 份映像來源。最終 GitHub 合併／tag 與 registry digest 以同版 Release 紀錄為準；本機 image ID 不充當 registry manifest digest。
+
+相較下方已驗證 snapshot，僅 Python／npm 專案版本及 lock 中的根專案版本改為 `0.3.2`，依賴解析與實作內容不變。沿用後端全套 211 項與桌面／手機 16 個適用案例的證據，發布環境另重驗前綴／部署邊界 `38 passed`、前端 typecheck、audit 0 vulnerabilities 及映像內 build。最終 JS／CSS SHA-256 與先前 E2E 成品逐檔相同，映像 `/data`／`/backups` 為空。
+
+`fucheng-release-032-20261003` 使用獨立新 named volumes、`network none`、無 host port，在最終候選上驗登入／Cookie／圖片／資產、重啟、`/fucheng` 成組 DB＋媒體備份及新目標 `/` restore。會員／媒體 ID、圖片 SHA-256 與 JS SHA-256 一致，source／restore schema 均為 `0010_deployment_report`、integrity `ok`、FK 錯誤 0；測試容器已停止，合成資料留存追溯。證據位於 ignored `data/release-0.3.2/build/` 與 `data/release-0.3.2/payload-audit.json`。0.3.1 升級無新增 migration；更舊版仍需既有 schema 升級流程。本輪未切換公開服務，Windows PowerShell／球館 Docker Desktop、WSL2 與實際入口仍待現場驗收。
+
 ## 可設定部署前綴（2026-10-03；本機工程驗證）
 
 分支 `codex/fucheng-base-path`，基底 `84b0b3f9cda57d9524de5f9c90f724ccb8096eb6`，本輪來源為未提交 snapshot。`FUCHENG_BASE_PATH=/fucheng` 支援子路徑，空值或 `/` 保留根路徑；同一份前端成品／image 於啟動時決定前綴，無新增 migration。API、頁面／資產、管理及訪客 Cookie、CSRF／Origin、限流、公告媒體、下載及 health 均遵循相同設定。入口契約見 [deployment.md](deployment.md#部署前綴與根路徑相容)。

@@ -72,6 +72,6 @@
     "src/fucheng/website.py": "3a91a64dc08fa230a2ed2770189c758a576fc045772d740be62cfebbaaae8278",
     "uv.lock": "46d4625482e96a9418d8c390d10199d833255b5319df1d806424c0da0ad428c4"
   },
-  "head": "84b0b3f9cda57d9524de5f9c90f724ccb8096eb6",
-  "kind": "uncommitted-working-tree-snapshot"
+  "head": "103ffbda2d1055dffa0f6daa0820524dc5225db3",
+  "kind": "committed-git-release"
 }
