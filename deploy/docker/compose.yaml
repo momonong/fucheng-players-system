@@ -1,5 +1,6 @@
 name: ${COMPOSE_PROJECT_NAME:-fucheng}
 x-runtime-env: &runtime-env
+  FUCHENG_BASE_PATH: ${FUCHENG_BASE_PATH:-}
   FUCHENG_IMAGE_REF: ${FUCHENG_IMAGE:?Set FUCHENG_IMAGE from the release manifest}
   FUCHENG_BACKUP_KEEP: ${FUCHENG_BACKUP_KEEP:-8}
   FUCHENG_RESTORE_PUBLIC_ORIGIN: ${FUCHENG_PUBLIC_ORIGIN:?Set HTTPS origin without trailing slash}

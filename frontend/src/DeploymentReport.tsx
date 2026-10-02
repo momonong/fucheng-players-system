@@ -1,3 +1,4 @@
+import { appUrl } from './paths'
 import { useEffect, useRef, useState } from 'react'
 import { AdminHeader } from './AdminHeader'
 import { request } from './api'
@@ -83,7 +84,7 @@ export function DeploymentReportPage({ username, onLogout }: { username: string;
           <p>主機檢查時間：{dateTime(report.checked_at)}；上傳時間：{state.uploaded_at ? dateTime(state.uploaded_at) : '未知'}</p>
           {timeWarning && <p role="alert" className="notice error">{timeWarning}</p>}
           <p className="deployment-counts">{(['PASS', 'WARN', 'FAIL', 'NOT_TESTED'] as const).map(status => <span key={status} className={`report-${status.toLowerCase()}`}>{status} {report.summary[status]}</span>)}</p>
-          <div className="deployment-actions"><button type="button" onClick={copyMarkdown}>複製 Markdown</button><a href="/api/admin/deployment-report/json" download>下載 JSON</a><a href="/api/admin/deployment-report/markdown" download>下載 Markdown</a></div>
+          <div className="deployment-actions"><button type="button" onClick={copyMarkdown}>複製 Markdown</button><a href={appUrl("/api/admin/deployment-report/json")} download>下載 JSON</a><a href={appUrl("/api/admin/deployment-report/markdown")} download>下載 Markdown</a></div>
         </section>
         <section className="panel"><h3>入口建議</h3><ul className="deployment-recommendations">{report.recommendations.map(item => <li key={item.candidate}><strong>{item.candidate}・{item.status}</strong><p>{item.reason}</p><p>下一步：{item.next_action}</p></li>)}</ul></section>
         <section className="panel"><h3>逐項檢查</h3><div className="deployment-checks">{report.checks.map(item => <article key={item.id}><h4>{item.id} <span className={`report-${item.status.toLowerCase()}`}>{item.status}</span></h4><p>{item.reason}</p><p>證據：{item.evidence}</p><p>下一步：{item.next_action}</p></article>)}</div></section>

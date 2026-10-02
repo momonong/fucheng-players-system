@@ -67,7 +67,9 @@ def install_public_routes(app, get_db, current_admin):
         if not x_csrf_token or not hmac.compare_digest(x_csrf_token, visit.csrf_token):
             raise HTTPException(403, '安全驗證失敗，請重新整理後再試')
         origin = request.headers.get('origin')
-        if origin and origin != str(request.base_url).rstrip('/'):
+        # Origin is scheme + authority, never the ASGI deployment prefix.
+        expected_origin = settings.public_origin or str(request.base_url.replace(path='', query='', fragment=''))
+        if origin and origin != expected_origin:
             raise HTTPException(403, '安全驗證失敗，請重新整理後再試')
         return visit
 
@@ -88,7 +90,7 @@ def install_public_routes(app, get_db, current_admin):
             row = PublicVisit(token_hash=token_hash(raw), csrf_token=csrf, expires_at=now_utc()+timedelta(hours=12))
             db.add(row)
             response.set_cookie(visit_cookie, raw, max_age=43200, httponly=True,
-                secure=settings.session_cookie_secure, samesite='lax', path='/')
+                secure=settings.session_cookie_secure, samesite='lax', path=settings.base_path + '/')
         db.commit()
         return {"csrf_token": row.csrf_token,
                 "turnstile_sitekey": settings.turnstile_sitekey if settings.turnstile_mode == "enabled" else None}

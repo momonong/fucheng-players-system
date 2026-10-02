@@ -3,6 +3,7 @@
 ## Docker部署共同規則
 
 - 單一app image包含React成品＋FastAPI，SQLite用Linux named volume；維護／備份復用image。正式Tunnel直連app，nginx只供https-test，見docs/deployment.md。
+- `FUCHENG_BASE_PATH` 於 runtime 設定（空值／`/` 為根路徑，`/fucheng` 為子路徑），同一image支援兩者。代理保留完整URI、不剝前綴或另加`--root-path`；前端導覽／API／媒體使用`paths.ts`，Cookie／health跟隨前綴。`PUBLIC_ORIGIN`僅含scheme＋host，搬移不把來源前綴寫死入資料。
 - 透過scripts/deployment_package.py的allowlist staging與source manifest建置；禁止data／帳密／備份／既有dist入context、image或離線包。未提交版標snapshot與hash。
 - volume寫入經runtime.py生命周期鎖與maintenance守門；start不migration。遷移先停寫、備份，回退匹配image/schema並還原新目標、保留故障庫。不繞過guard直接寫volume。
 - 部署驗證僅獨立project/port/volume合成資料；真實資料來源與操作另授權。公開Tunnel須另行明確授權，不動既有服務，禁止prune／down -v。

@@ -1,3 +1,4 @@
+import { appUrl, appPathname } from './paths'
 import { useEffect, useRef, useState } from 'react'
 import { request } from './api'
 import type { Diet } from './types'
@@ -16,7 +17,7 @@ const time = (value: string) => new Intl.DateTimeFormat('zh-TW', { dateStyle: 'm
 
 async function publicRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
   let response: Response
-  try { response = await fetch(url, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...options.headers } }) }
+  try { response = await fetch(appUrl(url), { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...options.headers } }) }
   catch { throw new Error('連線暫時中斷，請檢查網路後重試') }
   if (!response.ok) {
     const body = response.headers.get('content-type')?.includes('application/json') ? await response.json().catch(() => null) : null
@@ -34,7 +35,7 @@ export function PublicRegistrationPortal() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
-  const routeId = location.pathname.match(/^\/register\/([^/]+)$/)?.[1]
+  const routeId = appPathname().match(/^\/register\/([^/]+)$/)?.[1]
   useEffect(() => {
     let active = true
     setLoading(true); setError('')
@@ -53,7 +54,7 @@ export function PublicRegistrationPortal() {
     return () => { active = false }
   }, [retry, routeId])
   return <>
-    <header className="admin-header registration-header"><div><p className="eyebrow">府城球館</p><h1>比賽報名</h1></div><a href="/admin">管理員入口</a></header>
+    <header className="admin-header registration-header"><div><p className="eyebrow">府城球館</p><h1>比賽報名</h1></div><a href={appUrl("/admin")}>管理員入口</a></header>
     <main className="public-registration">
       <p className="registration-intro">找到自己的名字，就能報名。不用帳號、不用密碼。</p>
       {loading ? <p role="status">載入比賽中…</p> : error ? <div className="notice error" role="alert">{error}<button onClick={() => setRetry(r => r + 1)}>重新載入</button></div> : selected ?
@@ -62,7 +63,7 @@ export function PublicRegistrationPortal() {
           {!items.length && <div className="panel"><p>目前沒有開放報名的比賽。</p><p>如需協助，請洽球館管理員。</p></div>}
           <div className="public-competitions">{items.map(c => <article className="panel" key={c.id}>
             <h3>{c.name}</h3><CompetitionInfo competition={c} />
-            <a className="registration-button" href={`/register/${c.id}`}>我要報名：{c.name}</a>
+            <a className="registration-button" href={appUrl(`/register/${c.id}`)}>我要報名：{c.name}</a>
           </article>)}</div>
         </>}
       <p className="registration-help">如需取消、更正或找不到名字，請洽管理員協助。</p>
@@ -160,10 +161,10 @@ function RegistrationForm({ competition: c, csrf, turnstileSitekey }: { competit
     <p className="receipt-name">{result.member_name}{result.distinguishing_note && `（${result.distinguishing_note}）`}</p>
     <p>報名結果：<strong className="receipt-status">{states[result.status]}</strong></p><p>當次餐食：{diets[result.diet]}</p>
     <p>{result.status === 'waitlisted' ? '目前為候補，請等候管理員確認遞補。' : result.status === 'cancelled' ? '如需重新報名，請回比賽清單再次操作。' : '已完成登記，請留意比賽時間。'}</p>
-    <a className="registration-button" href="/competitions">回比賽清單</a>
+    <a className="registration-button" href={appUrl("/competitions")}>回比賽清單</a>
   </section>
   return <>
-    <a href="/competitions">← 回比賽清單</a>
+    <a href={appUrl("/competitions")}>← 回比賽清單</a>
     <section className="panel public-competition-info"><h2>{c.name}</h2><CompetitionInfo competition={c} /></section>
     <form className="panel registration-form" onSubmit={submit}>
       <h2>2. 找到自己的名字</h2>

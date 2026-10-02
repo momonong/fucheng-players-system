@@ -3,6 +3,7 @@ from ipaddress import ip_address
 from urllib.parse import urlsplit
 
 from starlette.responses import JSONResponse
+from starlette._utils import get_route_path
 
 
 def validate_ingress(settings):
@@ -69,7 +70,7 @@ class DeploymentBoundary:
             if proto != "https":
                 return await reject(400, "HTTPS required")
             scope = dict(scope, scheme="https", client=(remote, 0))
-        elif scope["path"] != "/api/health":
+        elif get_route_path(scope) != "/api/health":
             return await reject(400, "Trusted HTTPS ingress required")
         if scope["method"] not in {"GET", "HEAD", "OPTIONS"}:
             # Same-origin is mandatory for deployment API mutations, including login.

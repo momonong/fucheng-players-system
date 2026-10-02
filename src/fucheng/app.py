@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
@@ -171,7 +171,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             secure=settings.session_cookie_secure,
             samesite="lax",
             max_age=settings.session_hours * 3600,
-            path="/",
+            path=settings.base_path + "/",
         )
         return AuthResponse(username=admin.username, csrf_token=csrf_token)
 
@@ -201,7 +201,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def logout(response: Response, db: Db, auth: CsrfAuth) -> None:
         db.delete(auth[1])
         db.commit()
-        response.delete_cookie(session_cookie, path="/")
+        response.delete_cookie(session_cookie, path=settings.base_path + "/")
 
     @app.get("/api/admin/members", response_model=list[AdminMember])
     def admin_members(db: Db, _auth: Auth) -> list[Member]:
@@ -471,16 +471,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str, request: Request):
-        if path.startswith("api/"):
+        if path == "api" or path.startswith("api/"):
             raise HTTPException(status_code=404, detail="找不到 API")
         index = static_dir / "index.html"
         if not index.exists():
             raise HTTPException(status_code=503, detail="前端尚未建置")
         candidate = (static_dir / path).resolve()
-        if path and candidate.is_relative_to(static_dir.resolve()) and candidate.is_file():
+        if path and candidate != index.resolve() and candidate.is_relative_to(static_dir.resolve()) and candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(index)
+        html = index.read_text(encoding="utf-8")
+        base_marker = '<base href="/">'
+        config_marker = '<meta name="fucheng-base-path" content="">'
+        if settings.base_path and (base_marker not in html or config_marker not in html):
+            raise HTTPException(status_code=503, detail="前端版本不支援部署前綴，請同批更新前後端")
+        html = html.replace(base_marker, f'<base href="{settings.base_path}/">', 1)
+        html = html.replace(config_marker, f'<meta name="fucheng-base-path" content="{settings.base_path}">', 1)
+        return HTMLResponse(html)
 
+    from .base_path import BasePathBoundary
+    app.add_middleware(BasePathBoundary, base_path=settings.base_path)
     return app
 
 

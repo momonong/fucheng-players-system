@@ -1,5 +1,46 @@
 # Windows Docker 部署、搬移與維運
 
+## 0.3.2 發布與升級
+
+0.3.2 包含以下可設定部署前綴功能，使用 `momonong/fucheng-players-system:0.3.2`；發布後以 Docker Hub digest 核對映像，既有 `0.3.1` 保留。不要在 0.3.1 或更舊映像上僅設定 `FUCHENG_BASE_PATH`，舊版並不具備此功能。GitHub 的同版 Compose、Windows 維運腳本及本節說明需一起使用。
+
+- 家中：4090 的 Linux Docker Engine 執行 app，`FUCHENG_PUBLIC_ORIGIN=https://momonong.me`、`FUCHENG_BASE_PATH=/fucheng`。既有 HP 入口如何轉送及可信代理設定須在部署時依當次網路盤點核對；發布本版不會建立此路由。
+- 球館：Windows Docker Desktop／WSL2 的 Linux containers 使用相同 Linux/amd64 image，根路徑部署將 `FUCHENG_BASE_PATH` 留空，並設定球館入口的 HTTPS origin。若未來仍使用 `/fucheng/`，則保留前綴。PowerShell、WSL2、開機恢復及實際內外網可達性仍須在球館驗收。
+- 從 0.3.1 升級：schema 維持 `0010_deployment_report`，不需新增 migration；停寫並成組備份 DB＋媒體後，使用同版設定替換 app／backup／ops 映像，啟動並核 health、登入、報名、公告與下載。從 0.3.0／更早版本升級，仍需走下文既有停寫備份與顯式 migration 流程，不能直接跳過 schema 檢查。
+- 搬主機：映像可 pull 或離線傳送，資料另以既有成組 Backup／ImportBackup／Restore 還原到新目標 Linux named volume。image 不含會員 DB、圖片、密碼、Turnstile／Tunnel 金鑰；來源前綴只作備份 metadata，不強制套用到目標。切換前綴後重新登入。
+- 回退：保留故障庫，依既有流程將升級前備份還原至新目標，搭配匹配的 image／schema。0.3.1 不支援子路徑，回退至它時也須恢復相容的根路徑入口，不能只退 image 而保留 `/fucheng` 配置。
+
+## 部署前綴與根路徑相容
+
+2026-10-03 開發範圍：支援家中 `/fucheng/` 與日後球館電腦的根路徑部署，沿用單一 Linux/amd64 image、SQLite named volume、成組 DB＋媒體備份及原有安全／維護守門；不新增 migration，schema 仍為 `0010_deployment_report`。本次開發不包含正式資料搬遷、公開入口切換、HP 安裝或共用 Caddy／Tunnel 修改。
+
+| 設定 | 共用網域子路徑 | 獨立網域根路徑 |
+|---|---|---|
+| `FUCHENG_PUBLIC_ORIGIN` | `https://momonong.me` | `https://YOUR_CLUB_HOST` |
+| `FUCHENG_BASE_PATH` | `/fucheng` | 空值或 `/` |
+| 首頁 | `/fucheng/` | `/` |
+| 健康檢查 | `/fucheng/api/health` | `/api/health` |
+| 管理員／訪客 Cookie Path | `/fucheng/` | `/` |
+
+`FUCHENG_BASE_PATH` 是環境設定，不是 build argument。容器 `app`、`backup`、`ops` 共用此值，`runtime.py health` 自動探測相應路徑；`compose.local-http.yaml` 的合成 loopback 預覽也支援。支援 ASCII 英數、`_`、`-` 組成的路徑段；單一尾斜線正規化，`//`、點段、百分比編碼、query、fragment、空白等設定會拒絕啟動。`PUBLIC_ORIGIN` 不可附路徑或尾斜線，瀏覽器 Origin 比對仍為 scheme＋host。
+
+同一份 Vite 成品使用相對資產 URL，由 FastAPI 在傳回 `index.html` 時提供 `<base>` 與前端前綴 metadata。首頁、深層頁面重新整理、API、內文／文末公告圖片、管理報告下載及導覽皆使用相同設定；不修改磁碟上的 static，不需要在目標電腦執行 npm build。舊成品缺少前綴標記時，子路徑模式回 503，要求同批更新前後端。根路徑是預設，保留原開發方式。Vite dev server 仍用根路徑；子路徑驗證須使用建置成品＋FastAPI。
+
+### 代理與網址契約
+
+- 代理把完整 `/fucheng/...` 送給 app；**不剝除前綴**，也不另外加 Uvicorn `--root-path`，不依賴 `X-Forwarded-Prefix`。
+- `/fucheng` 的 GET／HEAD 會 308 到 `/fucheng/` 並保留 query；該位置的寫入不轉送。設定前綴後，app 對 `/`、`/api/...`、`/orderflow/` 及相似但不匹配的前綴回 404。
+- 既有 nginx 測試／host-ngrok 的 `proxy_pass http://app:8000` 保留完整 URI，不需換成帶尾斜線的剝除模式。若未來接 HP Caddy，使用匹配 `/fucheng` 與 `/fucheng/*` 的 `handle`／matcher；不能用會去前綴的 `handle_path`。保留 `momonong.me/` 首頁及 `/orderflow/`。
+- 沿用單一明確可信 socket peer、精確 Host／Origin、Secure Cookie、CSRF 與已驗證的真實 client IP。額外代理跳點必須依 selfhost-servers 接入契約另行配置及驗證，不能改成信任任意 XFF；Cloudflare 模式仍要求有效 Turnstile 設定。本輪沒有調整現場網路。
+
+### Windows／Linux 搬移
+
+Linux Docker Engine 與 Windows Docker Desktop／WSL2 均使用同版 Linux/amd64 image。保留 Linux named volume 中的 SQLite／媒體，不改為 Windows bind mount／SMB／同步資料夾；主機備份目錄則按實際 OS 設定。沿用 `operate.ps1` 或既有 Compose／runtime 操作，資料仍透過成組 Backup／ImportBackup／Restore 移到新目標，不直接複製運行中的 DB。
+
+備份 metadata 的 `restore_config.base_path` 記錄來源前綴供核對；舊備份沒有此欄位仍相容。Restore 不會自動改目標環境的網域／前綴。同一目標改前綴後，使用者應由新網址重新登入；原有效 Cookie Path 不會自動搬移，不清除其他路徑的 Cookie。根路徑 Cookie 仍依 HTTP 規則涵蓋整個 host；前綴不是同源安全隔離，不以同名 Cookie 支援同 host 多套球館系統共用 session。
+
+Windows 主機健檢的外網 opt-in 改用 `-PreviewOrigin https://momonong.me -BasePath /fucheng -ProbeNetwork`；根路徑省略 `-BasePath`。此參數只決定 health URL，不改主機／代理。Windows 虛擬化、WSL2、Docker 啟動、睡眠、重開機及外部手機可達性仍須在現場驗收，Linux 工程測試不能取代。舊版本 0.3.0／0.3.1 image 沒有本次程式變更，不能僅設定新環境變數就宣稱支援前綴；需使用包含本次來源的經驗證映像。
+
 ## 0.3.1 候選：管理後台部署檢查報告
 
 此版新增 `0010_deployment_report` migration。在目標 Windows 主機的 Git Bash、已整合本版腳本的 repo 根目錄執行 `bash deploy/docker/host-preflight.sh data/host-preflight-club-YYYYMMDD`；需要測出站網路時另加 `-ProbeNetwork`，並改用新的輸出目錄。腳本不需要 Python、不執行容器、不修改主機網路設定；只在 ignored `data/` 下建立 `report.json` 和 `report.md`。舊離線 kit 的 `preflight.ps1 -Output` 維持原契約，不以本腳本取代。
