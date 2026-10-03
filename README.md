@@ -2,6 +2,8 @@
 
 0.3.2 新增可設定的部署前綴，維持 schema `0010_deployment_report`，相容 0.3.1 資料庫。家中試用目標為 `https://momonong.me/fucheng/`；版本發布不代表公開入口已切換。發布與升級說明見[0.3.2 部署說明](docs/deployment.md#032-發布與升級)。
 
+家中 4090 的 Docker／HP 加密轉送設定與待完成條件見[家中部署準備](docs/home-deployment.md)；目前尚未公開切換。
+
 部署前綴可於啟動時設定：`FUCHENG_BASE_PATH=/fucheng` 使用 `/fucheng/`；空值或 `/` 使用網域根路徑。同一份前端成品／Linux amd64 image 可供兩種模式使用，不需因搬到球館 Windows Docker Desktop／WSL2 而重建。代理必須保留完整前綴，`FUCHENG_PUBLIC_ORIGIN` 仍只填 scheme＋host；設定、遷移與驗證邊界見[子路徑部署](docs/deployment.md#部署前綴與根路徑相容)。
 
 > 2026-09-26 獨立 8052 [手機合成預覽](https://29e0-140-116-158-107.ngrok-free.app/)已改由 Docker 0.3.0 app／週備份提供，沿用既有 ngrok agent；Cloudflare Turnstile 因尚無真實金鑰，在此預覽明確停用。Windows Docker 主機健檢、Git Bash 安裝步驟與驗證邊界見[部署手冊](docs/deployment.md)。這不是球館實機、真實資料或正式服務驗收。

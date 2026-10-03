@@ -1,0 +1,32 @@
+# Add to compose.yaml only for the existing HP Caddy -> SSH -> 4090 route.
+# The app is published on workstation loopback; no new Tunnel/proxy container.
+services:
+  app:
+    environment:
+      FUCHENG_PROXY_KIND: cloudflare
+      # Host loopback port forwarding reaches the app through this bridge peer.
+      # Verify the actual peer before publishing the Caddy route.
+      FUCHENG_TRUSTED_PROXY: ${FUCHENG_HOME_GATEWAY:?Set the verified Docker bridge gateway}
+      FUCHENG_TURNSTILE_MODE: enabled
+      FUCHENG_TURNSTILE_SITEKEY: ${FUCHENG_TURNSTILE_SITEKEY:?Set the public Turnstile sitekey}
+      FUCHENG_TURNSTILE_SECRET_FILE: /run/secrets/turnstile_secret
+    secrets: [turnstile_secret]
+    ports:
+      - "127.0.0.1:${FUCHENG_HOME_PORT:?Set an unused workstation loopback port}:8000"
+  backup:
+    volumes:
+      - data:/data
+      - home_backups:/backups
+  ops:
+    volumes:
+      - data:/data
+      - home_backups:/backups
+networks:
+  origin:
+    # Siteverify needs outbound HTTPS. Host publishing remains loopback only.
+    internal: false
+volumes:
+  home_backups:
+secrets:
+  turnstile_secret:
+    file: ${FUCHENG_TURNSTILE_SECRET_FILE:?Set a protected local Turnstile secret file}

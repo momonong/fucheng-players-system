@@ -1,0 +1,20 @@
+[Unit]
+Description=Fucheng encrypted HP loopback forward for %i
+Wants=network-online.target
+After=network-online.target docker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=%i
+ExecStart=/usr/bin/ssh -NT -o BatchMode=yes -o StrictHostKeyChecking=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ControlMaster=no -o ControlPath=none -R 127.0.0.1:18084:127.0.0.1:8064 hp-server
+Restart=always
+RestartSec=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
