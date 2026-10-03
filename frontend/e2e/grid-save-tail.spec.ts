@@ -29,6 +29,7 @@ async function setup(page: Page, info: TestInfo) {
     await expect(selector.locator(`option[value="${second ? other.id : comp.id}"]`)).toHaveCount(1)
     await selector.selectOption(second ? other.id : comp.id)
     await expect(area.locator('.arrangement-toolbar h2')).toHaveText(second ? other.name : comp.name)
+    await area.getByRole('button', { name: '完整表格', exact: true }).click()
   }
   await choose()
   const endpoint = `/api/admin/competitions/${comp.id}/arrangement`
@@ -47,6 +48,7 @@ async function setup(page: Page, info: TestInfo) {
     if (await selector.inputValue() === comp.id) await selector.selectOption(other.id)
     await selector.selectOption(comp.id)
     await expect(area.locator('.arrangement-toolbar h2')).toHaveText(comp.name)
+    await area.getByRole('button', { name: '完整表格', exact: true }).click()
     await expect.poll(async () => (await state()).layout?.rows.length).toBeGreaterThan(0)
   }
   const domRows = async () => area.locator('.arrangement-table tbody tr[data-row-id]').evaluateAll(rows => rows.map(row => ({ id: row.getAttribute('data-row-id'), role: row.getAttribute('data-row-role'), cellCount: row.querySelectorAll('td').length, playerIds: Array.from(row.querySelectorAll<HTMLElement>('[data-registration-id]')).map(cell => cell.dataset.registrationId) })))

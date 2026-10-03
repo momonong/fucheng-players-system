@@ -1,6 +1,6 @@
 # 府城球館會員管理系統
 
-0.3.2 新增可設定的部署前綴，維持 schema `0010_deployment_report`，相容 0.3.1 資料庫。家中試用目標為 `https://momonong.me/fucheng/`；版本發布不代表公開入口已切換。發布與升級說明見[0.3.2 部署說明](docs/deployment.md#032-發布與升級)。
+0.3.3 改善手機與桌面管理流程，沿用 schema `0010_deployment_report` 與 runtime 部署前綴；同一映像支援家中 `/fucheng/` 及球館根路徑。功能、驗證與升級方式見[0.3.3 發布說明](docs/release-0.3.3.md)，公開部署狀態另以日期化紀錄為準。
 
 家中試用已於 2026-10-03 切換至 [momonong.me/fucheng/](https://momonong.me/fucheng/)；Docker app／資料位於 4090，HP 僅提供共用入口與加密轉送。部署證據及待驗收範圍見[家中部署紀錄](docs/home-deployment.md)。
 
@@ -383,3 +383,5 @@ E2E 使用 `FUCHENG_E2E_DATABASE_URL=sqlite:///data/grid-e2e.db`、`FUCHENG_E2E_
 
 
 同色上色鎖場修正（2026-09-22，待受控更新）：已用合成資料重現使用者的「安排沒有變更」與「重新讀取並核對」；原因是未變更的 422 被視為待人工解除的拒絕。現在首次請求收到這個精確回覆後自動讀回，核對成功即可繼續；一般拒絕、衝突、未知請求仍保護。工程證據與交付指紋見 docs/acceptance.md、data/grid-shade-delivery-identity.json；本段不表示已部署。
+
+手機與桌面管理流程開發說明見[手機管理操作](docs/mobile-workflows.md)；原始碼／映像發布與公開部署分別記錄。

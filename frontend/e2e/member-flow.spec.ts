@@ -8,7 +8,7 @@ test('管理員新增修改，公開名單可搜尋篩選並支援列印', async
   await page.getByLabel('帳號').fill('e2e-admin')
   await page.getByLabel('密碼').fill(e2ePassword)
   await page.getByRole('button', { name: '登入', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '會員' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '會員', exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: '新增會員' }).click()
   await page.getByLabel('姓名（必填）').fill(`測試會員甲-${suffix}`)

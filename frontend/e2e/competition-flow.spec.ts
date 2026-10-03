@@ -10,6 +10,7 @@ test('管理員建立比賽、維護候補與列印名單', async ({ page }, tes
   await expect(page.getByRole('heading', { name: '比賽', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '報名與設定', exact: true }).click()
 
+  if (testInfo.project.name === 'mobile') await page.getByText('切換或建立比賽', { exact: true }).click()
   await page.getByRole('button', { name: '建立比賽' }).click()
   const date = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   const deadline = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
@@ -38,16 +39,18 @@ test('管理員建立比賽、維護候補與列印名單', async ({ page }, tes
   await expect(page.locator('.summary-card').filter({ hasText: '正取／名額' })).toContainText('2/2')
   await expect(page.locator('.summary-card').filter({ hasText: '候補' })).toContainText('1')
 
-  await page.locator('.admin-roster-grid').getByRole('button', { name: /合成會員一/ }).click()
+  await page.locator(testInfo.project.name === 'mobile' ? '.mobile-registration-list' : '.admin-roster-grid').getByRole('button', { name: /合成會員一/ }).click()
   await page.getByRole('button', { name: '取消報名' }).click()
   await expect(page.locator('.summary-card').filter({ hasText: '待遞補' })).toContainText('1')
   await expect(page.locator('.summary-card').filter({ hasText: '正取／名額' })).toContainText('1/2')
+  await page.getByRole('button', { name: '關閉', exact: true }).click()
   await page.locator('.admin-roster-sidebar').getByRole('button', { name: /候補 1 人 展開/ }).click()
   await page.locator('.admin-roster-sidebar').getByRole('button', { name: /合成會員三/ }).click()
   await page.getByRole('button', { name: '確認遞補' }).click()
   await expect(page.locator('.summary-card').filter({ hasText: '正取／名額' })).toContainText('2/2')
   await expect(page.locator('.summary-card').filter({ hasText: '葷／素／未設定' })).toContainText('1/1/0')
 
+  await page.getByRole('button', { name: '關閉', exact: true }).click()
   const finalCells = page.locator('.admin-roster-grid tbody tr:last-child td')
   expect(await finalCells.count()).toBeGreaterThan(0)
   for (const cell of await finalCells.all()) {
@@ -65,6 +68,7 @@ test('管理員建立比賽、維護候補與列印名單', async ({ page }, tes
       await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ detail: '此比賽已被其他管理員更新，請重新載入' }) })
     } else await route.continue()
   })
+  if (testInfo.project.name === 'mobile') await page.getByRole('heading', { name: '比賽設定', exact: true }).click()
   await page.getByLabel('名稱').fill('衝突時保留的比賽名稱')
   await page.getByRole('button', { name: '儲存比賽' }).click()
   await expect(page.getByRole('alert')).toContainText('輸入已保留')

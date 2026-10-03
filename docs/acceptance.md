@@ -2,6 +2,10 @@
 
 最後更新：2026-10-03。自動測試與功能驗收資料均為合成資料；經使用者明確授權的本機初始會員與 9/20 圖片案例只保存在 Git 忽略的資料庫、轉錄與對照報告中。
 
+## 手機管理操作（2026-10-03；本機開發）
+
+尺寸分流、點選調整、草稿及回歸範圍見[手機與桌面管理流程](mobile-workflows.md)。根路徑與 `/fucheng` 核心案例各 8 passed，既有分批回歸 38 passed，文字外點保存補驗 2 passed；保留正式限流與所有真實資料。未發布 image 或切換公開服務，真機驗收待完成。
+
 ## 0.3.2 發布映像來源核對（2026-10-03）
 
 從乾淨功能提交 `103ffbda2d1055dffa0f6daa0820524dc5225db3` 建出 Linux/amd64 候選 `local/fucheng:snapshot-9e8a1448677698d9`，image ID `sha256:585befc2f28a075467ce15ce32ab5d41f20134b34523cb6ae759e93da097ffe5`，source manifest SHA-256 `9e8a1448677698d9a237ba09ab21058dd4394cecdda2cbb7d8f1b915072ba962`。manifest 為 `committed-git-release`，71 檔 allowlist context audit 通過；後續記錄 manifest／驗證文件的提交不改變這 70 份映像來源。最終 GitHub 合併／tag 與 registry digest 以同版 Release 紀錄為準；本機 image ID 不充當 registry manifest digest。
