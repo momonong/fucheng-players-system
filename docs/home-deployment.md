@@ -1,6 +1,6 @@
 # 家中 4090 試用部署
 
-2026-10-03 狀態：0.3.2 原始碼與 image 已發布；4090 的 app/backup 已在 loopback 啟動，指定資料已還原，`https://momonong.me/fucheng/` 已切換並完成公開瀏覽器讀取驗證。管理員登入後人工操作、真實 Turnstile 報名及斷電恢復仍待驗收。
+2026-10-04 狀態：4090 已更新至 0.3.3 手機管理版本，GitHub／Docker Hub 已發布，既有資料完整保留。公開頁面已載入新版資產；管理員真機操作、真實 Turnstile 報名及斷電恢復仍待驗收。初次部署與歷史 0.3.2 證據保留於下方。
 
 ## 主機與入口
 
@@ -51,7 +51,7 @@ dc=(docker --context default compose --env-file data/home-deployment/home.env
 
 ## 日後搬到球館
 
-球館 Windows Docker Desktop／WSL2 仍可使用同一 Linux/amd64 0.3.2 image、runtime 及成組備份。改採該場域的入口配置，不沿用 HP SSH overlay；根路徑時 `FUCHENG_BASE_PATH` 留空，`FUCHENG_PUBLIC_ORIGIN` 改為當地 HTTPS origin，前綴不寫入會員資料。不因改前綴重建 image。實機登入、資料還原、照片、斷電／重啟及 Windows 登入後 Docker 恢復仍需驗收。
+球館 Windows Docker Desktop／WSL2 仍可使用同一 Linux/amd64 release image、runtime 及成組備份。改採該場域的入口配置，不沿用 HP SSH overlay；根路徑時 `FUCHENG_BASE_PATH` 留空，`FUCHENG_PUBLIC_ORIGIN` 改為當地 HTTPS origin，前綴不寫入會員資料。不因改前綴重建 image。實機登入、資料還原、照片、斷電／重啟及 Windows 登入後 Docker 恢復仍需驗收。
 
 ## 公開切換驗證（2026-10-03）
 
@@ -62,3 +62,19 @@ dc=(docker --context default compose --env-file data/home-deployment/home.env
 Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器正常進站。IAB 直接導覽 API 路徑另被 client 阻擋，因此未把它記成公開 API 成功，也未調整 Cloudflare 或繞過保護。先前透過可信本機入口的管理員登入／讀取／登出已通過；本輪公開瀏覽器登入後流程、真正的 Turnstile 挑戰及成功報名尚待使用者驗收。沒有斷電／重開機或另一條行動網路的驗證。
 
 現用 image 保持 0.3.2 與原 digest；本輪僅同步部署設定及證據，未重建 image。帳密、來源資料、備份和完整受限紀錄保存在 ignored `data/home-deployment/`，不進版本庫。
+
+
+## 0.3.3 手機管理升級（2026-10-04）
+
+先完成 [PR #5](https://github.com/momonong/fucheng-players-system/pull/5) 合併與 [v0.3.3 Release](https://github.com/momonong/fucheng-players-system/releases/tag/v0.3.3)，再發布並核對 Docker Hub `0.3.3`／`latest`，最後更新既有 `fucheng-home` project。合併／tag 提交 `29db9c9e0f68fd4d807aa774bae1a753dae64239`；建置來源 `44d2386938658259824132ab2533dcea516c4da8`，兩者 Git tree 相同。
+
+- 映像 digest：`sha256:001cae3e708512c95308cc672e26b1c0aa6d94172eff428eded1aa10883905da`。
+- Image ID：`sha256:ad8461b6fa5330c01b6ad3d1c3d55709b9e20f3b75f146a7a5db4ae5bceb0432`。
+- Source manifest：`ed50f853f7076b6bbdb454f0d205df91349d746f80afc00840322737780de935`，74 個 allowlist 檔案；乾淨已提交來源，無資料、秘密、備份或既有 dist。
+- 後端 211 passed（2 warnings）、typecheck／build、npm audit 0 vulnerabilities；前端分批 56 項證據見 [手機流程](mobile-workflows.md)。新映像用獨立 root／prefix 合成 project 驗 health、登入登出、Cookie Path、未登入拒絕及完整性；JS/CSS 與前述 E2E 成品逐位元相同。
+- 正常停止 app／backup，以 0.3.2 runtime 取得成組 backup／export，核對 archive 及所有成員 hash。停寫 checkpoint 為 `manual-export-20261003T181323809254Z-480d0e26.db`；私密匯出與原設定保留在 `data/release-0.3.3/`，原 volume 及 0.3.2 映像保留。
+- app／backup 同批換成新 digest；ops 使用同一設定。沿用 `fucheng-home_data` 與 `fucheng-home_home_backups`，不做 migration／reseed。schema `0010_deployment_report`、integrity ok、FK error 0。16 張業務表逐表內容 fingerprint 不變：342 會員、2 場次、81 報名、2 安排保存版、2 公告。
+- app／backup healthy，備份健康正常。可信 loopback／HP Caddy 路徑的 health、HTML、資產、管理員登入／讀取／登出、Secure/HttpOnly 前綴 cookie、匿名 401、錯誤 Host 400、裸 API 404 通過。沒有新增、刪除或修改真實業務紀錄。
+- 公開瀏覽器載入新版 `index-Bt0za5_-.js`／`index-DfqKPVwR.css`，首頁公告、342 位會員及管理員登入表單正常；共用首頁及 OrderFlow 保留。未更改 Caddy／Tunnel／SSH／DNS，HP Caddy SHA 與 10-03 相同。
+
+部署帳密沿用，無須重建管理員。這是程式更新與讀取驗證；公開登入後的手機操作手感、軟鍵盤、真正 Turnstile 報名及現場 Windows／斷電恢復仍待驗收。本次隔離合成 app 已停止，測試 volumes 與完整證據保留；未 prune 或刪除資料卷。同機備份不是異地備份。
