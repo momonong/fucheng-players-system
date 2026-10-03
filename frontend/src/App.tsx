@@ -166,21 +166,24 @@ function MemberManager({ username, onLogout }: { username: string; onLogout: () 
     }
   }
   useEffect(() => { load() }, [])
+  const [mobileEditor, setMobileEditor] = useState(false)
   const shown = members.filter(member => `${member.name} ${member.distinguishing_note ?? ''} ${member.legacy_number ?? ''}`.includes(query))
   async function signOut() { try { await api.logout(); onLogout() } catch (e) { setNotice({ kind: 'error', text: (e as Error).message }) } }
   return <>
     <AdminHeader section="members" username={username} onLogout={signOut} />
     {notice && <Toast kind={notice.kind} onClose={() => setNotice(null)}>{notice.text}</Toast>}
-    <main className="admin-main">
+    <main className={`admin-main member-workspace ${mobileEditor ? 'mobile-editing' : 'mobile-browsing'}`}>
       <section className="member-list panel">
-        <div className="section-title"><div><h2>會員</h2><p>共 {members.length} 筆，停用資料仍保留</p></div><button onClick={() => { setAdding(true); setSelected(null) }}>新增會員</button></div>
+        <div className="section-title"><div><h2>會員</h2><p>共 {members.length} 筆，停用資料仍保留</p></div><button onClick={() => { setAdding(true); setSelected(null); setMobileEditor(true) }}>新增會員</button></div>
+        {(adding || selected) && !mobileEditor && <button className="secondary mobile-pane-back" onClick={() => setMobileEditor(true)}>繼續編輯會員</button>}
         <label className="search-label">搜尋會員<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
-        <div className="member-rows">{shown.map(member => <button className={`member-row ${selected?.id === member.id ? 'selected' : ''}`} key={member.id} onClick={() => { setSelected(member); setAdding(false) }}>
+        <div className="member-rows">{shown.map(member => <button className={`member-row ${selected?.id === member.id ? 'selected' : ''}`} key={member.id} onClick={() => { setSelected(member); setAdding(false); setMobileEditor(true) }}>
           <span><strong>{member.name}</strong>{member.distinguishing_note && <small>{member.distinguishing_note}</small>}</span>
           <span>{member.level} 級</span><span className={member.is_active ? 'status active' : 'status inactive'}>{member.is_active ? '啟用' : '停用'}</span>
         </button>)}</div>
       </section>
       <section className="editor-area">
+        <button type="button" className="secondary mobile-pane-back" onClick={() => setMobileEditor(false)}>← 返回會員清單（保留輸入）</button>
         {adding && <MemberEditor key="new" onSaved={member => { setAdding(false); setSelected(member); setNotice({ kind: 'success', text: '會員已新增' }); load() }} />}
         {selected && <MemberEditor key={`${selected.id}-${selected.version}`} member={selected} onSaved={member => { setSelected(member); setNotice({ kind: 'success', text: '會員資料已儲存' }); load() }} onConflict={() => reloadSelected(selected.id)} />}
         {!adding && !selected && <div className="panel empty editor-empty">請選擇會員，或新增一位會員。</div>}

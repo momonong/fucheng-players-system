@@ -383,3 +383,5 @@ E2E 使用 `FUCHENG_E2E_DATABASE_URL=sqlite:///data/grid-e2e.db`、`FUCHENG_E2E_
 
 
 同色上色鎖場修正（2026-09-22，待受控更新）：已用合成資料重現使用者的「安排沒有變更」與「重新讀取並核對」；原因是未變更的 422 被視為待人工解除的拒絕。現在首次請求收到這個精確回覆後自動讀回，核對成功即可繼續；一般拒絕、衝突、未知請求仍保護。工程證據與交付指紋見 docs/acceptance.md、data/grid-shade-delivery-identity.json；本段不表示已部署。
+
+手機與桌面管理流程開發說明見[手機管理操作](docs/mobile-workflows.md)；此文件描述工作分支功能，不代表公開站台已更新。

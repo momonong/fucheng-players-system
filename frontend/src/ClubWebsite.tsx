@@ -14,7 +14,7 @@ const statusText = { open: '報名中', closed: '報名已截止', ended: '已�
 
 export function SiteNav() {
   const pathname = appPathname()
-  return <nav className="site-nav no-print" aria-label="網站導覽">
+  return <nav className={`site-nav no-print ${pathname.startsWith('/admin') ? 'admin-site-nav' : ''}`} aria-label="網站導覽">
     <a className="site-brand" href={appUrl("/")}>府城球館<span>一起打球，一起進步。</span></a>
     <div>{[['/', '最新消息'], ['/members', '會員分級'], ['/competitions', '比賽報名']].map(([href, label]) => <a key={href} href={appUrl(href)} aria-current={(pathname === href || (href === '/competitions' && pathname.startsWith('/register/'))) ? 'page' : undefined}>{label}</a>)}<a className="nav-admin" href={appUrl("/admin")}>管理後台</a></div>
   </nav>
@@ -57,6 +57,7 @@ export function ClubHome() {
 export function AnnouncementManager({ username, onLogout }: { username: string; onLogout: () => void }) {
   const [items, setItems] = useState<AdminAnnouncement[]>([])
   const [selected, setSelected] = useState<AdminAnnouncement | null>(null)
+  const [mobileEditor, setMobileEditor] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -65,9 +66,9 @@ export function AnnouncementManager({ username, onLogout }: { username: string; 
   useEffect(() => { load() }, [])
   return <><AdminHeader section="announcements" username={username} onLogout={signOut} /><main className="announcement-main">
     {error && <div role="alert" className="notice error">{error}<button onClick={load}>重新載入</button></div>}{notice && <p role="status" className="notice success">{notice}</p>}
-    <div className="section-title"><p>草稿不會公開；勾選發布後即顯示在首頁。取消發布即可下架。</p><button onClick={() => { setCreating(true); setSelected(null); setNotice('') }}>新增公告</button></div>
-    <div className="announcement-workspace"><section className="panel"><h2>公告清單</h2>{!items.length && <p>尚無公告，請新增第一則球館消息。</p>}{items.map(item => <button className="announcement-row" key={item.id} onClick={() => { setSelected(item); setCreating(false); setNotice('') }}><strong>{item.title}</strong><span>{item.is_published ? '已發布' : '未發布'}{item.is_pinned ? '・置頂' : ''}</span></button>)}</section>
-    {creating || selected ? <AnnouncementEditor key={selected ? `${selected.id}-${selected.version}` : 'new'} item={selected} onConflict={load} onSaved={item => { setSelected(item); setCreating(false); setNotice('公告已儲存'); load() }} /> : <div className="panel empty">選擇公告進行編輯，或新增一則公告。</div>}</div>
+    <div className="section-title"><p>草稿不會公開；勾選發布後即顯示在首頁。取消發布即可下架。</p><button onClick={() => { setCreating(true); setSelected(null); setNotice(''); setMobileEditor(true) }}>新增公告</button></div>
+    <div className={`announcement-workspace ${mobileEditor ? 'mobile-editing' : 'mobile-browsing'}`}><section className="panel"><h2>公告清單</h2>{(creating || selected) && !mobileEditor && <button className="secondary mobile-pane-back" onClick={() => setMobileEditor(true)}>繼續編輯公告</button>}{!items.length && <p>尚無公告，請新增第一則球館消息。</p>}{items.map(item => <button className="announcement-row" key={item.id} onClick={() => { setSelected(item); setCreating(false); setNotice(''); setMobileEditor(true) }}><strong>{item.title}</strong><span>{item.is_published ? '已發布' : '未發布'}{item.is_pinned ? '・置頂' : ''}</span></button>)}</section>
+    <section className="announcement-editor-pane"><button type="button" className="secondary mobile-pane-back" onClick={() => setMobileEditor(false)}>← 返回公告清單（保留輸入）</button>{creating || selected ? <AnnouncementEditor key={selected ? `${selected.id}-${selected.version}` : 'new'} item={selected} onConflict={load} onSaved={item => { setSelected(item); setCreating(false); setNotice('公告已儲存'); load() }} /> : <div className="panel empty">選擇公告進行編輯，或新增一則公告。</div>}</section></div>
   </main></>
 }
 

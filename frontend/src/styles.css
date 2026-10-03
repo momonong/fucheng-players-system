@@ -892,3 +892,90 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
   .mobile-image-actions span { width: 100%; font-size: .85rem; font-weight: 800; }
   .mobile-image-actions button { flex: 1 1 auto; min-height: 44px; padding: .4rem; font-size: .85rem; }
 }
+
+/* Alternate workflows share the same state and mutations at every viewport. */
+.arrangement-sheet[hidden] { display: none; }
+.arrangement-view-switch { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .7rem 0; }
+.arrangement-view-switch button[aria-pressed=true] { background: #245148; color: white; }
+.arrangement-view-switch small { color: #52645a; }
+.mobile-arrangement { max-width: 960px; margin-inline: auto; }
+.mobile-arrangement-filters, .mobile-undo { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-bottom: .7rem; }
+.mobile-arrangement-filters label { flex: 1; margin: 0; }
+.mobile-player-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+.mobile-player { display: flex; justify-content: space-between; align-items: center; gap: .8rem; width: 100%; text-align: left; padding: .8rem; border: 1px solid #becdc3; background: #f8faf7; color: #1e392e; }
+.mobile-player:hover, .mobile-player:focus-visible { background: #e1eee6; }
+.mobile-player > span { min-width: 0; overflow-wrap: anywhere; }
+.mobile-player > span:last-child { flex-shrink: 0; text-align: right; }
+.mobile-player strong, .mobile-player small { display: block; }
+.mobile-player small { font-size: .85rem; color: #52645a; margin-top: .25rem; }
+.mobile-player.diet-highlight { border-left: 5px solid #29704a; background: #e4f1e6; }
+.mobile-operation-dialog fieldset { border: 0; padding: 0; min-width: 0; }
+.mobile-operation-dialog .section-title { align-items: flex-start; }
+.mobile-operation-dialog .section-title h3 { margin: .25rem 0; }
+.mobile-operation-dialog .section-title button { flex-shrink: 0; }
+.mobile-pane-back, .mobile-registration-list, .mobile-home-link { display: none; }
+.announcement-editor-pane { min-width: 0; }
+.responsive-detail { position: static; width: 100%; max-width: 100%; margin: 1rem 0 0; padding: 1rem; border: 1px solid #adc0b3; border-radius: 10px; color: var(--ink); background: #f8faf7; }
+.responsive-detail .section-title h3 { margin: 0; overflow-wrap: anywhere; }
+.responsive-detail::backdrop { background: #102a2266; }
+
+@media screen and (max-width: 900px) {
+  .toast { top: auto; bottom: max(.5rem, env(safe-area-inset-bottom)); pointer-events: none; }
+  .toast button { pointer-events: auto; }
+  .admin-site-nav { display: none; }
+  .admin-account .mobile-home-link { display: inline-flex; }
+  .admin-account > span { display: none; }
+  .competition-workspace { display: flex; flex-direction: column; }
+  .competition-workspace > #registration-roster { order: 0; }
+  .competition-workspace > .competition-editor { order: 1; }
+  .competition-workspace > .competition-delete-actions { order: 2; }
+  .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mobile-pane-back { display: block; width: 100%; margin-bottom: .65rem; min-height: 44px; }
+  .member-workspace.mobile-editing > .member-list,
+  .member-workspace.mobile-browsing > .editor-area,
+  .announcement-workspace.mobile-editing > section:first-child,
+  .announcement-workspace.mobile-browsing > .announcement-editor-pane { display: none; }
+  .member-workspace, .announcement-workspace { grid-template-columns: minmax(0, 1fr); }
+  .mobile-registration-list { display: grid; gap: .5rem; }
+  .admin-roster-grid { display: none; }
+  .admin-roster-layout { grid-template-columns: minmax(0, 1fr); }
+  .responsive-detail:modal { position: fixed; inset: auto 0 0; width: 100%; max-width: 100%; max-height: 85dvh; margin: 0; padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; border-radius: 16px 16px 0 0; }
+  .arrangement-dialog { box-sizing: border-box; width: min(100% - 1rem, 560px); max-width: calc(100% - 1rem); max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; padding: 1rem; }
+  .arrangement-dialog input, .arrangement-dialog select, .arrangement-dialog textarea,
+  .admin-main input, .admin-main select, .announcement-main input, .announcement-main textarea,
+  .competition-layout input, .competition-layout select { font-size: 16px; max-width: 100%; }
+  .arrangement-dialog button, .responsive-detail button, .cell-menu-actions button { min-height: 44px; }
+  .arrangement-view-switch { position: sticky; top: 0; z-index: 4; background: white; padding-block: .5rem; }
+  .arrangement-view-switch small { flex-basis: 100%; }
+  .arrangement-search { margin-block: .5rem; }
+  .arrangement-history, .arrangement-diff { height: auto; max-height: 60vh; }
+  .arrangement-content.with-history { grid-template-columns: minmax(0, 1fr); }
+  .competition-mode select { flex-basis: 100%; max-width: none; }
+  .grid-menu-trigger { min-width: 44px; min-height: 44px; }
+}
+@media screen and (max-width: 600px) {
+  .mobile-player-list { grid-template-columns: minmax(0, 1fr); }
+  .arrangement-workspace { padding: .65rem; }
+  .arrangement-tools { display: flex; flex-wrap: nowrap; justify-content: flex-start; width: 100%; overflow-x: auto; padding-bottom: .3rem; }
+  .arrangement-tools > button { flex: 0 0 auto; }
+  .arrangement-save-primary { order: -2; }
+  .arrangement-tools .history-toggle { order: -1; }
+  .arrangement-tools button { min-height: 44px; }
+  .arrangement-icon-tools { display: none; }
+  .registration-detail-actions { display: grid; gap: .65rem; }
+}
+@media (any-pointer: coarse) {
+  .grid-axis-more { width: 44px; height: 44px; min-height: 44px; }
+  .grid-boundary button { min-height: 44px; }
+}
+
+.mobile-list-help { margin: .5rem 0; color: #52645a; }
+.mobile-list-help summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.mobile-list-help summary::before { content: "▸"; margin-right: .4rem; }
+.mobile-list-help[open] summary::before { content: "▾"; }
+
+.arrangement-content.list-mode.with-history { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.arrangement-content.list-mode .arrangement-history, .arrangement-content.list-mode .arrangement-diff { height: auto; max-height: 60vh; }
+@media screen and (max-width: 900px) {
+  .arrangement-content.list-mode.with-history { grid-template-columns: minmax(0, 1fr); }
+}

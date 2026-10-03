@@ -283,3 +283,5 @@ deploy/docker/*.zip
 /frontend/dist-deployment-report/
 # Isolated runtime-prefix verification build; never source or image context.
 frontend/dist-base-path/
+
+/frontend/dist-mobile-workflows/

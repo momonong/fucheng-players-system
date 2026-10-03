@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { CompetitionLevels } from './CompetitionLevels'
+import { ResponsivePanel } from './ResponsivePanel'
 import { AdminHeader } from './AdminHeader'
 import { useArrangementWorkspace } from './useArrangementWorkspace'
 import type {
@@ -34,6 +35,12 @@ export function CompetitionManager({ username, onLogout }: { username: string; o
   const [view, setView] = useState<'arrangement' | 'management'>('arrangement')
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
   const [listExpanded, setListExpanded] = useState(() => window.matchMedia('(min-width: 901px)').matches)
+
+  useEffect(() => {
+    if (notice?.kind !== 'success') return
+    const timer = window.setTimeout(() => setNotice(null), 3500)
+    return () => window.clearTimeout(timer)
+  }, [notice])
 
   const [deleted, setDeleted] = useState(false)
   const [confirmation, setConfirmation] = useState<Competition | null>(null)
@@ -232,6 +239,7 @@ function CompetitionRoster({ detail, reload, notify }: {
     </details>}
     <div className="roster-filters no-print"><label>搜尋行政姓名／辨識註記<input type="search" value={search} onChange={event => { setSearch(event.target.value); setSelectedRegistrationId(null) }} /></label><label>硬實力快照<select value={level} onChange={event => { setLevel(event.target.value); setSelectedRegistrationId(null) }}><option value="">全部級數</option>{range(1, 10).map(n => <option key={n}>{n}</option>)}</select></label><p>符合 {registrations.filter(item => matches(item) && (!level || item.hard_level_snapshot === Number(level))).length}／全場 {registrations.length} 筆</p></div>
     <div className="admin-roster-layout">
+      <div className="mobile-registration-list no-print" aria-label="正取報名名單">{confirmed.filter(item => matches(item) && (!level || item.hard_level_snapshot === Number(level))).map(item => <button className="mobile-player" key={item.id} onClick={() => setSelectedRegistrationId(item.id)} aria-label={`${item.member_name}，正取，${item.queue_sequence} 號`}><span><strong>{item.member_name}</strong><small>{item.distinguishing_note || '無辨識註記'}・順位 {item.queue_sequence}</small></span><span>{item.hard_level_snapshot} 級<small>{dietText[item.diet]}</small></span></button>)}{!confirmed.some(item => matches(item) && (!level || item.hard_level_snapshot === Number(level))) && <p>沒有符合條件的正取選手。</p>}</div>
       <div className="admin-roster-grid" role="region" aria-label="十級行政名單" tabIndex={0}>
         <table><thead><tr>{range(1, 10).map(n => <th key={n} scope="col">{n} 級</th>)}</tr></thead>
           <tbody><RosterGridRows rows={confirmed} status="confirmed" search={search} level={level} onSelect={setSelectedRegistrationId} /></tbody>
@@ -246,12 +254,12 @@ function CompetitionRoster({ detail, reload, notify }: {
         {showCancelled && <RosterSideList rows={cancelled} search={search} onSelect={setSelectedRegistrationId} />}
       </aside>
     </div>
-    {selectedRegistration && <section className="admin-registration-detail no-print" aria-label="報名管理操作"><div className="section-title"><h3>{selectedRegistration.member_name}・{registrationText[selectedRegistration.status]}</h3><button className="secondary" onClick={() => setSelectedRegistrationId(null)}>關閉</button></div>
+    {selectedRegistration && <ResponsivePanel label="報名管理操作" onClose={() => setSelectedRegistrationId(null)}><div className="section-title"><h3>{selectedRegistration.member_name}・{registrationText[selectedRegistration.status]}</h3><button autoFocus className="secondary" onClick={() => setSelectedRegistrationId(null)}>關閉</button></div>
       <p>{selectedRegistration.distinguishing_note && `${selectedRegistration.distinguishing_note}・`}{selectedRegistration.hard_level_snapshot} 級・順位 {selectedRegistration.queue_sequence}・{selectedRegistration.updated_by_username} {taipei(selectedRegistration.updated_at)}</p>
       <div className="registration-detail-actions"><label>當次餐食 <select aria-label={`${selectedRegistration.member_name}當次餐食`} value={selectedRegistration.diet} disabled={readonly || selectedRegistration.status === 'cancelled' || !!busy} onChange={event => changeDiet(selectedRegistration, event.target.value as Diet)}>{Object.entries(dietText).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></label>
       {!readonly && selectedRegistration.status !== 'cancelled' && <button className="danger" disabled={!!busy} onClick={() => mutate(selectedRegistration, 'cancel')}>取消報名</button>}
       {!readonly && selectedRegistration.status === 'waitlisted' && firstWaiting?.id === selectedRegistration.id && <button disabled={!!busy} onClick={() => mutate(selectedRegistration, 'promote')}>確認遞補</button>}</div>
-    </section>}
+    </ResponsivePanel>}
   </section>
 }
 

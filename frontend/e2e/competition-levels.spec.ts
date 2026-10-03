@@ -32,7 +32,7 @@ async function setup(page: Page, info: TestInfo, suffix: string, count=4) {
   }
   await page.reload()
   const area=page.getByRole('region',{name:'當次比賽級數安排'})
-  const choose=async(second=false)=>{ await page.getByLabel('選擇比賽',{exact:true}).selectOption(second?other.id:comp.id);await expect(area.getByRole('heading',{name:second?other.name:comp.name,exact:true})).toBeVisible();await expect(area.locator('.arrangement-cell')).toHaveCount(second?0:count) }
+  const choose=async(second=false)=>{ await page.getByLabel('選擇比賽',{exact:true}).selectOption(second?other.id:comp.id);await expect(area.getByRole('heading',{name:second?other.name:comp.name,exact:true})).toBeVisible();await expect(area.locator('.arrangement-cell')).toHaveCount(second?0:count);await area.getByRole('button',{name:'完整表格',exact:true}).click() }
   await choose()
   const endpoint=`/api/admin/competitions/${comp.id}/arrangement`
   const state=async()=>await (await page.request.get(endpoint)).json()

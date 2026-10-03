@@ -24,7 +24,7 @@ async function setup(page:Page,info:TestInfo,suffix:string,count=4){
   }
   await page.reload()
   const area=page.getByRole('region',{name:'當次比賽級數安排'})
-  const choose=async()=>{await page.getByLabel('選擇比賽',{exact:true}).selectOption(comp.id);await expect(area.getByRole('heading',{name:comp.name,exact:true})).toBeVisible()}
+  const choose=async()=>{await page.getByLabel('選擇比賽',{exact:true}).selectOption(comp.id);await expect(area.getByRole('heading',{name:comp.name,exact:true})).toBeVisible();await area.getByRole('button',{name:'完整表格',exact:true}).click()}
   await choose()
   const endpoint=`/api/admin/competitions/${comp.id}/arrangement`
   const state=async()=>await (await page.request.get(endpoint)).json()

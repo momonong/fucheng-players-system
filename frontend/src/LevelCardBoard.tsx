@@ -41,8 +41,8 @@ export function legacyLayout(rows: ArrangementRow[]): GridLayout {
   const heights = Array.from({ length: Math.max(8,...groups.map(g => g.length)) },(_,i) => ({ id: `legacy-row-${i}`, role: 'body' as const }))
   return { schema_version: 1, rows: heights, columns, merges: [], cells: groups.flatMap((g,i) => g.map((r,j) => ({ kind: 'registration' as const, registration_id:r.registration_id, row_id:heights[j].id, column_id:columns[i].id }))) }
 }
-export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, changes, search, vegetarian, readonly, busy, textDrafts, onTextDraft, onOperate, stateToken, competitionId, historical, confirmedGrid, canUndo, onUndo, canRedo, onRedo, locatedChangeId, locatedPoints, onClearLocated }: {
-  rows: ArrangementRow[]; layout: GridLayout | null; baselineLayout: GridLayout | null; changes: ArrangementChange[]; search: string; vegetarian: boolean
+export function LevelCardBoard({ active = true, rows, layout: knownLayout, baselineLayout, changes, search, vegetarian, readonly, busy, textDrafts, onTextDraft, onOperate, stateToken, competitionId, historical, confirmedGrid, canUndo, onUndo, canRedo, onRedo, locatedChangeId, locatedPoints, onClearLocated }: {
+  active?: boolean; rows: ArrangementRow[]; layout: GridLayout | null; baselineLayout: GridLayout | null; changes: ArrangementChange[]; search: string; vegetarian: boolean
   canUndo:boolean; onUndo:()=>void; canRedo:boolean; onRedo:()=>void; locatedChangeId:string|null; locatedPoints:GridPoint[]; onClearLocated:()=>void; confirmedGrid?:{request_id:string;action:GridOperation['action']}; historical:boolean; competitionId:string; stateToken: string; readonly: boolean; busy: boolean; textDrafts: Record<string, string>; onTextDraft: (key: string, text: string) => void; onOperate: (operation: GridOperation, expectedToken?: string) => void
 }) {
   const layout = knownLayout ?? legacyLayout(rows)
@@ -231,14 +231,14 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
     return()=>{document.removeEventListener('pointerdown',reset,true);document.removeEventListener('click',consume,true)}
   },[])
   useEffect(()=>{
-    if(!editing?.inline||blocked)return
+    if(!active||!editing?.inline||blocked)return
     const outside=(e:PointerEvent)=>{
-      if((e.target as HTMLElement).closest('.grid-inline-editor'))return
+      if((e.target as HTMLElement).closest('.grid-inline-editor,.arrangement-view-switch'))return
       consumeOutsideClick.current=true;e.preventDefault();e.stopImmediatePropagation();commitText()
     }
     document.addEventListener('pointerdown',outside,true)
     return()=>document.removeEventListener('pointerdown',outside,true)
-  },[editing,text,blocked])
+  },[editing,text,blocked,active])
   const beyond=(event:React.PointerEvent<HTMLDialogElement>)=>{const box=event.currentTarget.getBoundingClientRect();return event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom}
   const inlineEditor=()=> <input className="grid-inline-editor" aria-label="直接編輯文字" autoFocus maxLength={500} disabled={blocked} value={text}
     onCompositionStart={()=>{composing.current=true}} onCompositionEnd={()=>{composing.current=false}} onChange={e=>{setText(e.target.value);if(editing)onTextDraft(editing.key,e.target.value)}} onClick={e=>e.stopPropagation()}
