@@ -7,7 +7,7 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 User=%i
-ExecStart=/usr/bin/ssh -NT -o BatchMode=yes -o StrictHostKeyChecking=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ControlMaster=no -o ControlPath=none -R 127.0.0.1:18084:127.0.0.1:8064 hp-server
+ExecStart=/usr/bin/ssh -NT -i ~/.ssh/fucheng-hp-tunnel -o IdentitiesOnly=yes -o IdentityAgent=none -o BatchMode=yes -o StrictHostKeyChecking=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ControlMaster=no -o ControlPath=none -R 127.0.0.1:18084:127.0.0.1:8064 hp-server
 Restart=always
 RestartSec=10
 NoNewPrivileges=yes

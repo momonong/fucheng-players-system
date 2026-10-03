@@ -1,6 +1,6 @@
 # 家中 4090 試用部署
 
-2026-10-03 狀態：0.3.2 原始碼與 image 已發布；本文件與 Compose 是部署準備，`momonong.me/fucheng/` 尚未切換。不可把合成驗證或資料副本升級視為公開服務完成。
+2026-10-03 狀態：0.3.2 原始碼與 image 已發布；4090 的 app/backup 已在 loopback 啟動，指定資料已還原，`momonong.me/fucheng/` 尚未切換。不可把本機驗證視為公開服務完成。
 
 ## 主機與入口
 
@@ -32,7 +32,9 @@ dc=(docker --context default compose --env-file data/home-deployment/home.env
 "${dc[@]}" run --rm ops backup
 ```
 
-`fucheng-hp-tunnel@.service` 是 systemd 範本，以實際本機使用者執行，例如 `fucheng-hp-tunnel@ubuntu.service`。安裝前確認該使用者的 `hp-server` alias 與 known_hosts 能非互動登入，目的地符合 selfhost-servers；不複製私鑰。需使用者終端的 sudo 認證才能安裝／enable，不能把測試 SSH 當正式服務。先驗 app，再驗持續 forward，最後依基礎設施契約備份、validate、reload Caddy。
+`fucheng-hp-tunnel@.service` 是 systemd 範本，以實際本機使用者執行，例如 `fucheng-hp-tunnel@ubuntu.service`。它使用該帳號家目錄的 `~/.ssh/fucheng-hp-tunnel` 專用金鑰，明確停用 SSH agent，避免重開機後依賴桌面解鎖。私鑰只留 4090，權限 0600；HP 僅加入公開金鑰並保留原有 authorized_keys。對應授權使用 `command="/bin/false",restrict,port-forwarding,permitlisten="127.0.0.1:18084",permitopen="127.0.0.1:1"`：只允許指定 remote listener，不允許 shell、PTY 或 agent forwarding；local forward 僅限不可用的 loopback port 1。安裝前核對 `hp-server` alias 與 known_hosts，並驗證在沒有 agent 時正確 forward 可用、其他 listener 與 shell 被拒絕。金鑰若遺失須重新配對，不回退到一般管理金鑰。
+
+需使用者終端的 sudo 認證才能安裝／enable，不能把測試 SSH 當正式服務。先驗 app，再驗持續 forward，最後依基礎設施契約備份、validate、reload Caddy。
 
 ## 本輪證據與剩餘條件
 
@@ -40,7 +42,10 @@ dc=(docker --context default compose --env-file data/home-deployment/home.env
 - 隔離 project `fucheng-home-ingress-check-20261003`、8065、10.203.33.0/24、合成空資料：app/backup healthy；子路徑 health/HTML 200、匿名管理 401、根路徑 API 404、錯誤 Host／缺少轉送識別 400。測試金鑰是無效占位值，僅供 loopback 配置驗證，未呼叫 Siteverify、不代表 Turnstile 通過。
 - SSH systemd 範本通過 `systemd-analyze verify`；HP 實際 Caddy 版本 validate 候選通過。臨時 HP loopback 18086 → SSH → 4090 8065 → Docker health 通過，測試 forward 與 app/backup 已停止、合成 volumes 保留。尚未安裝 systemd 或套用 Caddy。
 - 使用者已接受收到的舊資料快照作為試用基準，不要求補取 Windows WAL。原始檔另行保留；獨立副本 0005 → 0010 升級後，14 張原表的所有既有欄位逐列一致，integrity ok、FK error 0。未補造安排歷史，也尚未把副本公開。
-- 待完成：有效 Turnstile、試用目標資料與管理員存取設定、正式 named volume 還原／備份、持續 SSH、Caddy 切換、完整 HTTPS/登入/報名/媒體驗收與異地備份安排。受限證據在 ignored `data/`，不提交 DB 或認證內容。
+- 正式 project `fucheng-home` 已經 runtime import/restore 還原指定副本。依使用者選擇，先在獨立副本建立及驗證新管理員，再停用舊管理員登入，保留其 actor 與業務資料；runtime 還原使舊 sessions 失效。本機新管理員登入／登出、Secure/HttpOnly 與 /fucheng/ Cookie、342 位會員及公開欄位界線通過。
+- 有效設定檔已放入私密目錄；Siteverify 對無效測試 token 回 invalid-input-response，未回 secret-key 錯誤。這僅核對連通與基本設定，真正的瀏覽器挑戰尚未驗收。
+- app/backup healthy；成組 export 與 archive/member hashes 通過，另以新 project `fucheng-home-restore-check-20261003` 驗 import/restore/inspect。第一次匯入因唯讀來源目錄欠缺容器 UID 穿越權限而停止，未建立產物；修正私密父目錄下的匯出子目錄權限後重新驗證。原始來源與全部資料卷保留。
+- 專用 SSH key 無 agent 的正向轉送通過，shell 與其他 remote listener 被拒絕；金鑰不進 repo。待使用者互動 sudo 安裝持續 SSH／套用已 validate 的 Caddy 候選，再驗完整 HTTPS/登入/報名/媒體與重啟恢復；異地備份仍待安排。受限證據在 ignored `data/`，不提交 DB 或認證內容。
 
 備份 volume 與 app 同機，不能算異地備份。更新前手動備份與成組 export；回退在新 volume 還原匹配 image/schema，保留故障資料。不得 prune 或 down -v。
 
