@@ -1,6 +1,6 @@
 # 家中 4090 試用部署
 
-2026-10-03 狀態：0.3.2 原始碼與 image 已發布；4090 的 app/backup 已在 loopback 啟動，指定資料已還原，`momonong.me/fucheng/` 尚未切換。不可把本機驗證視為公開服務完成。
+2026-10-03 狀態：0.3.2 原始碼與 image 已發布；4090 的 app/backup 已在 loopback 啟動，指定資料已還原，`https://momonong.me/fucheng/` 已切換並完成公開瀏覽器讀取驗證。管理員登入後人工操作、真實 Turnstile 報名及斷電恢復仍待驗收。
 
 ## 主機與入口
 
@@ -40,15 +40,25 @@ dc=(docker --context default compose --env-file data/home-deployment/home.env
 
 - 0.3.2 image ID `585befc2f28a075467ce15ce32ab5d41f20134b34523cb6ae759e93da097ffe5`，digest 固定於 env 範例。
 - 隔離 project `fucheng-home-ingress-check-20261003`、8065、10.203.33.0/24、合成空資料：app/backup healthy；子路徑 health/HTML 200、匿名管理 401、根路徑 API 404、錯誤 Host／缺少轉送識別 400。測試金鑰是無效占位值，僅供 loopback 配置驗證，未呼叫 Siteverify、不代表 Turnstile 通過。
-- SSH systemd 範本通過 `systemd-analyze verify`；HP 實際 Caddy 版本 validate 候選通過。臨時 HP loopback 18086 → SSH → 4090 8065 → Docker health 通過，測試 forward 與 app/backup 已停止、合成 volumes 保留。尚未安裝 systemd 或套用 Caddy。
-- 使用者已接受收到的舊資料快照作為試用基準，不要求補取 Windows WAL。原始檔另行保留；獨立副本 0005 → 0010 升級後，14 張原表的所有既有欄位逐列一致，integrity ok、FK error 0。未補造安排歷史，也尚未把副本公開。
+- SSH systemd 範本通過 `systemd-analyze verify`；HP 實際 Caddy 版本 validate 候選通過。臨時 HP loopback 18086 → SSH → 4090 8065 → Docker health 通過，測試 forward 與 app/backup 已停止、合成 volumes 保留。此為切換前驗證；後續正式安裝與公開切換見下節。
+- 使用者已接受收到的舊資料快照作為試用基準，不要求補取 Windows WAL。原始檔另行保留；獨立副本 0005 → 0010 升級後，14 張原表的所有既有欄位逐列一致，integrity ok、FK error 0。未補造安排歷史，切換前尚未公開副本；後續以使用者接受的快照還原正式 volume。
 - 正式 project `fucheng-home` 已經 runtime import/restore 還原指定副本。依使用者選擇，先在獨立副本建立及驗證新管理員，再停用舊管理員登入，保留其 actor 與業務資料；runtime 還原使舊 sessions 失效。本機新管理員登入／登出、Secure/HttpOnly 與 /fucheng/ Cookie、342 位會員及公開欄位界線通過。
 - 有效設定檔已放入私密目錄；Siteverify 對無效測試 token 回 invalid-input-response，未回 secret-key 錯誤。這僅核對連通與基本設定，真正的瀏覽器挑戰尚未驗收。
 - app/backup healthy；成組 export 與 archive/member hashes 通過，另以新 project `fucheng-home-restore-check-20261003` 驗 import/restore/inspect。第一次匯入因唯讀來源目錄欠缺容器 UID 穿越權限而停止，未建立產物；修正私密父目錄下的匯出子目錄權限後重新驗證。原始來源與全部資料卷保留。
-- 專用 SSH key 無 agent 的正向轉送通過，shell 與其他 remote listener 被拒絕；金鑰不進 repo。待使用者互動 sudo 安裝持續 SSH／套用已 validate 的 Caddy 候選，再驗完整 HTTPS/登入/報名/媒體與重啟恢復；異地備份仍待安排。受限證據在 ignored `data/`，不提交 DB 或認證內容。
+- 專用 SSH key 無 agent 的正向轉送通過，shell 與其他 remote listener 被拒絕；金鑰不進 repo。使用者其後已互動 sudo 安裝持續 SSH／套用 Caddy，公開驗證見下節；登入後人工操作、真實報名、媒體及重啟恢復與異地備份仍待驗收或安排。受限證據在 ignored `data/`，不提交 DB 或認證內容。
 
 備份 volume 與 app 同機，不能算異地備份。更新前手動備份與成組 export；回退在新 volume 還原匹配 image/schema，保留故障資料。不得 prune 或 down -v。
 
 ## 日後搬到球館
 
 球館 Windows Docker Desktop／WSL2 仍可使用同一 Linux/amd64 0.3.2 image、runtime 及成組備份。改採該場域的入口配置，不沿用 HP SSH overlay；根路徑時 `FUCHENG_BASE_PATH` 留空，`FUCHENG_PUBLIC_ORIGIN` 改為當地 HTTPS origin，前綴不寫入會員資料。不因改前綴重建 image。實機登入、資料還原、照片、斷電／重啟及 Windows 登入後 Docker 恢復仍需驗收。
+
+## 公開切換驗證（2026-10-03）
+
+使用者在終端完成兩台主機的互動 sudo。獨立核對 4090 的 `fucheng-hp-tunnel@ubuntu.service` active/enabled、NRestarts=0；app/backup healthy，app 僅發布 127.0.0.1:8064。HP forward 僅 127.0.0.1:18084；Caddy、cloudflared、既有 OrderFlow forward 皆 active。現用 Caddy SHA-256 為 `0e9b6473c465309ea5fad4dde547b9f286d3a363acd69142a3bd3157505da209`，與已審查候選一致；root-only 舊設定備份在 HP `/var/backups/fucheng-ingress/cutover-IQhjPaJx`。
+
+公開瀏覽器可完整載入首頁公告、342 位會員的分級頁、比賽頁與管理員登入表單；共用根首頁及 OrderFlow 登入頁正常。舊場次已截止，公開報名頁正確顯示沒有開放場次；未為驗證向真實試用資料新增合成比賽或報名。
+
+Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器正常進站。IAB 直接導覽 API 路徑另被 client 阻擋，因此未把它記成公開 API 成功，也未調整 Cloudflare 或繞過保護。先前透過可信本機入口的管理員登入／讀取／登出已通過；本輪公開瀏覽器登入後流程、真正的 Turnstile 挑戰及成功報名尚待使用者驗收。沒有斷電／重開機或另一條行動網路的驗證。
+
+現用 image 保持 0.3.2 與原 digest；本輪僅同步部署設定及證據，未重建 image。帳密、來源資料、備份和完整受限紀錄保存在 ignored `data/home-deployment/`，不進版本庫。
