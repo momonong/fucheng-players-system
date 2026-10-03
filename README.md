@@ -2,7 +2,7 @@
 
 0.3.2 新增可設定的部署前綴，維持 schema `0010_deployment_report`，相容 0.3.1 資料庫。家中試用目標為 `https://momonong.me/fucheng/`；版本發布不代表公開入口已切換。發布與升級說明見[0.3.2 部署說明](docs/deployment.md#032-發布與升級)。
 
-家中 4090 的 Docker／HP 加密轉送設定與待完成條件見[家中部署準備](docs/home-deployment.md)；目前尚未公開切換。
+家中試用已於 2026-10-03 切換至 [momonong.me/fucheng/](https://momonong.me/fucheng/)；Docker app／資料位於 4090，HP 僅提供共用入口與加密轉送。部署證據及待驗收範圍見[家中部署紀錄](docs/home-deployment.md)。
 
 部署前綴可於啟動時設定：`FUCHENG_BASE_PATH=/fucheng` 使用 `/fucheng/`；空值或 `/` 使用網域根路徑。同一份前端成品／Linux amd64 image 可供兩種模式使用，不需因搬到球館 Windows Docker Desktop／WSL2 而重建。代理必須保留完整前綴，`FUCHENG_PUBLIC_ORIGIN` 仍只填 scheme＋host；設定、遷移與驗證邊界見[子路徑部署](docs/deployment.md#部署前綴與根路徑相容)。
 
