@@ -753,7 +753,7 @@ Chromium 觸控模擬與 contextmenu 注入不是 Android／iPhone 真機或 Saf
 
 ## 素食小圓形入口與欄名／隊名（2026-10-04，尚未發布）
 
-分支 `codex/roster-location-labels`，起點 `3b5675098ec614793f45586ba73fe6fe3cdfad14`。使用者確認「1 級最高、缺少則依序往下找」及「隊名取左側最近非空文字欄，否則右側，跨列合併適用」。完整顯示契約見 [手機流程](mobile-workflows.md#素食名單後續修正2026-10-04尚未發布)。本輪只有前端顯示／解析、相關測試與文件；沒有 API、schema、依賴或正式資料變更。
+分支 `codex/roster-location-labels`，起點 `3b5675098ec614793f45586ba73fe6fe3cdfad14`。使用者確認「1 級最高、缺少則依序往下找」及「隊名取左側最近非空文字欄，否則右側，跨列合併適用」。完整顯示契約見 [手機流程](mobile-workflows.md#素食名單後續修正2026-10-04035-已部署)。本輪只有前端顯示／解析、相關測試與文件；沒有 API、schema、依賴或正式資料變更。
 
 - Production build（含 TypeScript 檢查）、`npm audit --audit-level=high`（0 vulnerabilities）、`git diff --check` 通過。
 - `roster-labels.spec.ts` 的 5 個純資料案例通過：多層欄名、非 anchor／跨列合併文字、固定表頭自訂／null／空值、左近右備援隊名、缺少 1 級時以本場級數推導、單字／同名識別、換列與歷史不變性，以及 legacy／缺格位未知。
@@ -777,3 +777,7 @@ npm --prefix frontend run test:e2e -- mobile-workflows.spec.ts --project mobile 
 ```
 
 本機證據在 `test-results/roster-labels-mobile-final/`、`test-results/roster-labels-desktop-final/`；兩批 `.last-run.json` 均 passed。精簡截圖留在 `data/roster-labels-review/mobile-button.png` 與 `mobile-list.png`。Chromium 手機模擬不等於 Android／iPhone 真機驗收。此階段本機開發完成，未合併／推送、未發布 image／部署；人工接受待確認。
+
+### 0.3.5 發布後補充
+
+上節「尚未發布」是功能完成時的歷史狀態。後續依使用者明確授權，已完成 0.3.5 GitHub／Docker Hub 發布、4090 部署及公開管理頁唯讀核對，見 [部署紀錄](home-deployment.md)。最後管理列靠右改動在 `test-results/admin-status-right/` 的 desktop／mobile 2 passed，手機容器加寬後在 `test-results/admin-status-right-mobile-final/` 補驗 1 passed，均含 360–1440px；重用 8294 一度因 socket 占用而在接觸 fixture 前拒絕啟動，改用已核對空閒的 8295 通過。發布前另跑全後端 211 passed，沒有新增 migration 或依賴。

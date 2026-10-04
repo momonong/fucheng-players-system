@@ -1,6 +1,6 @@
 # 家中 4090 試用部署
 
-2026-10-04 狀態：4090 已更新至 0.3.4 手機表格修正版，GitHub／Docker Hub 已發布，帳號與既有資料保留。公開 HTTPS 已載入新版資產，既有登入 session 的管理頁確認新素食名單入口、帳號位置及移除名單操作。真機手感、真實 Turnstile 報名與斷電恢復仍待驗收；歷史紀錄保留於下方。
+2026-10-04 狀態：4090 已更新至 0.3.5，GitHub／Docker Hub 已發布，帳號與既有資料保留。公開管理頁已核對小圓形素食名單入口，以及靠右的備份／管理員名稱。真機操作手感、真實 Turnstile 報名與斷電恢復仍待驗收；歷史紀錄保留於下方。
 
 ## 主機與入口
 
@@ -95,3 +95,20 @@ Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器�
 - 4090 SSH forward active；HP Caddy／cloudflared active，Caddy SHA 仍為 `0e9b6473c465309ea5fad4dde547b9f286d3a363acd69142a3bd3157505da209`。未更改入口、DNS、Tunnel、SSH、服務目錄或其他應用；ASUS 不承接府城 app。
 
 帳密沿用，使用者重新整理頁面即可試用。工程及公開讀取檢查不代替 Android／iPhone 真機手感驗收；無斷電／重開機或真正 Turnstile 報名測試。舊映像、資料卷、備份及隔離合成證據保留；兩個合成 app 已停止，沒有 prune 或 down -v。回退可恢復 0.3.3 程式；若還原資料則另以匹配 image/schema 的新目標保留後續寫入。同機備份仍不是異地備份。
+
+
+## 0.3.5 素食名單與管理列排版部署（2026-10-04）
+
+先合併 [PR #9](https://github.com/momonong/fucheng-players-system/pull/9)，發布 [v0.3.5](https://github.com/momonong/fucheng-players-system/releases/tag/v0.3.5) 與 Docker Hub `0.3.5`／`latest`，兩個標籤遠端 digest 相同且拉回 image ID 正確後，才升級既有 4090 project。
+
+- 合併／tag／映像來源：`36469149d9bff1e5d6aacf7530ca35d078b1b3e9`。
+- Digest：`sha256:a6a6a8cda18517ed082bbd5c13545d21e4d729bf75e5c3c3cd0d5b4d312f9ca2`；Image ID：`sha256:04b30d787f44ff00cfe9b4cc2371bd0188d8ff9081920ce59178ce149f59222a`。
+- Source manifest：`0a480d64505d859240b502725fbee9e1cc162194ac83f858c2ab51cac0e8ec5a`，75 個 allowlist 檔案；乾淨已提交來源、context audit 通過，沒有 data／秘密／備份／舊 dist。
+- 全後端 211 passed（2 個既有棄用警告），uv sync --locked、production build／typecheck、npm high audit（0 vulnerabilities）及 diff／秘密掃描通過。根路徑與 `/fucheng/` 合成 image 驗 health、登入登出、Cookie Path、匿名拒絕及完整性；映像 JS/CSS 與本輪桌面／手機測試成品逐位元相同。
+- 更新前正常停止 app／backup，以舊 runtime 建立 backup／成組 export，archive 及所有成員 hash 正確。停寫 checkpoint：`manual-export-20261004T053232217100Z-7fd06fa2.db`。私密 env／備份與完整證據保存在 ignored `data/release-0.3.5/`；不提交來源資料或帳密。
+- app／backup／ops 同批固定新 digest，原 named volumes 保留；無 migration／reseed，schema 0010、integrity ok、FK errors 0。16 張業務表內容 fingerprint 不變：342 會員、2 場次、81 報名、2 安排保存版、2 公告。
+- app／backup healthy；loopback 管理員登入／讀取／登出、Secure/HttpOnly 前綴 cookie、匿名 401、錯誤 Host 400、裸 API 404、備份狀態通過。HP Caddy 的根首頁／OrderFlow／府城首頁及 health 均 200。
+- 公開 HTTPS 實際載入 `index-NQDf3-Ql.js`／`index-D48eAE_k.css`。獨立瀏覽器分頁沿用既有 session，確認管理列 flex-end、名稱右側與狀態列齊邊、28px 圓形、名單可開啟／關閉。沒有在真實資料拖曳、保存或增刪；使用者原分頁未重新整理。
+- HP Caddy／cloudflared 與 4090 SSH forward active，Caddy SHA 仍為 `0e9b6473c465309ea5fad4dde547b9f286d3a363acd69142a3bd3157505da209`。沒有入口、DNS、Tunnel、SSH 或其他 app 變更，ASUS 不承接府城 app。
+
+重新整理頁面即可載入新版，帳密沿用。兩個合成 app 已停止，合成 volumes、舊映像、原資料卷與備份保留，沒有 prune／down -v。沒有斷電／Windows 實機／真實 Turnstile 或 Android／iPhone 手感驗收；同機備份不等於異地備份。
