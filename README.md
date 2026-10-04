@@ -1,6 +1,6 @@
 # 府城球館會員管理系統
 
-0.3.4 修正手機安排表拖曳與選單衝突，新增素食名單及調整管理員名稱位置；沿用 schema `0010_deployment_report`，同一映像支援家中 `/fucheng/` 與球館根路徑。詳見[0.3.4 發布說明](docs/release-0.3.4.md)，部署狀態以日期化紀錄為準。
+0.3.5 改善素食名單入口、多層欄名／隊名判定，並將備份與管理員名稱整組靠右；沿用 schema `0010_deployment_report`，同一映像支援家中 `/fucheng/` 與球館根路徑。詳見[0.3.5 發布說明](docs/release-0.3.5.md)，部署狀態以日期化紀錄為準。
 
 家中試用已於 2026-10-03 切換至 [momonong.me/fucheng/](https://momonong.me/fucheng/)；Docker app／資料位於 4090，HP 僅提供共用入口與加密轉送。部署證據及待驗收範圍見[家中部署紀錄](docs/home-deployment.md)。
 
