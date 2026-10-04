@@ -8,6 +8,10 @@
 
 同一映像仍支援 Linux Docker Engine 與 Windows Docker Desktop 的 Linux/amd64 containers，runtime 可選 `/fucheng` 或根路徑；球館 Windows 開機恢復與手機真機操作仍須現場驗收。
 
+## 0.3.3 發布與升級
+
+0.3.3 為先前手機名單操作版本；歷史功能與驗證見 [0.3.3 發布說明](release-0.3.3.md)，當時部署證據保留在 [家中部署紀錄](home-deployment.md)。目前更新請使用上方 0.3.4 流程。
+
 ## 0.3.2 發布與升級
 
 0.3.2 包含以下可設定部署前綴功能，使用 `momonong/fucheng-players-system:0.3.2`；發布後以 Docker Hub digest 核對映像，既有 `0.3.1` 保留。不要在 0.3.1 或更舊映像上僅設定 `FUCHENG_BASE_PATH`，舊版並不具備此功能。GitHub 的同版 Compose、Windows 維運腳本及本節說明需一起使用。
