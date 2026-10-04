@@ -858,7 +858,7 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
   .admin-header { gap: .35rem; padding: .65rem 1rem; }
   .admin-header .eyebrow { display: none; }
   .admin-header h1 { font-size: 1.4rem; }
-  .admin-header-controls { display: grid; width: 100%; gap: .3rem; }
+  .admin-header-controls { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: .3rem; }
   .admin-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .25rem; }
   .admin-nav a { min-height: 44px; display: grid; place-items: center; padding: .35rem .25rem; font-size: .9rem; }
   .admin-account { display: flex; width: 100%; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: .25rem; }
@@ -946,7 +946,7 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
 
 
 
-.admin-status-line { display: flex; align-items: center; gap: .65rem; width: 100%; min-width: 0; }
+.admin-status-line { display: flex; align-items: center; justify-content: flex-end; gap: .65rem; width: 100%; min-width: 0; }
 .admin-username { font-size: .85rem; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
 .admin-status-line .admin-backup { flex-shrink: 0; }
 .vegetarian-control { position: relative; flex: 0 0 auto; margin-right: 18px; padding-top: 10px; }
