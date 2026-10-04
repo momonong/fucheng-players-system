@@ -1,10 +1,10 @@
 # Windows Docker 部署、搬移與維運
 
-## 0.3.3 發布與升級
+## 0.3.4 發布與升級
 
-0.3.3 提供手機名單操作、觸控操作面板與會員／公告清單編輯切換，桌面完整表格保留。版本細節與驗證見 [0.3.3 發布說明](release-0.3.3.md)。Docker Hub 標籤為 `momonong/fucheng-players-system:0.3.3`；部署使用核對後的 digest。
+0.3.4 移除手機名單操作，改用表格專用觸控把手並隔離長按選單；新增素食名單及調整管理員名稱位置。版本細節與驗證見 [0.3.4 發布說明](release-0.3.4.md)。Docker Hub 標籤為 `momonong/fucheng-players-system:0.3.4`；部署使用核對後的 digest。
 
-從 0.3.2 升級不需 migration，schema 仍為 `0010_deployment_report`；先停止本 project 的 app／backup、使用原版 runtime 成組備份 DB＋媒體，再同批更新 app／backup／ops 映像，保留現有 named volumes 與環境設定。驗 health、資產、登入、讀取與備份健康後再交付。不要重建資料庫或套回舊匯入資料。此版沒有後端／schema 變更，程式回退可恢復 0.3.2 映像並保留當前資料；若涉及資料還原，仍須使用新目標及匹配 image/schema，保留後續寫入。
+從 0.3.3 升級不需 migration，schema 仍為 `0010_deployment_report`；先停止本 project 的 app／backup、使用原版 runtime 成組備份 DB＋媒體，再同批更新 app／backup／ops 映像，保留現有 named volumes 與環境設定。驗 health、資產、登入、讀取與備份健康後再交付。不要重建資料庫或套回舊匯入資料。此版沒有後端／schema 變更，程式回退可恢復 0.3.3 映像並保留當前資料；若涉及資料還原，仍須使用新目標及匹配 image/schema，保留後續寫入。
 
 同一映像仍支援 Linux Docker Engine 與 Windows Docker Desktop 的 Linux/amd64 containers，runtime 可選 `/fucheng` 或根路徑；球館 Windows 開機恢復與手機真機操作仍須現場驗收。
 

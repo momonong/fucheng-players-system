@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ArrangementRow, GridCell, GridLayout, GridOperation, GridPoint } from './types'
 import { createPortal } from 'react-dom'
 import { useLevelCardDrag } from './useLevelCardDrag'
+import { useCompactLayout } from './useCompactLayout'
 import { useGridSelection } from './useGridSelection'
 import { MemberLevelHistory } from './MemberLevelHistory'
 import { shadeResolver, expandedSelection, shades } from './gridShade'
@@ -41,10 +42,14 @@ export function legacyLayout(rows: ArrangementRow[]): GridLayout {
   const heights = Array.from({ length: Math.max(8,...groups.map(g => g.length)) },(_,i) => ({ id: `legacy-row-${i}`, role: 'body' as const }))
   return { schema_version: 1, rows: heights, columns, merges: [], cells: groups.flatMap((g,i) => g.map((r,j) => ({ kind: 'registration' as const, registration_id:r.registration_id, row_id:heights[j].id, column_id:columns[i].id }))) }
 }
-export function LevelCardBoard({ active = true, rows, layout: knownLayout, baselineLayout, changes, search, vegetarian, readonly, busy, textDrafts, onTextDraft, onOperate, stateToken, competitionId, historical, confirmedGrid, canUndo, onUndo, canRedo, onRedo, locatedChangeId, locatedPoints, onClearLocated }: {
-  active?: boolean; rows: ArrangementRow[]; layout: GridLayout | null; baselineLayout: GridLayout | null; changes: ArrangementChange[]; search: string; vegetarian: boolean
+export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, changes, search, vegetarian, readonly, busy, textDrafts, onTextDraft, onOperate, stateToken, competitionId, historical, confirmedGrid, canUndo, onUndo, canRedo, onRedo, locatedChangeId, locatedPoints, onClearLocated }: {
+  rows: ArrangementRow[]; layout: GridLayout | null; baselineLayout: GridLayout | null; changes: ArrangementChange[]; search: string; vegetarian: boolean
   canUndo:boolean; onUndo:()=>void; canRedo:boolean; onRedo:()=>void; locatedChangeId:string|null; locatedPoints:GridPoint[]; onClearLocated:()=>void; confirmedGrid?:{request_id:string;action:GridOperation['action']}; historical:boolean; competitionId:string; stateToken: string; readonly: boolean; busy: boolean; textDrafts: Record<string, string>; onTextDraft: (key: string, text: string) => void; onOperate: (operation: GridOperation, expectedToken?: string) => void
 }) {
+  const compact = useCompactLayout()
+  const columnWidth = compact ? 152 : 110
+  const lastPointer = useRef('')
+  const dragToken = useRef(stateToken)
   const layout = knownLayout ?? legacyLayout(rows)
   const [selected, setSelected] = useState<GridPoint | null>(null)
   const selectionDocument=selectionLayout(layout),headings=headerCells(layout)
@@ -55,7 +60,7 @@ export function LevelCardBoard({ active = true, rows, layout: knownLayout, basel
   const [shadePanel,setShadePanel]=useState<CellShadePanel|null>(null)
   const textPending=useRef<string|null>(null),composing=useRef(false),outsideDetail=useRef(false),outsideText=useRef(false),consumeOutsideClick=useRef(false)
   const playerClicks=useRef<{id:string;at:number;count:number;touch:boolean}|null>(null)
-  const playerPointer=useRef<{x:number;y:number}|null>(null)
+  const playerPointer=useRef<{x:number;y:number;id:number}|null>(null)
   const cellShade=shadeResolver(layout)
   const [target, setTarget] = useState('1')
   const [editing, setEditing] = useState<{ key: string; point?: GridPoint; column?: string; headerMerge?:string; inline: boolean; original: string; persisted:string } | null>(null)
@@ -88,17 +93,23 @@ export function LevelCardBoard({ active = true, rows, layout: knownLayout, basel
     const row=rowMap.get(id)
     if(row){setDetailId(id);setTarget(String(row.competition_level))}
   }
-  function clickPlayer(event:React.MouseEvent<HTMLButtonElement>,id:string) {
-    const touch=(event.nativeEvent as PointerEvent).pointerType==='touch'
+  function activatePlayer(id:string,shiftKey:boolean,touch:boolean) {
     const previous=playerClicks.current,now=performance.now()
-    const extending=rangeMode||event.shiftKey
+    const extending=rangeMode||shiftKey
     // Keep both clicks of a range-ending gesture from collapsing the range or opening a dialog.
     if(previous?.id===id&&previous.count===0&&now-previous.at<500)return
-    selectPlayer(id,event.shiftKey)
+    selectPlayer(id,shiftKey)
     if(extending){playerClicks.current={id,at:now,count:0,touch};return}
     const count=previous?.id===id&&previous.touch===touch&&now-previous.at<500?previous.count+1:1
     playerClicks.current={id,at:now,count,touch}
     if(touch&&count===2){playerClicks.current=null;openDetail(id)}
+  }
+  function clickPlayer(event:React.MouseEvent<HTMLButtonElement>,id:string) {
+    // Touch uses completed pointer taps: a browser may omit a compatibility click
+    // after a cancelled drag or a focus/layout change. Never count it twice.
+    const pointerType=(event.nativeEvent as PointerEvent).pointerType
+    const touch=pointerType ? pointerType==='touch' : lastPointer.current==='touch'&&event.detail>0
+    if(!touch)activatePlayer(id,event.shiftKey,false)
   }
   function doubleClickPlayer(id:string) {
     // A drag's suppressed click must never count toward opening details.
@@ -110,16 +121,21 @@ export function LevelCardBoard({ active = true, rows, layout: knownLayout, basel
     if(event.key==='Enter'&&!rangeMode)openDetail(id)
     else selectPlayer(id)
   }
-  const { drag, holding, start } = useLevelCardDrag((id, destination) => {
+  const { drag, start } = useLevelCardDrag((id, destination) => {
     if (blocked) return
     const source = layout.cells.find(c => c.kind === 'registration' && c.registration_id === id)
     if (!source || pointKey(source) === pointKey(destination))return
     const point={row_id:destination.row_id,column_id:destination.column_id}
-    if(destination.mode==='swap')onOperate({action:'swap',registration_id:id,target_registration_id:destination.registrationId!})
-    else if(destination.mode==='insert')onOperate({action:'insert',registration_id:id,target:point,side:destination.side!})
-    else onOperate({action:'move_empty',registration_id:id,target:point})
+    if(destination.mode==='swap')onOperate({action:'swap',registration_id:id,target_registration_id:destination.registrationId!},dragToken.current)
+    else if(destination.mode==='insert')onOperate({action:'insert',registration_id:id,target:point,side:destination.side!},dragToken.current)
+    else onOperate({action:'move_empty',registration_id:id,target:point},dragToken.current)
   },!blocked&&!rangeMode)
-  useEffect(()=>{if(drag)playerClicks.current=null},[drag])
+  function startDrag(event: React.PointerEvent<HTMLButtonElement>, row: ArrangementRow) {
+    if (blocked || rangeMode || event.button !== 0) return
+    setShadePanel(null); dragToken.current = stateToken
+    start(event, { id: row.registration_id, name: row.member_name, note: row.distinguishing_note })
+  }
+  useEffect(()=>{if(drag){playerClicks.current=null;setShadePanel(null)}},[!!drag])
   useEffect(() => { if (detailId) detailDialog.current?.showModal() },[detailId])
   useEffect(() => { if (editing && !editing.inline) textDialog.current?.showModal() },[editing])
   const selection=selected?expandedSelection(selectionDocument,selected,end??selected):null
@@ -129,7 +145,7 @@ export function LevelCardBoard({ active = true, rows, layout: knownLayout, basel
     return ri>=selection.top&&ri<=selection.bottom&&ci>=selection.left&&ci<=selection.right
   }
   function openShade(point:GridPoint,left:number,top:number){
-    if(blocked)return
+    if(blocked || drag)return
     if(!selectedRange(point))select(point)
     setShadePanel({left,top})
   }
@@ -225,30 +241,35 @@ export function LevelCardBoard({ active = true, rows, layout: knownLayout, basel
     document.addEventListener('keydown',undoKey);return()=>document.removeEventListener('keydown',undoKey)
   },[readonly,blocked,canUndo,onUndo,canRedo,onRedo])
   useEffect(()=>{
-    const reset=(e:PointerEvent)=>{consumeOutsideClick.current=false;if(!(e.target as HTMLElement).closest('.cell-name'))playerClicks.current=null}
+    const reset=(e:PointerEvent)=>{consumeOutsideClick.current=false;if(!e.isPrimary){playerPointer.current=null;playerClicks.current=null}else if(!(e.target as HTMLElement).closest('.cell-name'))playerClicks.current=null}
     const consume=(e:MouseEvent)=>{if(consumeOutsideClick.current){consumeOutsideClick.current=false;e.preventDefault();e.stopImmediatePropagation()}}
     document.addEventListener('pointerdown',reset,true);document.addEventListener('click',consume,true)
     return()=>{document.removeEventListener('pointerdown',reset,true);document.removeEventListener('click',consume,true)}
   },[])
   useEffect(()=>{
-    if(!active||!editing?.inline||blocked)return
+    if(!editing?.inline||blocked)return
     const outside=(e:PointerEvent)=>{
-      if((e.target as HTMLElement).closest('.grid-inline-editor,.arrangement-view-switch'))return
+      if((e.target as HTMLElement).closest('.grid-inline-editor'))return
       consumeOutsideClick.current=true;e.preventDefault();e.stopImmediatePropagation();commitText()
     }
     document.addEventListener('pointerdown',outside,true)
     return()=>document.removeEventListener('pointerdown',outside,true)
-  },[editing,text,blocked,active])
+  },[editing,text,blocked])
   const beyond=(event:React.PointerEvent<HTMLDialogElement>)=>{const box=event.currentTarget.getBoundingClientRect();return event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom}
   const inlineEditor=()=> <input className="grid-inline-editor" aria-label="直接編輯文字" autoFocus maxLength={500} disabled={blocked} value={text}
     onCompositionStart={()=>{composing.current=true}} onCompositionEnd={()=>{composing.current=false}} onChange={e=>{setText(e.target.value);if(editing)onTextDraft(editing.key,e.target.value)}} onClick={e=>e.stopPropagation()}
     onKeyDown={e=>{if(e.nativeEvent.isComposing)return;if(e.key==='Enter'){e.preventDefault();commitText()}if(e.key==='Escape'){e.preventDefault();cancelEdit()}}}/>
   return <>
-    <div className={`arrangement-table-scroll ${drag ? 'is-dragging' : ''}`} tabIndex={0} role="region" aria-label="級數表格，可水平捲動">
-      {!readonly&&<button className="grid-menu-trigger secondary" type="button" disabled={blocked} aria-label="開啟儲存格操作" title="儲存格操作" onClick={e=>{const box=e.currentTarget.getBoundingClientRect();setShadePanel({left:box.right-250,top:box.bottom+4})}}>⋯</button>}
-      <div className="grid-canvas" style={{minWidth:Math.max(1100,layout.columns.length*110)}}>
-      {!readonly&&<GridInsertControls layout={layout} table={tableRef} stateToken={stateToken} disabled={blocked} onOperate={operate}/>}
-      <table ref={tableRef} className="arrangement-table grid-table" aria-label="當次級數表" style={{ minWidth: layout.columns.length * 110 }}>
+    <div className={`arrangement-table-scroll ${drag ? 'is-dragging' : ''}`} tabIndex={0} role="region" aria-label="級數表格，可水平捲動"
+      onPointerDownCapture={event=>{lastPointer.current=event.pointerType}}
+      onContextMenuCapture={event=>{
+        // Touch contextmenu may be a MouseEvent on WebKit: remember the originating pointer.
+        if (compact || lastPointer.current==='touch' || drag) { event.preventDefault(); event.stopPropagation() }
+      }}>
+      {!readonly&&<button className="grid-menu-trigger secondary" type="button" disabled={blocked || !!drag} aria-label="開啟儲存格操作" title="儲存格操作" onClick={e=>{const box=e.currentTarget.getBoundingClientRect();setShadePanel({left:box.right-250,top:box.bottom+4})}}>⋯</button>}
+      <div className="grid-canvas" style={{minWidth:Math.max(columnWidth*10,layout.columns.length*columnWidth)}}>
+      {!readonly&&<GridInsertControls layout={layout} table={tableRef} stateToken={stateToken} disabled={blocked || !!drag} dragging={!!drag} onOperate={operate}/>}
+      <table ref={tableRef} className="arrangement-table grid-table" aria-label="當次級數表" style={{ minWidth: layout.columns.length * columnWidth }}>
         <colgroup>{layout.columns.map(c=><col key={c.id} data-column-id={c.id}/>)}</colgroup>
         <tbody>{layout.rows.map((r,ri) => <Fragment key={r.id}>{r.role==='body'&&(ri===0||layout.rows[ri-1].role==='header')&&<tr className="grid-level-head">{headings.map(h=>{
           if(!h.anchor)return null
@@ -274,10 +295,11 @@ export function LevelCardBoard({ active = true, rows, layout: knownLayout, basel
             onClick={event => { if ((event.target as HTMLElement).closest('.cell-name,.cell-grip')) return; select(point,event.shiftKey) }}>
             {editing?.inline&&editing.point&&pointKey(editing.point)===k?inlineEditor():row ? <div data-draggable={!blocked} data-registration-id={row.registration_id} className={`arrangement-cell ${drag?.card.id===row.registration_id ? 'is-drag-source' : ''} ${change ? `net-${change.kind}` : ''} ${!match ? 'search-hidden' : search.trim() ? 'search-match' : ''} ${vegetarian && row.diet==='vegetarian' ? 'diet-highlight' : ''}`}>
               {!match ? <span className="search-occupied" aria-label="搜尋隱藏，已占用">已占用</span> : <>
-              {!readonly && <button className="cell-grip" type="button" disabled={blocked} aria-label={`拖曳 ${row.member_name} ${row.distinguishing_note ?? ''}`} onPointerDown={event => {if(!rangeMode)start(event,{ id:row.registration_id,name:row.member_name,note:row.distinguishing_note })}} onClick={()=>{playerClicks.current=null;selectPlayer(row.registration_id)}} onKeyDown={e=>keyPlayer(e,row.registration_id)} onContextMenu={event=>event.preventDefault()}>{holding===row.registration_id?'…':'⠿'}</button>}
+              {!readonly && <button className="cell-grip" type="button" disabled={blocked} aria-label={`拖曳 ${row.member_name} ${row.distinguishing_note ?? ''}`} onPointerDown={event => startDrag(event,row)} onClick={()=>{playerClicks.current=null;selectPlayer(row.registration_id)}} onKeyDown={e=>keyPlayer(e,row.registration_id)} onContextMenu={event=>{event.preventDefault();event.stopPropagation()}}>⠿</button>}
               <button className="cell-name" type="button" aria-label={`${row.member_name}${row.distinguishing_note ? `・${row.distinguishing_note}` : ''}，單擊選取、雙擊查看`} title={row.member_name}
-                onPointerDown={event => {playerPointer.current={x:event.clientX,y:event.clientY};if(event.pointerType==='mouse'&&!blocked&&!rangeMode)start(event,{id:row.registration_id,name:row.member_name,note:row.distinguishing_note})}}
-                onPointerMove={event=>{const p=playerPointer.current;if(p&&Math.hypot(event.clientX-p.x,event.clientY-p.y)>8)playerClicks.current=null}}
+                onPointerDown={event => {playerPointer.current=event.isPrimary?{x:event.clientX,y:event.clientY,id:event.pointerId}:null;if(event.pointerType==='mouse')startDrag(event,row)}}
+                onPointerMove={event=>{const p=playerPointer.current;if(p&&Math.hypot(event.clientX-p.x,event.clientY-p.y)>8){playerClicks.current=null;playerPointer.current=null}}}
+                onPointerUp={event=>{const p=playerPointer.current;playerPointer.current=null;if(event.pointerType==='touch'&&p?.id===event.pointerId&&Math.hypot(event.clientX-p.x,event.clientY-p.y)<=8)activatePlayer(row.registration_id,event.shiftKey,true)}}
                 onPointerCancel={()=>{playerClicks.current=null;playerPointer.current=null}}
                 onClick={event=>clickPlayer(event,row.registration_id)} onDoubleClick={()=>doubleClickPlayer(row.registration_id)} onKeyDown={event=>keyPlayer(event,row.registration_id)}><span className="cell-name-line"><span className="cell-person-name">{row.member_name}</span>{vegetarian&&row.diet==='vegetarian'&&<em className="diet-mark" aria-label="本場素食">素</em>}</span>{row.distinguishing_note&&<small>{row.distinguishing_note}</small>}</button>
               {change&&<span className="cell-change" aria-label={changeText(change)}>{change.kind==='added'?'+':change.kind==='position'?'↕':`${change.before}→${change.after}`}</span>}
@@ -288,7 +310,7 @@ export function LevelCardBoard({ active = true, rows, layout: knownLayout, basel
       </table>
       </div>
     </div>
-    {shadePanel&&<CellShadeMenu panel={shadePanel} value={selectedShades.size===1?[...selectedShades][0]:undefined} disabled={blocked||!selection} onClose={()=>setShadePanel(null)} onChoose={applyShade}>
+    {shadePanel&&!drag&&<CellShadeMenu panel={shadePanel} value={selectedShades.size===1?[...selectedShades][0]:undefined} disabled={blocked||!selection} onClose={()=>setShadePanel(null)} onChoose={applyShade}>
       <div className="cell-menu-actions">
         <button className="secondary" disabled={blocked||!selected||selectionCell?.kind==='registration'} onClick={()=>menuAction(()=>selectedHeader?beginEdit(null,selectedHeader):selected&&beginEdit(selected))}>編輯文字</button>
         <button className="secondary" disabled={blocked||!selected} aria-pressed={rangeMode} onClick={()=>menuAction(()=>setRangeMode(true))}>範圍選取</button>

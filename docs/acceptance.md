@@ -719,3 +719,33 @@ C3 篩選 8 個測試標題、桌機與手機共 16 例。四個失敗實例是�
 - `npm run typecheck` 與 `npm run build -- --outDir ../frontend/dist-security-stage` 通過，建置成品隔離在新目錄。第一次建置受沙箱的 Vite 設定路徑讀取拒絕，核准的重跑成功。Compose Cloudflare overlay 的 `docker compose config --no-interpolate --no-path-resolution --format json` 通過；僅解析設定，未啟動 Docker、Cloudflare 或主機服務。
 - `frontend/e2e/self-registration.spec.ts` 最終在桌機／390×844 手機模擬 **2 passed**（`data/security-stage-e2e-followup/.last-run.json` 為 passed），使用獨立 `data/security-stage-e2e.db`、port 8031、`frontend/dist-security-stage`，single worker。既有測試定位舊行政名單／稽核畫面造成先前失敗；改依目前十級名單與管理 API 驗證稽核後通過。此次再以 mock edge HTML 403 驗證匿名前端不把 HTML 當 JSON，顯示中文安全提示、姓名／葷素與同一 request_id 保留；另以本機 fake Turnstile script／session sitekey 模擬 Siteverify 503，驗 `interaction-only`、重置 widget、姓名／餐食與 request_id 在重試時不丟失。後端 timeout 到 503 的映射由 fake `urlopen` 測試驗證；沒有真實 widget／Cloudflare 連線。首次瀏覽器啟動 `spawn EPERM` 是沙箱限制；核准重跑後才實際執行。未測外部 WAF、真實共享 Wi-Fi 誤攔或 Linux 重啟恢復。
 - `git diff --check` 通過（有 Windows LF→CRLF 提示）。本機 8052 listener PID 2136、8044 listener PID 45460 仍在；直接 localhost health 因缺 ngrok proxy identity 回 400，符合既有邊界，不是透過公網的健康驗證。8031 E2E listener 測後未留存。未執行正式資料遷移、公開入口切換、異地備份或實際災難還原。
+
+
+## 手機表格拖曳與素食名單（2026-10-04）
+
+分支 `codex/mobile-grid-touch`，起點 `179a6b556344cf01912c26c9c50bba26a877404e`。移除 0.3.3 的「名單操作」與模式切換；手機在同一格位表以 44px 把手直接拖動、姓名區原生捲表、明確 ⋯ 開啟選單。管理員名稱移到備份標籤右側；素食按鈕右上新增名單圖示。隊長暫依同一 stable row 的 1 級選手，已提問但尚未收到使用者確認；缺位置／歷史缺資料不補現況。詳見 [手機流程](mobile-workflows.md)。
+
+本對話負責實作與整合，唯讀 subagent 另核對根因、手勢邊界與最終 diff；最後未發現阻斷缺陷。未修改 API／schema／依賴，未接觸正式資料、Docker、HP／4090 服務或公開入口。本輪尚未合併、推送、發布 image 或部署；真機接受度未確認。
+
+### 最終驗證
+
+- `npm --prefix frontend run typecheck`、`npm --prefix frontend run build -- --outDir dist-mobile-grid-touch`、`git diff --check` 通過；`npm --prefix frontend audit --audit-level=high` 為 0 vulnerabilities。
+- 獨立成品 `frontend/dist-mobile-grid-touch`、合成 DB `data/mobile-grid-touch-20261004-e2e.db`。最終核心分 desktop/mobile、根路徑與 `/fucheng` 四批執行（loopback 8270–8273），`mobile-workflows.spec.ts` 合計 **24 passed、4 skipped**；skip 是兩個觸控專用案例的 desktop 複本。每個路徑 desktop 5 passed／2 skipped，mobile 7 passed。
+- 核心覆蓋：會員／公告草稿及報名面板、立即起拖、中央交換／邊界插入／空格移動、touch contextmenu 隔離、650ms 長按、第二指取消、點按／取消零寫入、桌面右鍵與 Shift+F10、起拖後外來寫入 409、unknown 原 request/payload 恢復、搜尋不裁素食名單、同名辨識、隊長未安排、legacy layout/diet 未知、備份與名稱排列，以及 360／390／430／768／1440 尺寸無頁面橫向溢出。另覆蓋 1024 寬觸控畫面在起拖時關閉軸選單。
+- 桌面／手機回歸九批（8252–8260）合計 **20 passed**：表頭／資料選單、外部點擊／Escape、真觸控橫捲至第十級、拖曳來源／浮動卡／取消／失敗清理、交換與插入預告、文字外點提交、單雙擊／鍵盤／範圍／唯讀資訊、大保存 pending 與變更保留、Undo／Redo。最後補上多指姓名計數與空 pointerType 防護後，在 8274 重驗受影響的失敗恢復與單雙擊／範圍案例 **4 passed**；其餘證據沿用，沒有重複計入 20。
+- 最終 log／截圖在本機忽略目錄 `test-results/mobile-grid-touch-verified/`，五批 `results.json` 皆 exit 0；回歸在 `test-results/mobile-grid-touch-final/2.log` 到 `10.log`。手機素食名單與表格截圖已目視核對。測試服務均由 runner 結束，成品／合成資料及證據留供本輪審查，不影響正式服務。
+
+初輪回歸實際抓到桌面雙擊被起拖入口清除計數，以及手機失敗恢復後缺少第一次 compatibility click，均已修正後重驗。大保存測試的舊 positional selector 改為語意按鈕；空格拖曳測試先把來源置於可操作視窗中央，避免離屏目標。擴大核心後曾因同帳號短時間大量登入觸發既有頻率限制，故按 project／路徑分批；未放寬安全限制。這些先前失敗紀錄保留，但不視為最終通過證據。
+
+可重現指令（每個 project／路徑用新測試 server 循序執行）：
+
+```bash
+PATH=/home/ubuntu/.hermes/bin:$PATH \
+PLAYWRIGHT_BROWSERS_PATH=/tmp/fucheng-mobile-browsers \
+FUCHENG_E2E_DATABASE_URL=sqlite:///data/mobile-grid-touch-20261004-e2e.db \
+FUCHENG_E2E_STATIC_DIR=frontend/dist-mobile-grid-touch \
+FUCHENG_E2E_PORT=8270 FUCHENG_BASE_PATH=/fucheng \
+npm --prefix frontend run test:e2e -- mobile-workflows.spec.ts --project mobile
+```
+
+Chromium 觸控模擬與 contextmenu 注入不是 Android／iPhone 真機或 Safari 原生長按驗收。沒有測實體印表機、APK 或新增部署；工程通過不代表使用者已接受手機手感。

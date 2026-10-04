@@ -29,7 +29,6 @@ async function setup(page: Page, info: TestInfo) {
     await expect(selector.locator(`option[value="${second ? other.id : comp.id}"]`)).toHaveCount(1)
     await selector.selectOption(second ? other.id : comp.id)
     await expect(area.locator('.arrangement-toolbar h2')).toHaveText(second ? other.name : comp.name)
-    await area.getByRole('button', { name: '完整表格', exact: true }).click()
   }
   await choose()
   const endpoint = `/api/admin/competitions/${comp.id}/arrangement`
@@ -48,7 +47,6 @@ async function setup(page: Page, info: TestInfo) {
     if (await selector.inputValue() === comp.id) await selector.selectOption(other.id)
     await selector.selectOption(comp.id)
     await expect(area.locator('.arrangement-toolbar h2')).toHaveText(comp.name)
-    await area.getByRole('button', { name: '完整表格', exact: true }).click()
     await expect.poll(async () => (await state()).layout?.rows.length).toBeGreaterThan(0)
   }
   const domRows = async () => area.locator('.arrangement-table tbody tr[data-row-id]').evaluateAll(rows => rows.map(row => ({ id: row.getAttribute('data-row-id'), role: row.getAttribute('data-row-role'), cellCount: row.querySelectorAll('td').length, playerIds: Array.from(row.querySelectorAll<HTMLElement>('[data-registration-id]')).map(cell => cell.dataset.registrationId) })))
@@ -118,7 +116,7 @@ test('large save keeps exact rows and history; version heading stays inline', as
     await page.screenshot({ path: info.outputPath('large-save-before.png'), fullPage: true })
 
     const firstPost = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/arrangement/versions'))
-    const saveButton = s.area.locator('.arrangement-tools > button').nth(4)
+    const saveButton = s.area.getByRole('button', { name: '保存完整安排', exact: true })
     await expect(saveButton).toBeEnabled()
     await saveButton.click()
     const dialog = s.area.locator('dialog.arrangement-dialog')
@@ -155,7 +153,7 @@ test('large save keeps exact rows and history; version heading stays inline', as
     const beforeSecond = await s.state()
     const secondFacts = facts(beforeSecond.layout)
     const secondPost = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/arrangement/versions'))
-    const secondSaveButton = s.area.locator('.arrangement-tools > button').nth(4)
+    const secondSaveButton = s.area.getByRole('button', { name: '保存完整安排', exact: true })
     await expect(secondSaveButton).toBeEnabled()
     await secondSaveButton.click()
     const secondDialog = s.area.locator('dialog.arrangement-dialog')
