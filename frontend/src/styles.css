@@ -394,7 +394,6 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
 .admin-nav a, .admin-account a { color: white; text-decoration: none; padding: .55rem .75rem; border-radius: 8px; font-weight: 700; }
 .admin-nav a:hover, .admin-account a:hover { background: #ffffff24; }
 .admin-nav a[aria-current=page] { background: #f4c17d; color: #292016; }
-.admin-account > span { font-weight: 700; padding: .5rem; }
 .admin-backup { padding: .35rem .6rem; color: #fff; background: #ffffff20; border-radius: 7px; }
 .admin-backup.failed, .admin-backup.stale { color: #2c2115; background: #ffd391; }
 .deployment-report-page { width: min(100% - 2rem, 1200px); margin: 1.5rem auto 4rem; display: grid; gap: 1rem; }
@@ -863,7 +862,6 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
   .admin-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .25rem; }
   .admin-nav a { min-height: 44px; display: grid; place-items: center; padding: .35rem .25rem; font-size: .9rem; }
   .admin-account { display: flex; width: 100%; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: .25rem; }
-  .admin-account > span { min-width: 0; padding: .25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; }
   .admin-account a { min-height: 44px; display: grid; place-items: center; padding: .3rem; font-size: .8rem; white-space: nowrap; }
   .admin-account button { min-height: 44px; padding: .35rem .55rem; }
   .admin-backup { font-size: .8rem; }
@@ -893,26 +891,7 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
   .mobile-image-actions button { flex: 1 1 auto; min-height: 44px; padding: .4rem; font-size: .85rem; }
 }
 
-/* Alternate workflows share the same state and mutations at every viewport. */
-.arrangement-sheet[hidden] { display: none; }
-.arrangement-view-switch { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .7rem 0; }
-.arrangement-view-switch button[aria-pressed=true] { background: #245148; color: white; }
-.arrangement-view-switch small { color: #52645a; }
-.mobile-arrangement { max-width: 960px; margin-inline: auto; }
-.mobile-arrangement-filters, .mobile-undo { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-bottom: .7rem; }
-.mobile-arrangement-filters label { flex: 1; margin: 0; }
-.mobile-player-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
-.mobile-player { display: flex; justify-content: space-between; align-items: center; gap: .8rem; width: 100%; text-align: left; padding: .8rem; border: 1px solid #becdc3; background: #f8faf7; color: #1e392e; }
-.mobile-player:hover, .mobile-player:focus-visible { background: #e1eee6; }
-.mobile-player > span { min-width: 0; overflow-wrap: anywhere; }
-.mobile-player > span:last-child { flex-shrink: 0; text-align: right; }
-.mobile-player strong, .mobile-player small { display: block; }
-.mobile-player small { font-size: .85rem; color: #52645a; margin-top: .25rem; }
-.mobile-player.diet-highlight { border-left: 5px solid #29704a; background: #e4f1e6; }
-.mobile-operation-dialog fieldset { border: 0; padding: 0; min-width: 0; }
-.mobile-operation-dialog .section-title { align-items: flex-start; }
-.mobile-operation-dialog .section-title h3 { margin: .25rem 0; }
-.mobile-operation-dialog .section-title button { flex-shrink: 0; }
+/* Responsive editors retain their mounted drafts. */
 .mobile-pane-back, .mobile-registration-list, .mobile-home-link { display: none; }
 .announcement-editor-pane { min-width: 0; }
 .responsive-detail { position: static; width: 100%; max-width: 100%; margin: 1rem 0 0; padding: 1rem; border: 1px solid #adc0b3; border-radius: 10px; color: var(--ink); background: #f8faf7; }
@@ -924,7 +903,6 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
   .toast button { pointer-events: auto; }
   .admin-site-nav { display: none; }
   .admin-account .mobile-home-link { display: inline-flex; }
-  .admin-account > span { display: none; }
   .competition-workspace { display: flex; flex-direction: column; }
   .competition-workspace > #registration-roster { order: 0; }
   .competition-workspace > .competition-editor { order: 1; }
@@ -945,8 +923,6 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
   .admin-main input, .admin-main select, .announcement-main input, .announcement-main textarea,
   .competition-layout input, .competition-layout select { font-size: 16px; max-width: 100%; }
   .arrangement-dialog button, .responsive-detail button, .cell-menu-actions button { min-height: 44px; }
-  .arrangement-view-switch { position: sticky; top: 0; z-index: 4; background: white; padding-block: .5rem; }
-  .arrangement-view-switch small { flex-basis: 100%; }
   .arrangement-search { margin-block: .5rem; }
   .arrangement-history, .arrangement-diff { height: auto; max-height: 60vh; }
   .arrangement-content.with-history { grid-template-columns: minmax(0, 1fr); }
@@ -954,7 +930,6 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
   .grid-menu-trigger { min-width: 44px; min-height: 44px; }
 }
 @media screen and (max-width: 600px) {
-  .mobile-player-list { grid-template-columns: minmax(0, 1fr); }
   .arrangement-workspace { padding: .65rem; }
   .arrangement-tools { display: flex; flex-wrap: nowrap; justify-content: flex-start; width: 100%; overflow-x: auto; padding-bottom: .3rem; }
   .arrangement-tools > button { flex: 0 0 auto; }
@@ -969,13 +944,26 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
   .grid-boundary button { min-height: 44px; }
 }
 
-.mobile-list-help { margin: .5rem 0; color: #52645a; }
-.mobile-list-help summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
-.mobile-list-help summary::before { content: "▸"; margin-right: .4rem; }
-.mobile-list-help[open] summary::before { content: "▾"; }
 
-.arrangement-content.list-mode.with-history { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.arrangement-content.list-mode .arrangement-history, .arrangement-content.list-mode .arrangement-diff { height: auto; max-height: 60vh; }
-@media screen and (max-width: 900px) {
-  .arrangement-content.list-mode.with-history { grid-template-columns: minmax(0, 1fr); }
+
+.admin-status-line { display: flex; align-items: center; gap: .65rem; width: 100%; min-width: 0; }
+.admin-username { font-size: .85rem; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.admin-status-line .admin-backup { flex-shrink: 0; }
+.vegetarian-control { position: relative; flex: 0 0 auto; padding: 8px 44px 0 0; }
+.vegetarian-roster-trigger { position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; }
+.vegetarian-roster-dialog { width: min(640px, calc(100vw - 2rem)); }
+.vegetarian-roster-dialog .section-title { gap: .7rem; align-items: flex-start; }
+.vegetarian-roster-dialog h3 { margin: 0; }
+.vegetarian-roster-dialog .section-title button { flex-shrink: 0; }
+.vegetarian-roster-list { list-style: none; padding: 0; margin: 1rem 0; }
+.vegetarian-roster-list li { display: grid; grid-template-columns: 3rem minmax(0, 1fr) minmax(0, 1fr); gap: .6rem; padding: .8rem 0; border-bottom: 1px solid #d6e1da; overflow-wrap: anywhere; }
+.touch-grid-hint { color: #466353; font-size: .85rem; margin: .5rem 0; }
+.arrangement-table-scroll .cell-grip, .arrangement-table-scroll .cell-name,
+.arrangement-table-scroll .grid-empty, .arrangement-table-scroll .grid-column-title { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+@media screen and (max-width: 900px), (pointer: coarse) {
+  .arrangement-cell .cell-grip { width: 44px; flex-basis: 44px; min-height: 44px; border-right: 1px solid #d6e1da; color: #426650; background: #f1f6f2; }
+  .arrangement-table-scroll .cell-name { min-height: 44px; }
+  .admin-status-line { gap: .4rem; }
+  .admin-status-line .admin-backup { font-size: .72rem; padding: .35rem; }
+  .admin-username { font-size: .8rem; }
 }

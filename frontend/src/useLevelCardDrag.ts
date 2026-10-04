@@ -8,13 +8,12 @@ export type DropTarget = GridPoint & { mode:'swap'|'insert'|'move_empty'; side?:
 type Drag = { card: Card; x: number; y: number; touch: boolean; width: number; height: number; target: DropTarget | null }
 type Gesture = {
   card: Card; pointer: number; handle: HTMLElement; startX: number; startY: number
-  x: number; y: number; active: boolean; touch: boolean; width: number; height: number; target: DropTarget | null; timer?: number
+  x: number; y: number; active: boolean; touch: boolean; width: number; height: number; target: DropTarget | null
 }
 
 // Only the handle opts out of native touch scrolling. Cards and lane bodies still scroll.
 export function useLevelCardDrag(onMove: (id: string, target: DropTarget) => void, enabled: boolean) {
   const [drag, setDrag] = useState<Drag | null>(null)
-  const [holding, setHolding] = useState<string | null>(null)
   const gesture = useRef<Gesture | null>(null)
   const displayed = useRef<DropTarget | null>(null)
   useLayoutEffect(()=>{displayed.current=drag?.target??null},[drag])
@@ -52,9 +51,8 @@ export function useLevelCardDrag(onMove: (id: string, target: DropTarget) => voi
       const current = gesture.current
       if (current && (current.active || cancelledMovement)) dragClick.current = { pointer: current.pointer, endedAt: performance.now() }
       gesture.current = null
-      if (current?.timer) window.clearTimeout(current.timer)
       if (current?.handle.hasPointerCapture(current.pointer)) current.handle.releasePointerCapture(current.pointer)
-      setDrag(null); setHolding(null)
+      setDrag(null)
     }
     function move(event: PointerEvent) {
       const current = gesture.current
@@ -62,8 +60,7 @@ export function useLevelCardDrag(onMove: (id: string, target: DropTarget) => voi
       current.x = event.clientX; current.y = event.clientY
       const distance = Math.hypot(current.x - current.startX, current.y - current.startY)
       if (!current.active) {
-        if (current.touch && distance > 8) { clear(true); return }
-        if (!current.touch && distance > 6) current.active = true
+        if (distance > 6) current.active = true
       }
       if (current.active) { if (event.cancelable) event.preventDefault(); show(current) }
     }
@@ -76,7 +73,10 @@ export function useLevelCardDrag(onMove: (id: string, target: DropTarget) => voi
       if (current.active && target !== null) latest.current.onMove(current.card.id, target)
     }
     function cancel(event: PointerEvent) { if (gesture.current?.pointer === event.pointerId) clear() }
-    function pointerDown() { dragClick.current = null }
+    function pointerDown(event: PointerEvent) {
+      dragClick.current = null
+      if (gesture.current && event.pointerId !== gesture.current.pointer) clear(true)
+    }
     function click(event: MouseEvent) {
       const completed = dragClick.current
       if (!completed) return
@@ -129,14 +129,13 @@ export function useLevelCardDrag(onMove: (id: string, target: DropTarget) => voi
       window.removeEventListener('keydown', key)
       window.removeEventListener('blur', blur)
       const current = gesture.current
-      if (current?.timer) window.clearTimeout(current.timer)
       if (current?.handle.hasPointerCapture(current.pointer)) current.handle.releasePointerCapture(current.pointer)
       gesture.current = null
     }
   }, [])
 
   function start(event: ReactPointerEvent<HTMLButtonElement>, card: Card) {
-    if (!latest.current.enabled || event.button !== 0 || gesture.current) return
+    if (!latest.current.enabled || !event.isPrimary || event.button !== 0 || gesture.current) return
     const box = (event.currentTarget.closest('.arrangement-cell') ?? event.currentTarget).getBoundingClientRect()
     const current: Gesture = {
       card, pointer: event.pointerId, handle: event.currentTarget,
@@ -145,14 +144,9 @@ export function useLevelCardDrag(onMove: (id: string, target: DropTarget) => voi
     }
     gesture.current = current
     event.currentTarget.setPointerCapture(event.pointerId)
-    if (current.touch) {
-      setHolding(card.id)
-      current.timer = window.setTimeout(() => {
-        if (gesture.current !== current || !latest.current.enabled) return
-        current.active = true; setHolding(null)
-        setDrag({ card, x: current.x, y: current.y, touch: current.touch, width: current.width, height: current.height, target: null })
-      }, 350)
-    }
+    // A handle touch shows readiness immediately; movement beyond 6px starts a drag.
+    // No long-press timer competes with the platform context menu. A tap never writes.
+    if (current.touch) setDrag({ card, x: current.x, y: current.y, touch: true, width: current.width, height: current.height, target: null })
   }
-  return { drag, holding, start }
+  return { drag, start }
 }

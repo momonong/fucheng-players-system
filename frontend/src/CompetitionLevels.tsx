@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { exportArrangementExcel } from './arrangementExcel'
-import { MobileArrangement } from './MobileArrangement'
+import { VegetarianRoster } from './VegetarianRoster'
 import { useCompactLayout } from './useCompactLayout'
 import { ArrangementPrint } from './ArrangementPrint'
 import { arrangementVersion } from './api'
@@ -13,8 +13,6 @@ export function CompetitionLevels({ competition, controller, username }: {
   competition: Competition; controller: ArrangementController; username: string
 }) {
   const compact = useCompactLayout()
-  const [preferredView, setPreferredView] = useState<'list' | 'grid' | null>(null)
-  const boardView = preferredView ?? (compact ? 'list' : 'grid')
   const id = competition.id
   const workspace = controller.workspaces[id]
   const state = workspace?.state
@@ -97,7 +95,6 @@ export function CompetitionLevels({ competition, controller, username }: {
   const boardReadonly = readonly || !!selectedVersion
   const busy = !!big || !!operation || !workspace?.verified
   function locateChange(change: (typeof changes)[number]) {
-    setPreferredView('grid')
     const prior=oldLayout?.cells.find(cell=>cell.kind==='registration'&&cell.registration_id===change.row.registration_id)
     const current=layout?.cells.find(cell=>cell.kind==='registration'&&cell.registration_id===change.row.registration_id)
     const available=(point:GridPoint|null|undefined)=>!!point&&!!layout?.rows.some(row=>row.id===point.row_id)&&!!layout?.columns.some(column=>column.id===point.column_id)
@@ -134,7 +131,7 @@ export function CompetitionLevels({ competition, controller, username }: {
     <div className="arrangement-toolbar"><div><h2>{competition.name}</h2><small>{selectedVersion ? `回看：${historical?.current.label ?? '讀取中'}` : '目前安排'}</small></div><div className="arrangement-tools">
       <button className="secondary" disabled={selectedVersion?!historical:!state||busy} onClick={()=>setPrintJob({rows,layout,title:competition.name,version:selectedVersion?`歷史：${historical!.current.label}`:'目前安排'})}>列印安排</button>
       <button className="secondary" disabled={!canExport} onClick={()=>void exportExcel()}>{exporting?'匯出中…':'匯出 Excel'}</button>
-      <button className="secondary vegetarian-toggle" aria-pressed={vegetarian} onClick={() => setVegetarian(!vegetarian)}>素食 {rows.filter(row => row.diet === 'vegetarian').length} 人{dietUnknown ? `（${dietUnknown} 人未記錄）` : ''}</button>
+      <div className="vegetarian-control"><button className="secondary vegetarian-toggle" aria-pressed={vegetarian} onClick={() => setVegetarian(!vegetarian)}>素食 {rows.filter(row => row.diet === 'vegetarian').length} 人{dietUnknown ? `（${dietUnknown} 人未記錄）` : ''}</button><VegetarianRoster key={`${id}/${selectedVersion ?? 'current'}`} rows={rows} layout={layout} historical={!!selectedVersion} /></div>
       <button className="secondary history-toggle" onClick={() => setHistoryOpen(!historyOpen)} aria-pressed={historyOpen} aria-expanded={historyOpen}>歷史</button>
       {selectedVersion ? <button onClick={() => { chooseVersion(null); setHistorical(null) }}>回目前安排</button> : <button className="arrangement-save-primary" disabled={!canSave} onClick={() => { setLabel(workspace?.draft?.label ?? `版本 ${(state?.latest?.sequence ?? 0) + 1}`); setEditor(workspace?.draft?.editor_label ?? username); setNote(workspace?.draft?.note ?? ''); setSaveOpen(true) }}>保存完整安排</button>}
       <div className="arrangement-icon-tools"><button className="icon-button secondary" title="搜尋姓名" aria-label="搜尋姓名" aria-expanded={searchOpen} onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearch('') }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button></div>
@@ -147,11 +144,10 @@ export function CompetitionLevels({ competition, controller, username }: {
     {operation && operation.status !== 'saving' && <div className="arrangement-recovery" role="alert"><p>{operation.status === 'refresh' ? '已儲存，等待讀回目前布局；這場暫停修改。' : operation.error}</p>{operation.status === 'unknown' && <p>結果尚未確認，這場暫停所有表格調整與保存；重試不會重複執行同一次修改。</p>}{operation.status === 'rejected' ? <button disabled={workspace?.loading} onClick={() => void controller.recover(id)}>重新讀取並核對</button> : <button disabled={workspace?.loading} onClick={() => void controller.recover(id)}>{operation.status === 'refresh' ? '讀回目前安排' : '確認操作結果／原樣重試'}</button>}</div>}
     {!layout && <p className="notice">舊版未記錄儲存格位置；以下僅按級數與順位檢視，不代表當時分組。未保存的餐食與長期級數顯示未知。</p>}
     {layout && !selectedVersion && !state?.latest?.layout && <p className="notice">級數與名單仍比較上次保存；位置與文字比較本次啟用布局時的基準。</p>}
-    <div className="arrangement-view-switch no-print" role="group" aria-label="安排顯示方式"><button className="secondary" aria-pressed={boardView === 'list'} onClick={() => setPreferredView('list')}>名單操作</button><button className="secondary" aria-pressed={boardView === 'grid'} onClick={() => setPreferredView('grid')}>完整表格</button><small>同一份安排，切換不會儲存或清除草稿。</small></div>
-    <div hidden={boardView !== 'list'}><MobileArrangement key={`${id}/${selectedVersion ?? 'current'}`} rows={rows} layout={layout} stateToken={state?.state_token ?? ''} search={search} vegetarian={vegetarian} readonly={boardReadonly} busy={busy} competitionId={id} historical={!!selectedVersion} confirmedRequest={workspace?.confirmedGrid?.request_id} canUndo={!!workspace?.undoStack?.length && workspace?.undoToken === state?.state_token} canRedo={!!workspace?.redoStack?.length && workspace?.undoToken === state?.state_token} onUndo={() => controller.undo(id)} onRedo={() => controller.redo(id)} onOperate={(operation, token) => controller.operate(id, operation, token)} /></div>
-    <div ref={contentRef} className={`arrangement-content ${historyOpen ? 'with-history' : ''} ${boardView === 'list' ? 'list-mode' : ''}`}>
-      <div className="arrangement-sheet" ref={sheetRef} hidden={boardView !== 'grid'}><LevelCardBoard active={boardView === 'grid'} canUndo={!boardReadonly&&!!workspace?.undoStack?.length&&workspace?.undoToken===state?.state_token} onUndo={()=>controller.undo(id)} canRedo={!boardReadonly&&!!workspace?.redoStack?.length&&workspace?.undoToken===state?.state_token} onRedo={()=>controller.redo(id)} locatedChangeId={located?.registrationId??null} locatedPoints={located?.points??[]} onClearLocated={()=>setLocated(null)} confirmedGrid={workspace?.confirmedGrid} historical={!!selectedVersion} competitionId={id} key={`${id}/${selectedVersion ?? 'current'}`} stateToken={state?.state_token??''} rows={rows} layout={layout} baselineLayout={oldLayout} changes={changes} search={search} vegetarian={vegetarian} readonly={boardReadonly} busy={busy} textDrafts={workspace?.texts ?? {}} onTextDraft={(key, text) => controller.setTextDraft(id,key,text)} onOperate={(operation,token) => controller.operate(id, operation,token)} />
-        <details className="arrangement-help"><summary>操作說明</summary><p>滑鼠拖動姓名；手機可在「名單操作」點選選手並確認移動／交換，或在完整表格長按小把手再拖動，表格其他位置可水平捲動。單擊／輕點姓名選取儲存格，雙擊／連點兩下查看本場餐食與級數。鍵盤 Space 選格、Enter 查看資訊；資訊內選級數可移到欄底。範圍選取時點姓名只延伸選區。拖到選手中央交換位置，上下邊界插入並讓下方選手向下移；拖到空格直接移動、來源留空。放手前請核對交換或插入提示。搜尋只顯示符合姓名，其他選手以已占用格表示，不改格位；素食以柔和底色及「素」標記提示。表格邊界的＋可在該處插入；級數標題上緣的＋新增表頭列。邊緣可右鍵或點選開啟整排／文字欄刪除。表格上方工具列可對選取範圍設底色、合併或解除合併；復原上一個動作或重做（Ctrl／Command+Z、Ctrl／Command+Shift+Z；Ctrl+Y）可逐步復原本次編輯已確認的操作，大保存後開始新區段。滑鼠從空白、文字或格邊拖曳框選，表頭單擊選取後可用工具列改字／底色，不影響級數身份或下面格子；表頭與資料格不混選合併。雙擊文字或表頭直接編輯（Enter送出、點外面保存退出、Escape取消）；手機選格後按編輯文字或範圍選取。合併格可直接改字，解除保留原文字格位。列印安排與匯出 Excel 都包含完整名單，不受搜尋或素食開關影響；Excel 可離線編輯，不會回寫本系統。寬表與長表分幅接續列印。橙色表示位置或級數異動，綠色表示新增。保存完整安排後以該版為新基準。</p></details>
+    {compact && <p className="touch-grid-hint no-print">滑姓名區捲表・拉 ⠿ 移動・點 ⋯ 開選單</p>}
+    <div ref={contentRef} className={`arrangement-content ${historyOpen ? 'with-history' : ''}`}>
+      <div className="arrangement-sheet" ref={sheetRef}><LevelCardBoard canUndo={!boardReadonly&&!!workspace?.undoStack?.length&&workspace?.undoToken===state?.state_token} onUndo={()=>controller.undo(id)} canRedo={!boardReadonly&&!!workspace?.redoStack?.length&&workspace?.undoToken===state?.state_token} onRedo={()=>controller.redo(id)} locatedChangeId={located?.registrationId??null} locatedPoints={located?.points??[]} onClearLocated={()=>setLocated(null)} confirmedGrid={workspace?.confirmedGrid} historical={!!selectedVersion} competitionId={id} key={`${id}/${selectedVersion ?? 'current'}`} stateToken={state?.state_token??''} rows={rows} layout={layout} baselineLayout={oldLayout} changes={changes} search={search} vegetarian={vegetarian} readonly={boardReadonly} busy={busy} textDrafts={workspace?.texts ?? {}} onTextDraft={(key, text) => controller.setTextDraft(id,key,text)} onOperate={(operation,token) => controller.operate(id, operation,token)} />
+        <details className="arrangement-help"><summary>操作說明</summary><p>滑鼠拖動姓名；手機滑動姓名區捲動表格，直接拉動 ⠿ 把手移動人員，不必長按。手機只透過 ⋯ 開啟操作選單，拖動不會叫出右鍵選單。單擊／輕點姓名選取儲存格，雙擊／連點兩下查看本場餐食與級數。鍵盤 Space 選格、Enter 查看資訊；資訊內選級數可移到欄底。範圍選取時點姓名只延伸選區。拖到選手中央交換位置，上下邊界插入並讓下方選手向下移；拖到空格直接移動、來源留空。放手前請核對交換或插入提示。搜尋只顯示符合姓名，其他選手以已占用格表示，不改格位；素食以柔和底色及「素」標記提示。表格邊界的＋可在該處插入；級數標題上緣的＋新增表頭列。邊緣可右鍵或點選開啟整排／文字欄刪除。表格上方工具列可對選取範圍設底色、合併或解除合併；復原上一個動作或重做（Ctrl／Command+Z、Ctrl／Command+Shift+Z；Ctrl+Y）可逐步復原本次編輯已確認的操作，大保存後開始新區段。滑鼠從空白、文字或格邊拖曳框選，表頭單擊選取後可用工具列改字／底色，不影響級數身份或下面格子；表頭與資料格不混選合併。雙擊文字或表頭直接編輯（Enter送出、點外面保存退出、Escape取消）；手機選格後按編輯文字或範圍選取。合併格可直接改字，解除保留原文字格位。列印安排與匯出 Excel 都包含完整名單，不受搜尋或素食開關影響；Excel 可離線編輯，不會回寫本系統。寬表與長表分幅接續列印。橙色表示位置或級數異動，綠色表示新增。保存完整安排後以該版為新基準。</p></details>
       </div>
       {historyOpen && <>
         <aside className="arrangement-diff" aria-label="該版本變動"><div className="arrangement-panel-heading"><h3>該版本變動</h3><p className="arrangement-diff-baseline">{selectedVersion ? `相較 ${historical?.previous?.label ?? '前一保存版本'}` : `相較 ${state?.latest?.label ?? '起始基準'}`}</p></div>

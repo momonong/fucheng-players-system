@@ -1,12 +1,13 @@
-import { useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import type { RefObject } from 'react'
 import type { GridLayout, GridOperation } from './types'
 import { GridAxisMenu, type AxisTarget, type AxisPanel } from './GridAxisMenu'
 type Boundary={id:string;axis:'row'|'column';offset:number;label:string;operation:GridOperation}
-export function GridInsertControls({layout,table,disabled,onOperate,stateToken}:{layout:GridLayout;table:RefObject<HTMLTableElement|null>;disabled:boolean;stateToken:string;onOperate:(op:GridOperation,token?:string)=>void}) {
+export function GridInsertControls({layout,table,disabled,onOperate,stateToken,dragging=false}:{layout:GridLayout;table:RefObject<HTMLTableElement|null>;disabled:boolean;dragging?:boolean;stateToken:string;onOperate:(op:GridOperation,token?:string)=>void}) {
   const [boundaries,setBoundaries]=useState<Boundary[]>([]),[active,setActive]=useState<string|null>(null)
   const [edge,setEdge]=useState<string|null>(null)
   const [targets,setTargets]=useState<AxisTarget[]>([]),[panel,setPanel]=useState<AxisPanel|null>(null)
+  useEffect(()=>{if(dragging){setPanel(null);setEdge(null);setActive(null)}},[dragging])
   useLayoutEffect(()=>{
     const element=table.current;if(!element)return
     function measure(){
@@ -40,5 +41,5 @@ export function GridInsertControls({layout,table,disabled,onOperate,stateToken}:
     {active===b.id&&<span className="boundary-line" aria-hidden="true"/>}
   </div>})}{targets.map(target=><button key={`${target.axis}/${target.id}`} className={`grid-axis-more grid-axis-${target.axis} ${edge===`${target.axis}/${target.id}`?'edge-selected':''}`} type="button" disabled={disabled} aria-label={`第 ${target.index+1} ${target.axis==='row'?'排':'直欄'}更多操作`} title="點選或右鍵：底色與刪除" style={target.axis==='row'?{top:target.offset+7,height:Math.max(24,target.size-14)}:{left:target.offset+14,width:Math.max(24,target.size-28)}} onClick={e=>open(target,e.currentTarget)} onContextMenu={e=>{e.preventDefault();if(!disabled)open(target,e.currentTarget)}}><span>⋯</span></button>)}
     {selected&&<div className={`axis-removal-preview axis-removal-${selected.axis}`} style={selected.axis==='row'?{top:selected.offset,height:selected.size}:{left:selected.offset,width:selected.size}}/>}
-  </div>{panel&&<GridAxisMenu panel={panel} disabled={disabled} onPanel={value=>{setPanel(value);if(!value)setEdge(null)}} onOperate={onOperate}/>}</>
+  </div>{panel&&!dragging&&<GridAxisMenu panel={panel} disabled={disabled} onPanel={value=>{setPanel(value);if(!value)setEdge(null)}} onOperate={onOperate}/>}</>
 }

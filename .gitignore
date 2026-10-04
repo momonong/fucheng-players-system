@@ -285,3 +285,5 @@ deploy/docker/*.zip
 frontend/dist-base-path/
 
 /frontend/dist-mobile-workflows/
+
+/frontend/dist-mobile-grid-touch/
