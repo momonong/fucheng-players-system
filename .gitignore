@@ -287,3 +287,5 @@ frontend/dist-base-path/
 /frontend/dist-mobile-workflows/
 
 /frontend/dist-mobile-grid-touch/
+
+/frontend/dist-roster-labels/

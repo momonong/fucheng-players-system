@@ -749,3 +749,31 @@ npm --prefix frontend run test:e2e -- mobile-workflows.spec.ts --project mobile
 ```
 
 Chromium 觸控模擬與 contextmenu 注入不是 Android／iPhone 真機或 Safari 原生長按驗收。沒有測實體印表機、APK 或新增部署；工程通過不代表使用者已接受手機手感。
+
+
+## 素食小圓形入口與欄名／隊名（2026-10-04，尚未發布）
+
+分支 `codex/roster-location-labels`，起點 `3b5675098ec614793f45586ba73fe6fe3cdfad14`。使用者確認「1 級最高、缺少則依序往下找」及「隊名取左側最近非空文字欄，否則右側，跨列合併適用」。完整顯示契約見 [手機流程](mobile-workflows.md#素食名單後續修正2026-10-04尚未發布)。本輪只有前端顯示／解析、相關測試與文件；沒有 API、schema、依賴或正式資料變更。
+
+- Production build（含 TypeScript 檢查）、`npm audit --audit-level=high`（0 vulnerabilities）、`git diff --check` 通過。
+- `roster-labels.spec.ts` 的 5 個純資料案例通過：多層欄名、非 anchor／跨列合併文字、固定表頭自訂／null／空值、左近右備援隊名、缺少 1 級時以本場級數推導、單字／同名識別、換列與歷史不變性，以及 legacy／缺格位未知。
+- `/fucheng` 手機最終批次 3 passed：快速拖曳及右鍵隔離回歸、名單／高亮各自操作與搜尋不裁名單、多層欄名／跨列隊名的實際保存→更名→回看歷史。360／390／430／768／1440 寬度確認頁面不溢出、28px 圓形疊角、44px 觸控區，以及點主按鈕文字末端不誤開名單。
+- 根路徑桌面最終批次 2 passed：同一名單入口與實際歷史保存案例，包含五種寬度的點按邊界。先前同源解析的手機 legacy layout/diet 案例也通過，最後兩次僅調整按鈕間距與 tap highlight，不影響該資料語意。
+- 第一批 8 passed（5 個解析 + 3 個手機）與初次桌面 2 passed 用於定位外觀；最後重驗手機 3／桌面 2，不重複當成新增覆蓋。唯讀審查抓到 44px 命中區可能覆蓋主按鈕文字末尾，已加大右側 padding，並加入實際點按驗證。目視截圖核對已去除點按藍色方塊，小圓形與名單無明顯裁切。
+
+隔離資源為 `frontend/dist-roster-labels`、`data/roster-labels-20261004-e2e.db`，循序使用 loopback 8290–8293。測試 runner 已停止，合成 DB、成品與截圖留存；未變更正式 Docker、HP／4090 服務或公開入口。
+
+可重現最後批次（專案根目錄；兩批循序執行，desktop 批次將 prefix 清空、project 改 desktop，port 改 8293）：
+
+```bash
+PATH=/home/ubuntu/.hermes/bin:$PATH \
+PLAYWRIGHT_BROWSERS_PATH=/tmp/fucheng-mobile-browsers \
+FUCHENG_E2E_DATABASE_URL=sqlite:///data/roster-labels-20261004-e2e.db \
+FUCHENG_E2E_STATIC_DIR=frontend/dist-roster-labels \
+FUCHENG_E2E_PORT=8292 FUCHENG_BASE_PATH=/fucheng \
+npm --prefix frontend run test:e2e -- mobile-workflows.spec.ts --project mobile \
+  --output ../test-results/roster-labels-mobile-final \
+  --grep '多層欄名|依顯示布局|單一表格快速'
+```
+
+本機證據在 `test-results/roster-labels-mobile-final/`、`test-results/roster-labels-desktop-final/`；兩批 `.last-run.json` 均 passed。精簡截圖留在 `data/roster-labels-review/mobile-button.png` 與 `mobile-list.png`。Chromium 手機模擬不等於 Android／iPhone 真機驗收。此階段本機開發完成，未合併／推送、未發布 image／部署；人工接受待確認。

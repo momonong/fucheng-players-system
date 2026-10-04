@@ -949,14 +949,22 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
 .admin-status-line { display: flex; align-items: center; gap: .65rem; width: 100%; min-width: 0; }
 .admin-username { font-size: .85rem; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
 .admin-status-line .admin-backup { flex-shrink: 0; }
-.vegetarian-control { position: relative; flex: 0 0 auto; padding: 8px 44px 0 0; }
-.vegetarian-roster-trigger { position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; }
+.vegetarian-control { position: relative; flex: 0 0 auto; margin-right: 18px; padding-top: 10px; }
+.vegetarian-control .vegetarian-toggle { padding-right: 2rem; }
+.vegetarian-control .vegetarian-roster-trigger { position: absolute; z-index: 1; top: -2px; right: -18px; display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; border-radius: 50%; -webkit-tap-highlight-color: transparent; }
+.vegetarian-roster-badge { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid #406752; border-radius: 50%; background: #fff; color: #285c3e; box-shadow: 0 1px 3px #173f3020; }
+.vegetarian-roster-trigger:hover .vegetarian-roster-badge, .vegetarian-roster-trigger:focus-visible .vegetarian-roster-badge { background: #e7f1e8; }
+.vegetarian-roster-trigger:focus-visible { outline: 2px solid #287354; outline-offset: -5px; }
 .vegetarian-roster-dialog { width: min(640px, calc(100vw - 2rem)); }
 .vegetarian-roster-dialog .section-title { gap: .7rem; align-items: flex-start; }
 .vegetarian-roster-dialog h3 { margin: 0; }
 .vegetarian-roster-dialog .section-title button { flex-shrink: 0; }
 .vegetarian-roster-list { list-style: none; padding: 0; margin: 1rem 0; }
-.vegetarian-roster-list li { display: grid; grid-template-columns: 3rem minmax(0, 1fr) minmax(0, 1fr); gap: .6rem; padding: .8rem 0; border-bottom: 1px solid #d6e1da; overflow-wrap: anywhere; }
+.vegetarian-roster-list li { padding: .9rem 0; border-bottom: 1px solid #e1e7e2; overflow-wrap: anywhere; }
+.vegetarian-roster-person { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.vegetarian-roster-team { color: #426650; text-align: right; }
+.vegetarian-roster-columns { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .4rem; color: #52645a; font-size: .85rem; }
+.vegetarian-roster-columns span { padding: .12rem .45rem; border-radius: 4px; background: #f0f4f0; }
 .touch-grid-hint { color: #466353; font-size: .85rem; margin: .5rem 0; }
 .arrangement-table-scroll .cell-grip, .arrangement-table-scroll .cell-name,
 .arrangement-table-scroll .grid-empty, .arrangement-table-scroll .grid-column-title { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
