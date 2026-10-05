@@ -71,6 +71,10 @@ class InsertAxis(StrictInput):
     action: Literal["insert_row", "insert_column", "insert_header"]
     before_id: str | None = Field(default=None, max_length=36)
 
+class AddLevelColumn(StrictInput):
+    action: Literal["add_level_column"]
+    level: int = Field(ge=1, le=10, strict=True)
+
 class DeleteAxis(StrictInput):
     action: Literal["delete_row", "delete_column"]
     axis_id: str = Field(min_length=1, max_length=36)
@@ -109,7 +113,7 @@ class HeaderText(StrictInput):
     merge_id: str = Field(min_length=1, max_length=36)
     text: str = Field(max_length=500)
 
-Operation = Annotated[MoveCell | SwapCells | InsertPlayer | MoveEmpty | SetShade | ShadeHeader | ShadeCells | UndoOperation | RedoOperation | MoveBottom | InsertAxis | DeleteAxis | SetText | ColumnTitle | MergeCells | UnmergeCells | HeaderRange | UnmergeHeader | HeaderText, Field(discriminator="action")]
+Operation = Annotated[MoveCell | SwapCells | InsertPlayer | MoveEmpty | SetShade | ShadeHeader | ShadeCells | UndoOperation | RedoOperation | MoveBottom | InsertAxis | AddLevelColumn | DeleteAxis | SetText | ColumnTitle | MergeCells | UnmergeCells | HeaderRange | UnmergeHeader | HeaderText, Field(discriminator="action")]
 
 class GridMutation(StrictInput):
     request_id: str = Field(min_length=8, max_length=64)
@@ -268,8 +272,21 @@ def ensure_workspace(db, competition, admin_id, rows):
     return workspace
 
 
+def add_level_column(layout, level):
+    if any(c["kind"] == "level" and c["level"] == level for c in layout["columns"]):
+        fail("這個級數欄已存在，請重新讀取")
+    if len(layout["columns"]) >= MAX_COLUMNS:
+        fail("已達50欄上限，請先刪除不需要的文字欄再加入級數欄")
+    column = {"id": new_id(), "kind": "level", "level": level}
+    # Append outside existing merges; surviving coordinates and merged regions stay intact.
+    layout["columns"].append(column)
+    return column
+
+
 def bottom_target(layout, level):
-    col = next(c for c in layout["columns"] if c["kind"] == "level" and c["level"] == level)
+    col = next((c for c in layout["columns"] if c["kind"] == "level" and c["level"] == level), None)
+    if col is None:
+        col = add_level_column(layout, level)
     rows = [r["id"] for r in layout["rows"] if r["role"] == "body"]
     occupied = {c["row_id"] for c in layout["cells"] if c["column_id"] == col["id"] and c["row_id"] in rows}
     occupied |= {r for r,c in covered(layout) if c == col["id"] and r in rows}
@@ -368,11 +385,11 @@ def delete_axis(layout, op):
     item = next((v for v in layout[axis] if v["id"] == op["axis_id"]), None)
     if item is None:
         fail("指定位置已不存在，請重新讀取並核對")
-    if axis == "columns" and item["kind"] == "level":
-        fail("1到10級的固定級數欄不能刪除")
     removed = [c for c in layout["cells"] if c[field] == op["axis_id"]]
     if any(c["kind"] == "registration" for c in removed):
         fail("這一整排仍有選手，請先移走選手再刪除；報名不會被刪除")
+    if axis == "columns" and item["kind"] == "level" and sum(c["kind"] == "level" for c in layout["columns"]) <= 1:
+        fail("請至少保留一個級數欄，供後續安排選手")
     if axis == "rows" and item["role"] == "body" and sum(r["role"] == "body" for r in layout["rows"]) <= 1:
         fail("請至少保留一排資料格，供後續安排選手")
     custom_title = axis == "columns" and item.get("title") not in (None, "", "文字／備註")
@@ -525,8 +542,12 @@ def apply(layout, operation):
             target = bottom_target(layout, op["level"])
             layout["cells"].append(source)
         return move(layout, op["registration_id"], target)
-    if action in {"insert_row", "insert_column", "insert_header"}:
+    if action == "add_level_column":
+        add_level_column(layout, op["level"])
+    elif action in {"insert_row", "insert_column", "insert_header"}:
         axis = "columns" if action == "insert_column" else "rows"
+        if axis == "columns" and sum(c["kind"] == "text" for c in layout["columns"]) >= MAX_COLUMNS - 10:
+            fail("文字欄最多40欄，需保留新增報名時補回級數欄的空間")
         if len(layout[axis]) >= (MAX_ROWS if axis == "rows" else MAX_COLUMNS):
             fail("已達安排大小上限（500列、50欄）")
         items = layout[axis]
@@ -595,9 +616,10 @@ def validate(layout, rows):
     columns = {c["id"]:c for c in layout["columns"]}
     if len(row_ids) != len(set(row_ids)) or len(columns) != len(layout["columns"]):
         fail("行列識別重複")
-    if sorted(c["level"] for c in columns.values() if c["kind"] == "level") != list(range(1,11)):
-        fail("級數欄必須完整保留1到10級")
-    if not 1 <= len(row_ids) <= MAX_ROWS or not 10 <= len(columns) <= MAX_COLUMNS or not any(r["role"] == "body" for r in layout["rows"]):
+    levels = [c["level"] for c in columns.values() if c["kind"] == "level"]
+    if not levels or any(type(n) is not int or not 1 <= n <= 10 for n in levels) or len(levels) != len(set(levels)):
+        fail("級數欄須為不重複的1到10級，並至少保留一個級數欄")
+    if not 1 <= len(row_ids) <= MAX_ROWS or not 1 <= len(columns) <= MAX_COLUMNS or not any(r["role"] == "body" for r in layout["rows"]):
         fail("安排大小或資料排不合法")
     for column in layout["columns"]:
         header_shade = column.get("header_shade")

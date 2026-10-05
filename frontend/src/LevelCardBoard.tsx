@@ -51,6 +51,7 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
   const lastPointer = useRef('')
   const dragToken = useRef(stateToken)
   const layout = knownLayout ?? legacyLayout(rows)
+  const missingLevels = Array.from({length:10},(_,i)=>i+1).filter(level=>!layout.columns.some(c=>c.kind==='level'&&c.level===level))
   const [selected, setSelected] = useState<GridPoint | null>(null)
   const selectionDocument=selectionLayout(layout),headings=headerCells(layout)
   const selectedHeader=selected?.row_id===HEADER_ROW_ID?selected.column_id:null
@@ -260,6 +261,7 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
     onCompositionStart={()=>{composing.current=true}} onCompositionEnd={()=>{composing.current=false}} onChange={e=>{setText(e.target.value);if(editing)onTextDraft(editing.key,e.target.value)}} onClick={e=>e.stopPropagation()}
     onKeyDown={e=>{if(e.nativeEvent.isComposing)return;if(e.key==='Enter'){e.preventDefault();commitText()}if(e.key==='Escape'){e.preventDefault();cancelEdit()}}}/>
   return <>
+    {!readonly&&missingLevels.length>0&&<div className="level-column-controls no-print"><label>加回級數欄<select aria-label="加回級數欄" value="" disabled={blocked||!!drag} onChange={e=>{if(e.target.value)operate({action:'add_level_column',level:Number(e.target.value)})}}><option value="">選擇級數…</option>{missingLevels.map(level=><option key={level} value={level}>{level} 級</option>)}</select></label><small>加回的欄位放在表格右側；新增報名或調級用到未顯示級數時，也會自動補回。</small></div>}
     <div className={`arrangement-table-scroll ${drag ? 'is-dragging' : ''}`} tabIndex={0} role="region" aria-label="級數表格，可水平捲動"
       onPointerDownCapture={event=>{lastPointer.current=event.pointerType}}
       onContextMenuCapture={event=>{
@@ -267,7 +269,7 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
         if (compact || lastPointer.current==='touch' || drag) { event.preventDefault(); event.stopPropagation() }
       }}>
       {!readonly&&<button className="grid-menu-trigger secondary" type="button" disabled={blocked || !!drag} aria-label="開啟儲存格操作" title="儲存格操作" onClick={e=>{const box=e.currentTarget.getBoundingClientRect();setShadePanel({left:box.right-250,top:box.bottom+4})}}>⋯</button>}
-      <div className="grid-canvas" style={{minWidth:Math.max(columnWidth*10,layout.columns.length*columnWidth)}}>
+      <div className="grid-canvas" style={{minWidth:layout.columns.length*columnWidth}}>
       {!readonly&&<GridInsertControls layout={layout} table={tableRef} stateToken={stateToken} disabled={blocked || !!drag} dragging={!!drag} onOperate={operate}/>}
       <table ref={tableRef} className="arrangement-table grid-table" aria-label="當次級數表" style={{ minWidth: layout.columns.length * columnWidth }}>
         <colgroup>{layout.columns.map(c=><col key={c.id} data-column-id={c.id}/>)}</colgroup>

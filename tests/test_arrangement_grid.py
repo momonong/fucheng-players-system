@@ -453,7 +453,7 @@ def test_delete_protection_rollback_and_terminal(app,client,auth):
     comp,_,reg=setup_registration(client,auth)
     state=init(client,auth,comp);layout=state['layout']
     op={'action':'delete_row','axis_id':layout['rows'][3]['id'],'confirmed_text':False}
-    operate(client,auth,comp,{'action':'delete_column','axis_id':layout['columns'][0]['id'],'confirmed_text':True},422)
+    operate(client,auth,comp,{'action':'delete_column','axis_id':where(layout,reg['id'])['column_id'],'confirmed_text':True},422)
     operate(client,auth,comp,{**op,'axis_id':where(layout,reg['id'])['row_id']},422)
     operate(client,auth,comp,{**op,'axis_id':'missing'},422)
     operate(client,auth,comp,{**op,'confirmed_text':'true'},422)

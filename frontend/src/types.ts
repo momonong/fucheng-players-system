@@ -157,6 +157,7 @@ export type GridOperation = { action: 'move'; registration_id: string; target: G
   | { action: 'shade_row' | 'shade_column'; axis_id: string; shade: number }
   | { action: 'move_bottom'; registration_id: string; level: number }
   | { action: 'insert_row' | 'insert_column' | 'insert_header'; before_id: string | null }
+  | { action: 'add_level_column'; level: number }
   | { action: 'delete_row' | 'delete_column'; axis_id: string; confirmed_text: boolean }
   | { action: 'text'; target: GridPoint; text: string }
   | { action: 'column_title'; column_id: string; text: string }

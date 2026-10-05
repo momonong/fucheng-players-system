@@ -187,7 +187,7 @@ ArrangementPrint從選定版本的完整rows/layout建立凍結printJob，portal
 
 ### 刪除軸、範圍確認與顯示狀態
 
-`delete_row`／`delete_column`採stable `axis_id`及strict boolean `confirmed_text`，透過既有mutate_grid的BEGIN IMMEDIATE、完整state_token與actor/payload idempotency、稽核同交易執行。固定級數欄、含registration的排、最後body排、不存在ID均拒絕。非空文字或自訂欄title需確認；不刪會員或報名。剩餘選手座標、級數、hard_level_snapshot與version保持原值。
+`delete_row`／`delete_column`採stable `axis_id`及strict boolean `confirmed_text`，透過既有mutate_grid的BEGIN IMMEDIATE、完整state_token與actor/payload idempotency、稽核同交易執行。含registration的排／欄、最後級數欄、最後body排、不存在ID均拒絕；其餘空級數欄可刪除。非空文字或自訂欄title需確認；不刪會員或報名。剩餘選手座標、級數、hard_level_snapshot與version保持原值。
 
 刪軸先規劃所有受影響merge，再變更layout；剩餘為矩形則保留原merge ID及合法端點，單格則解除，無剩餘則移除。唯一非空文字在剩餘格時維持原座標；來源軸被刪但merge仍有剩餘時搬至新anchor（去除anchor空白text，避免重複address）。多段文字或含選手的歧義merge拒絕，不默默丟內容。
 
@@ -222,7 +222,7 @@ MemberLevelHistory獨立呈現即時參考；close/unmount或換人／換場會�
 
 ### 表頭選格與請求等待修正（2026-09-22）
 
-虛擬級數表頭保留 column ID/level，使用獨立 selectedHeader，不建立假 row/cell。單擊／Enter 選取、雙擊直接改字、工具列文字沿 `column_title`；選取 header 與 body 互斥，包含右鍵 body 切換，表頭不參與矩形範圍、merge/unmerge。多個畫面表頭對應同一 column 顯示設定。`shade_header(column_id,shade)` 接受 strict 0..3；optional `header_shade` 僅保存 strict 1..3，0 移除 override，回原 column.shade（missing 視 0），只影響 th／列印表頭，絕不擴散至 body。signature missing/null 等價、GET 不回寫舊 bytes；undo、保存、歷史沿原交易／快照機制。固定十級不能刪除，title 和 header_shade 不改語義級數。
+虛擬級數表頭保留 column ID/level，使用獨立 selectedHeader，不建立假 row/cell。單擊／Enter 選取、雙擊直接改字、工具列文字沿 `column_title`；選取 header 與 body 互斥，包含右鍵 body 切換，表頭不參與矩形範圍、merge/unmerge。多個畫面表頭對應同一 column 顯示設定。`shade_header(column_id,shade)` 接受 strict 0..3；optional `header_shade` 僅保存 strict 1..3，0 移除 override，回原 column.shade（missing 視 0），只影響 th／列印表頭，絕不擴散至 body。signature missing/null 等價、GET 不回寫舊 bytes；undo、保存、歷史沿原交易／快照機制。空級數欄可刪除／加回，title 和 header_shade 不改語義級數。
 
 安排專用 `arrangementRequest` 以 AbortController + 20 秒計時包住整個 `await request`，包含 fetch 與 JSON body 解碼。僅安排讀取／初始化／operation／完整保存／歷史版本請求使用，不變更其他 API。超時 throw 無 HTTP status 的明確錯誤，寫入由既有 controller 分類 unknown，保留 request_id/payload、整場寫入鎖及原樣重播入口；不自動重送、不假失敗／成功。已取得 receipt 而 GET 超時時保留 refresh/receipt，只重讀 GET；初次／一般 GET 超時清 loading 顯示讀取錯誤與重試。超時不表示伺服器停止執行，正確性仍由 BEGIN IMMEDIATE 與固定請求識別守護。
 
@@ -273,3 +273,10 @@ ArrangementPrint 將 header_merges 映射成表頭 colspan；跨 12 欄分幅時
 目前安排的差異卡依 registration ID 比較來源與目標 stable row／column ID，卡片只高亮仍存在的實際端點，不建立矩形選區或寫回布局；新增、取消、移動、同級換位、跨級移動及交換皆可從卡片定位，鍵盤與觸控可啟用。舊快照無座標或軸已刪除時只定位可證實存在的端點，並說明缺失原因；換場、換版本及一般格位選取清除定位。卡片位於獨立捲動的「該版本變動」側欄，基準標題固定顯示相較版本；右側「版本紀錄」固定標題及「目前安排」控制，兩側各自捲動。僅 compact card 本身縮小間距，不改表格與側欄捲動行為。結構差異仍參與保存與淨差，移除泛用結構提示；純結構變更仍可保存且不顯示「沒有變更」。固定級數表頭及其按鈕 hover 使用 `cell` cursor。
 
 大型保存只把目前 workspace 的完整布局附加為不可變版本快照，不執行新增、刪除或裁切布局列；row 的變更只由明確布局操作產生。大型保存後的尾端空列仍須依使用者回報另行觀察，不能在保存路徑以裁切或 fallback 隱藏。
+
+
+### 場次級數欄子集合
+
+`validate` 允許1–10級的不重複非空子集合，不要求十欄齊全。`delete_column` 沿用 stable ID、確認 token、文字預覽及 merge/shade 清理；`add_level_column(level)` 拒絕重複、以新 ID 附加最右，不跨入既有合併區。`bottom_target` 僅在原本寫交易內補缺少的級數，涵蓋新增正取、遞補、舊調級 API 與 move_bottom；GET、列印與讀歷史不補欄。文字欄仍最多40個，保留全部十個級數所需容量，總欄數上限50。
+
+刪欄不改剩餘報名的 version／當次級數／會員級數／快照；自動補欄與報名／調級一併成功或回滾。快照保存實際 columns，Undo／Redo 使用服務端快照回復。表格最小寬度按實際欄數計算；列印及 Excel 直接使用同一 layout。無 DB migration，但舊版完整十欄驗證與新增 operation 不相容，不得依 schema 相同就直接降版。
