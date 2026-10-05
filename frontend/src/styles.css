@@ -657,6 +657,10 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: var(--page-wid
 
 /* Boundary rails keep insertion at its actual position, outside player hit areas. */
 .grid-canvas { position: relative; margin: 38px 35px 34px 46px; }
+.level-column-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding: .5rem 0; }
+.level-column-controls label { display: flex; align-items: center; gap: .5rem; }
+.level-column-controls select { width: auto; }
+.level-column-controls small { color: #46534e; }
 .grid-insert-controls { position: absolute; inset: 0; pointer-events: none; }
 .grid-boundary { position: absolute; pointer-events: none; z-index: 3; }
 .grid-boundary-row { left: 0; width: 100%; height: 0; }

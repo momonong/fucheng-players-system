@@ -39,7 +39,7 @@ Python 使用 uv、`pyproject.toml`、`uv.lock` 與專案 `.venv`；前端使用
 
 ## 精確格位安排共同契約
 
-- 布局使用 stable row/column ID 與 header/body 角色；十個級數欄語義固定，文字欄不代表級數。插空列的索引移動不等於重新分組。搜尋只顯示匹配姓名，其他選手保持無姓名的已占用格；素食按本場 registration.diet 高亮，不篩掉人、不寫入。
+- 布局使用 stable row/column ID 與 header/body 角色；級數欄身份仍對應1–10級，但各場可刪除無選手的級數欄並加回，文字欄不代表級數。插空列的索引移動不等於重新分組。搜尋只顯示匹配姓名，其他選手保持無姓名的已占用格；素食按本場 registration.diet 高亮，不篩掉人、不寫入。
 - 拖到選手中央交換兩人；上下邊界插入並向下讓位，空格直接移動來源留洞。payload明確swap／insert／move_empty，放手採已顯示預告；legacy move保留插入語義。文字／合併／header不可落人，固定十級身份不變。跨級swap兩人level/version與各自稽核同交易，整操作receipt防重；其他人不動。舊level API與正取新增／取消／遞補同交易同步布局。
 - 僅文字／空格可合併，跨數字級數標頭或多段非空文字衝突須拒絕；解除保留原底格文字座標。合併可直接改字，保留原非空文字來源格；空白區才用anchor。欄title只改顯示，missing/null以原級數或文字欄標題呈現，不能改十級身份。完整快照含 rows/columns/cells/merges。0007 歷史 layout=null/schema_version=1，未保存位置／餐食／長期級數維持未知，禁止回填現況。
 - 小存与大存固定 request_id／actor／payload、同場串行，未知或待讀回時整場鎖；409重新核對，不自動重算目標。文字草稿按場次與 stable cell 保存，成功讀回後才清除。
@@ -47,7 +47,7 @@ Python 使用 uv、`pyproject.toml`、`uv.lock` 與專案 `.venv`；前端使用
 
 當次安排列印使用當前所檢視的完整 rows/layout，搜尋不裁名單，所有已知本場素食印「素」，歷史未知不補現況。列印只能browser print/PDF驗證，不操作實體印表機。新版格位編輯驗證用獨立dist-grid-edit、data/grid-edit-e2e.db、8043，不覆寫現用static/DB；無新增migration。
 
-刪除行／自訂文字欄只依stable axis ID與確認時token執行，不按更新後索引重算；固定十級欄、含選手行及最後body行拒絕刪除。文字須明確範圍確認；受影響merge保留合法剩餘區與唯一文字（必要時搬到剩餘anchor），衝突拒絕。刪軸不改其他選手座標／報名version；成功且讀回驗證後才清除已失效選格、編輯器及草稿，失败／未知保留原請求與輸入。
+刪除行／自訂文字欄只依stable axis ID與確認時token執行，不按更新後索引重算；含選手行／欄、最後body行及最後級數欄拒絕刪除。文字須明確範圍確認；受影響merge保留合法剩餘區與唯一文字（必要時搬到剩餘anchor），衝突拒絕。刪軸不改其他選手座標／報名version；成功且讀回驗證後才清除已失效選格、編輯器及草稿，失败／未知保留原請求與輸入。
 
 灰階以row／自訂文字column的shade 0–3保存，missing視為0、GET不回填舊JSON；交叉與merge涵蓋軸取max，不疊加。灰階入完整保存／淨差／歷史／列印，列印用實體SVG填色以保留背景圖形關閉時的灰階。歷次級數參考僅admin查同member confirmed、未刪ended、日期早於所選且不晚於台北今天的最近5場registration.competition_level；不回寫快照或擴public schema。
 
@@ -55,4 +55,7 @@ Python 使用 uv、`pyproject.toml`、`uv.lock` 與專案 `.venv`；前端使用
 局部色 `cell_shades` 綁 stable 格位，shade 僅 0–3；0 是明確白色 override，缺少局部項目才沿用原 row／column 色階，舊 JSON 的 missing／null／空集合保持相容，GET 不回填。merge 閉包選取並保留底格色，delete 軸 prune，空格著色不建立文字。undo 僅依 server 成功 receipt 前狀態及目前 head/token/revision，同 actor／保存基準驗證後以新 transaction／receipt 留存；version 不倒退，不接受 client 任意 snapshot、不刪歷史。大保存與外來更新斷鏈；本頁 stack 失敗不 pop，unknown 固定 payload 重試。新增契約仍 schema 0008，但不保證舊 app 可無損回退。
 
 
-固定十級表頭以 stable column ID／level 呈現，支援虛擬表頭選取與共用操作選單；optional `header_merges` 以 stable 欄 ID 保存，只能在同一表頭列內合併，不可跨表頭、body 或自訂文字列；合併不改十級身份或欄 ID。`header_shade=0` 是明確白色，缺少時沿用原欄色；只影響 th／列印表頭，不染 body。表頭與 body 可同在一個矩形選區內上色；跨表頭、body 或自訂文字列的合併須拒絕並在選單說明。表格選單可由桌面右鍵／Shift+F10 或觸控 ⋯ 開啟，點擊外部／Escape 關閉；整張表格 Undo 保持獨立操作，依服務端 receipt 前狀態與當前 token 驗證。安排專用請求等待涵蓋完整 body，逾時寫入保持 unknown 與原 key／payload；receipt 後讀回逾時保持 refresh，只重讀不再 POST。無新增 migration，schema 仍 0008；新版需與接受上述 JSON／operation 的前後端同批更新。
+級數表頭以 stable column ID／level 呈現，支援虛擬表頭選取與共用操作選單；optional `header_merges` 以 stable 欄 ID 保存，只能在同一表頭列內合併，不可跨表頭、body 或自訂文字列；合併不改十級身份或欄 ID。`header_shade=0` 是明確白色，缺少時沿用原欄色；只影響 th／列印表頭，不染 body。表頭與 body 可同在一個矩形選區內上色；跨表頭、body 或自訂文字列的合併須拒絕並在選單說明。表格選單可由桌面右鍵／Shift+F10 或觸控 ⋯ 開啟，點擊外部／Escape 關閉；整張表格 Undo 保持獨立操作，依服務端 receipt 前狀態與當前 token 驗證。安排專用請求等待涵蓋完整 body，逾時寫入保持 unknown 與原 key／payload；receipt 後讀回逾時保持 refresh，只重讀不再 POST。無新增 migration，schema 仍 0008；新版需與接受上述 JSON／operation 的前後端同批更新。
+
+
+場次級數欄可為1–10級的不重複子集合，至少保留一個級數欄；既有十欄資料不改寫。空級數欄可依 stable axis ID／token 刪除，文字確認、合併保留、局部底色 prune 與 Undo／Redo 沿用原契約。`add_level_column` 只加回未存在級數、以新 stable ID 接在最右側，不改既有格位。新增正取／遞補／調級用到缺少級數時，在同一寫入交易補回欄位，GET 不補造。文字欄最多40欄，為十個級數身份保留上限空間；總上限仍50欄。保存／歷史／列印／Excel 依實際 columns 呈現。無新增 migration，但啟用精簡欄位後不可直接回退至仍要求完整十欄的舊 app；需使用相容新版或既有匹配備份回復流程。
