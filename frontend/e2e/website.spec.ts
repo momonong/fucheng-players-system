@@ -2,6 +2,12 @@ import { expect, test } from '@playwright/test'
 
 test('首頁公告發布下架、免登入分級與比賽導覽', async ({ page, browser }, testInfo) => {
   const title = `合成球館公告-${testInfo.project.name}`
+  const checkSavedListing = async (name: string) => {
+    if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '← 返回公告清單（保留輸入）' }).click()
+    const item = page.getByRole('button', { name, exact: true })
+    await expect(item).toBeVisible()
+    if (testInfo.project.name === 'mobile') await item.click()
+  }
   await page.goto('/admin')
   await page.getByLabel('帳號', { exact: true }).fill('e2e-admin')
   await page.getByLabel('密碼', { exact: true }).fill(process.env.FUCHENG_E2E_ADMIN_PASSWORD!)
@@ -25,7 +31,7 @@ test('首頁公告發布下架、免登入分級與比賽導覽', async ({ page,
   await expect(page.getByLabel('公告內容').locator('figure img')).toHaveCount(1)
   await page.getByRole('button', { name: '儲存公告', exact: true }).click()
   await expect(page.getByLabel('發布到首頁')).toBeChecked()
-  await expect(page.getByRole('button', { name: `${title} 已發布・置頂`, exact: true })).toBeVisible()
+  await checkSavedListing(`${title} 已發布・置頂`)
   await visitor.reload()
   await expect(visitor.getByRole('heading', { name: title, exact: true })).toBeVisible()
   await expect(visitor.locator('.news-card').filter({ hasText: title })).toContainText('<script>window.unsafe=true</script>')
@@ -36,7 +42,7 @@ test('首頁公告發布下架、免登入分級與比賽導覽', async ({ page,
   await visitor.getByRole('navigation').getByRole('link', { name: '會員分級表', exact: true }).click()
   await expect(visitor.getByRole('heading', { name: '會員分級表', exact: true })).toBeVisible()
   await visitor.getByLabel('搜尋姓名或辨識註記').fill('合成同名')
-  await expect(visitor.locator('.level-card tbody tr')).toHaveCount(2)
+  await expect(visitor.locator('.level-card tbody tr').filter({ has: visitor.getByText('合成同名', { exact: true }) })).toHaveCount(2)
   await visitor.getByRole('combobox', { name: /級數/ }).selectOption('8')
   await expect(visitor.locator('.level-card tbody tr')).toHaveCount(1)
   await expect(visitor.locator('.level-card')).toContainText('西區')
@@ -53,7 +59,7 @@ test('首頁公告發布下架、免登入分級與比賽導覽', async ({ page,
   await page.unroute('**/api/admin/announcements/*')
   await page.getByLabel('發布到首頁').uncheck()
   await page.getByRole('button', { name: '儲存公告', exact: true }).click()
-  await expect(page.getByRole('button', { name: `${title} 未發布・置頂`, exact: true })).toBeVisible()
+  await checkSavedListing(`${title} 未發布・置頂`)
   await visitor.reload()
   await expect(visitor.getByRole('heading', { name: title, exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: '公告修改歷史', exact: true }).click()

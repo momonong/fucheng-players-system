@@ -22,7 +22,7 @@ export function App() {
   return <><SiteNav />{adminPage ? <AdminPage /> : appPathname() === '/members' ? <PublicPage /> : appPathname() === '/' ? <ClubHome /> : <PublicRegistrationPortal />}</>
 }
 
-function PublicPage() {
+function PublicPage({ managed = false }: { managed?: boolean }) {
   const [members, setMembers] = useState<PublicMember[]>([])
   const [printMembers, setPrintMembers] = useState<PublicMember[]>([])
   const [search, setSearch] = useState('')
@@ -74,11 +74,8 @@ function PublicPage() {
   }
 
   return <>
-    <header className="hero">
-      <div><p className="eyebrow">府城球館</p><h1>會員分級表</h1><p>依級數查看目前啟用會員名單</p></div>
-      <a className="admin-link no-print" href={appUrl("/admin")}>管理員登入</a>
-    </header>
     <main>
+      {!managed && <h1 className="visually-hidden">會員分級表</h1>}
       <section className="filters no-print" aria-label="搜尋與篩選">
         <label>搜尋姓名或辨識註記<input value={search} onChange={e => setSearch(e.target.value)} placeholder="例如：林先生" type="search" /></label>
         <label>級數<select value={level} onChange={e => setLevel(e.target.value)}><option value="">全部級數</option>{range(1, 10).map(n => <option key={n}>{n}</option>)}</select></label>
@@ -120,7 +117,7 @@ function AdminPage() {
   if (!username) return <Login onLogin={setUsername} />
   if (appPathname() === '/admin/announcements') return <AnnouncementManager username={username} onLogout={() => setUsername(null)} />
   if (appPathname() === '/admin/system/deployment-report') return <DeploymentReportPage username={username} onLogout={() => setUsername(null)} />
-  if (appPathname() === '/admin/roster') return <PublicPage />
+  if (appPathname() === '/admin/roster') return <><AdminHeader section="roster" username={username} onLogout={() => setUsername(null)} /><PublicPage managed /></>
   if (appPathname().startsWith('/admin/competitions')) return <CompetitionManager username={username} onLogout={() => setUsername(null)} />
   return <MemberManager username={username} onLogout={() => setUsername(null)} />
 }
