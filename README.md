@@ -1,6 +1,6 @@
 # 府城球館會員管理系統
 
-0.3.6 讓手機整張選手方塊直接拖曳、連點兩下查看資訊，選單由右上 ⋯ 開啟；桌面功能及樣式保留。沿用 schema `0010_deployment_report`，同一映像支援家中 `/fucheng/` 與球館根路徑。詳見[0.3.6 發布說明](docs/release-0.3.6.md)，部署狀態以日期化紀錄為準。
+0.3.7 統一「會員分級表」名稱，精簡素食名單與工具列，移除公開頁面重複標題，統一管理導覽間距及響應式留白。沿用 schema `0010_deployment_report`，同一映像支援家中 `/fucheng/` 與球館根路徑。詳見[0.3.7 發布說明](docs/release-0.3.7.md)；本次僅發布版本與映像，部署狀態以日期化紀錄為準。
 
 家中試用已於 2026-10-03 切換至 [momonong.me/fucheng/](https://momonong.me/fucheng/)；Docker app／資料位於 4090，HP 僅提供共用入口與加密轉送。部署證據及待驗收範圍見[家中部署紀錄](docs/home-deployment.md)。
 
