@@ -56,8 +56,9 @@ async function drag(page:Page,info:TestInfo,from:any,to:any,cancel=false,fractio
   if(info.project.name==='mobile') {
     const cdp=await page.context().newCDPSession(page)
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:a.x+a.width/2,y:a.y+a.height/2}]})
-    await expect(page.locator('.level-drag-ghost')).toBeVisible()
+    await expect(page.locator('.level-drag-ghost')).toHaveCount(0)
     await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:b.x+b.width/2,y:b.y+b.height*fraction}]})
+    await expect(page.locator('[data-drag-intent]')).toBeVisible()
     if(fraction===.1) await expect(to).toHaveClass(/drop-insert before/)
     await cdp.send('Input.dispatchTouchEvent',{type:cancel?'touchCancel':'touchEnd',touchPoints:[]})
     await cdp.detach()
@@ -87,9 +88,9 @@ test('格位八十人：搜尋不壓縮、真實插入觸控、素食與欄底�
   // Viewing a player does not enter cell-range selection or leave editing tools over the grip.
   await page.evaluate(()=>{(window as any).trusted=[];window.addEventListener('pointerdown',e=>(window as any).trusted.push(`${e.pointerType}:${e.isTrusted}`))})
   await s.slot(target).scrollIntoViewIfNeeded()
-  await drag(page,info,s.cell(0).locator('.cell-grip'),s.slot(target),true,.1)
+  await drag(page,info,s.cell(0).locator(info.project.name==='mobile'?'.cell-name':'.cell-grip'),s.slot(target),true,.1)
   expect((await s.state()).layout).toEqual(before.layout)
-  await drag(page,info,s.cell(0).locator('.cell-grip'),s.slot(target),false,.1)
+  await drag(page,info,s.cell(0).locator(info.project.name==='mobile'?'.cell-name':'.cell-grip'),s.slot(target),false,.1)
   await expect.poll(async()=>position((await s.state()).layout,s.rows[0].id)).toEqual(target)
   await s.idle()
   const after=await s.state()
@@ -150,7 +151,7 @@ test('格位未知小存原樣重試與成功待讀回整場鎖',async({page},in
   let lost=true
   const payloads:any[]=[]
   await page.route('**/arrangement/operations',async route=>{payloads.push(route.request().postDataJSON());if(lost){lost=false;await route.fetch();await route.fulfill({status:503,json:{detail:'合成未知結果'}})}else await route.continue()})
-  await drag(page,info,s.cell(0).locator('.cell-grip'),s.slot(target))
+  await drag(page,info,s.cell(0).locator(info.project.name==='mobile'?'.cell-name':'.cell-grip'),s.slot(target))
   await expect(s.area.getByRole('button',{name:'確認操作結果／原樣重試'})).toBeVisible()
   await expect(s.cell(1).locator('.cell-grip')).toBeDisabled();await expect(s.area.getByRole('button',{name:'保存完整安排'})).toBeDisabled()
   await s.op({action:'insert_row',before_id:null});const revision=(await s.state()).layout_revision
@@ -248,16 +249,17 @@ test('格位原生橫捲不寫入與拖曳最遠第十欄',async({page},info)=>{
   await table.scrollIntoViewIfNeeded()
   if(info.project.name==='mobile') {
     const cdp=await page.context().newCDPSession(page)
-    const box=(await table.boundingBox())!,y=box.y+65
+    const blank=s.slot(point(before.layout,2,1)).locator('.grid-empty');await blank.scrollIntoViewIfNeeded()
+    const box=(await blank.boundingBox())!,y=box.y+box.height/2
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:box.x+box.width-20,y}]})
-    for(let i=1;i<=10;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:box.x+box.width-20-i*23,y}]})
+    for(let i=1;i<=10;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:box.x+box.width-20-i*20,y}]})
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]})
     await expect.poll(()=>table.evaluate(el=>el.scrollLeft)).toBeGreaterThan(50)
     expect((await s.state()).layout).toEqual(before.layout)
-    await s.cell(0).locator('.cell-grip').scrollIntoViewIfNeeded()
-    const from=(await s.cell(0).locator('.cell-grip').boundingBox())!,edge=(await table.boundingBox())!
+    await s.cell(0).locator(info.project.name==='mobile'?'.cell-name':'.cell-grip').scrollIntoViewIfNeeded()
+    const from=(await s.cell(0).locator(info.project.name==='mobile'?'.cell-name':'.cell-grip').boundingBox())!,edge=(await table.boundingBox())!
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:from.x+from.width/2,y:from.y+20}]})
-    await expect(page.locator('.level-drag-ghost')).toBeVisible()
+    await expect(page.locator('.level-drag-ghost')).toHaveCount(0)
     await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:edge.x+edge.width-8,y:from.y+20}]})
     await expect.poll(()=>table.evaluate(el=>el.scrollLeft+el.clientWidth>=el.scrollWidth-4)).toBe(true)
     const to=(await s.slot(target).boundingBox())!
@@ -273,7 +275,7 @@ test('拖曳修正：姓名與把手放下不開資訊、浮動卡跟手及來�
   const s=await setup(page,info,'dragfix')
   const ghost=page.locator('.level-drag-ghost')
   await page.evaluate(()=>{(window as any).dragEvents=[];window.addEventListener('pointerup',e=>(window as any).dragEvents.push({type:e.pointerType,trusted:e.isTrusted,id:e.pointerId}))})
-  for(const sourceSelector of info.project.name==='mobile'?['.cell-grip']:['.cell-name','.cell-grip']) {
+  for(const sourceSelector of info.project.name==='mobile'?['.cell-name']:['.cell-name','.cell-grip']) {
     // Keep GET pending after commit, making the old blocked/onClick race deterministic.
     let unblock!:()=>void;const waitRead=new Promise<void>(resolve=>unblock=resolve)
     let mutation=false
@@ -284,7 +286,7 @@ test('拖曳修正：姓名與把手放下不開資訊、浮動卡跟手及來�
     const a=(await source.boundingBox())!,b=(await destination.boundingBox())!,cardBox=(await s.cell(0).boundingBox())!
     const start={x:a.x+a.width/2,y:a.y+a.height/2},finish={x:b.x+b.width/2,y:b.y+b.height/2}
     const cdp=info.project.name==='mobile'?await page.context().newCDPSession(page):null
-    if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[start]});await expect(ghost).toBeVisible();await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finish]})}
+    if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[start]});await expect(ghost).toHaveCount(0);await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finish]})}
     else {await page.mouse.move(start.x,start.y);await page.mouse.down();await page.mouse.move(finish.x,finish.y,{steps:8})}
     await expect(ghost).toBeVisible();await expect(ghost).toHaveText('格位選手000合成dragfix')
     await expect(s.cell(0)).toHaveCSS('opacity','0.25')
@@ -305,7 +307,7 @@ test('拖曳修正：姓名與把手放下不開資訊、浮動卡跟手及來�
     await page.getByRole('dialog').getByRole('button',{name:'關閉',exact:true}).click()
     await s.cell(0).locator('.cell-name').focus();await page.keyboard.press('Enter')
     await expect(page.getByRole('dialog',{name:'格位選手000'})).toBeVisible();await page.keyboard.press('Escape')
-    await activate(info,s.cell(0).locator('.cell-grip'));await expect(page.getByRole('dialog')).toHaveCount(0);await s.cell(0).locator('.cell-grip').focus();await page.keyboard.press('Enter')
+    await activate(info,s.cell(0).locator(info.project.name==='mobile'?'.cell-name':'.cell-grip'));await expect(page.getByRole('dialog')).toHaveCount(0);await s.cell(0).locator(info.project.name==='mobile'?'.cell-name':'.cell-grip').focus();await page.keyboard.press('Enter')
     await expect(page.getByRole('dialog',{name:'格位選手000'})).toBeVisible();await page.keyboard.press('Escape')
   }
   expect(await page.evaluate(expected=>(window as any).dragEvents.some((e:any)=>e.trusted&&e.type===expected),info.project.name==='mobile'?'touch':'mouse')).toBe(true)
@@ -314,7 +316,7 @@ test('拖曳修正：姓名與把手放下不開資訊、浮動卡跟手及來�
 test('拖曳修正：取消與失敗清理、普通觸控捲動不殘留淡化',async({page},info)=>{
   const s=await setup(page,info,'dragcancel')
   const ghost=page.locator('.level-drag-ghost'),before=await s.state()
-  const source=s.cell(0).locator(info.project.name==='mobile'?'.cell-grip':'.cell-name')
+  const source=s.cell(0).locator('.cell-name')
   const destination=s.cell(1).locator('.cell-name')
   await drag(page,info,source,destination,true)
   await expect(ghost).toHaveCount(0);await expect(page.getByRole('dialog')).toHaveCount(0);await expect(s.cell(0)).toHaveCSS('opacity','1')
@@ -323,7 +325,7 @@ test('拖曳修正：取消與失敗清理、普通觸控捲動不殘留淡化',
   await expect(page.getByRole('dialog',{name:'格位選手000'})).toBeVisible();await page.keyboard.press('Escape')
   // Server failure also clears all drag visuals and suppresses the derived click while busy.
   await page.route('**/arrangement/operations',route=>route.fulfill({status:503,json:{detail:'合成拖曳失敗'}}))
-  await drag(page,info,s.cell(0).locator('.cell-grip'),destination)
+  await drag(page,info,s.cell(0).locator(info.project.name==='mobile'?'.cell-name':'.cell-grip'),destination)
   await expect(s.area.getByRole('button',{name:'確認操作結果／原樣重試'})).toBeVisible()
   await expect(ghost).toHaveCount(0);await expect(s.cell(0)).toHaveCSS('opacity','1');await expect(page.getByRole('dialog')).toHaveCount(0)
   await openPlayer(info,s.cell(0).locator('.cell-name'))
@@ -331,10 +333,10 @@ test('拖曳修正：取消與失敗清理、普通觸控捲動不殘留淡化',
   await page.unroute('**/arrangement/operations');await s.area.getByRole('button',{name:'確認操作結果／原樣重試'}).click();await s.idle()
   if(info.project.name==='mobile') {
     const table=s.area.locator('.arrangement-table-scroll');await table.evaluate(el=>el.scrollLeft=0);await table.scrollIntoViewIfNeeded()
-    const box=(await table.boundingBox())!,cdp=await page.context().newCDPSession(page),y=box.y+65
-    const state=await s.state()
+    const state=await s.state(),blank=s.slot(point(state.layout,2,1)).locator('.grid-empty');await blank.scrollIntoViewIfNeeded()
+    const box=(await blank.boundingBox())!,cdp=await page.context().newCDPSession(page),y=box.y+box.height/2
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:box.x+box.width-25,y}]})
-    for(let i=1;i<=10;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:box.x+box.width-25-i*22,y}]})
+    for(let i=1;i<=10;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:box.x+box.width-25-i*20,y}]})
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach()
     await expect.poll(()=>table.evaluate(el=>el.scrollLeft)).toBeGreaterThan(40)
     await expect(ghost).toHaveCount(0);await expect(s.area.locator('.is-drag-source')).toHaveCount(0);await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -691,12 +693,12 @@ test('表格刪除：低位置多文字選單與確認內容可捲、按鈕可�
 
 
 async function previewDrag(page:Page,info:TestInfo,s:any,index:number,target:any,fraction:number,mode:string,label:string) {
-  const source=s.cell(index).locator('.cell-grip'),slot=s.slot(target)
+  const source=s.cell(index).locator(info.project.name==='mobile'?'.cell-name':'.cell-grip'),slot=s.slot(target)
   await slot.evaluate((el:Element)=>el.scrollIntoView({block:'center',inline:'nearest'}));await source.scrollIntoViewIfNeeded()
   const a=(await source.boundingBox())!,b=(await slot.boundingBox())!
   const start={x:a.x+a.width/2,y:a.y+a.height/2},end={x:b.x+b.width/2,y:b.y+b.height*fraction}
   const cdp=info.project.name==='mobile'?await page.context().newCDPSession(page):null
-  if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[start]});await expect(page.locator('.level-drag-ghost')).toBeVisible();await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[end]})}
+  if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[start]});await expect(page.locator('.level-drag-ghost')).toHaveCount(0);await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[end]})}
   else {await page.mouse.move(start.x,start.y);await page.mouse.down();await page.mouse.move(end.x,end.y,{steps:8})}
   const preview=page.locator('.drag-intent');await expect(preview).toHaveAttribute('data-drag-intent',mode);await expect(preview).toContainText(label)
   await expect(slot).toHaveClass(new RegExp('drop-'+mode));await expect(s.cell(index)).toHaveCSS('opacity','0.25')

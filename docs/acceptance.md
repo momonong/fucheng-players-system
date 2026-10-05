@@ -781,3 +781,31 @@ npm --prefix frontend run test:e2e -- mobile-workflows.spec.ts --project mobile 
 ### 0.3.5 發布後補充
 
 上節「尚未發布」是功能完成時的歷史狀態。後續依使用者明確授權，已完成 0.3.5 GitHub／Docker Hub 發布、4090 部署及公開管理頁唯讀核對，見 [部署紀錄](home-deployment.md)。最後管理列靠右改動在 `test-results/admin-status-right/` 的 desktop／mobile 2 passed，手機容器加寬後在 `test-results/admin-status-right-mobile-final/` 補驗 1 passed，均含 360–1440px；重用 8294 一度因 socket 占用而在接觸 fixture 前拒絕啟動，改用已核對空閒的 8295 通過。發布前另跑全後端 211 passed，沒有新增 migration 或依賴。
+
+## 手機整張選手方塊拖曳（2026-10-05，尚未發布）
+
+分支 `fix/mobile-whole-card-drag`，起點 `21631f59ade0e68c968cf37a59f1b57785bd9870`。依使用者最新要求，僅 900px 以下改為整個選手方塊起拖、雙點查看資訊，右上 ⋯ 繼續開啟選單。寬畫面滑鼠與觸控保留原行為、把手和樣式。沒有 API、schema、migration、依賴或正式資料變更。
+
+- Production build（含 TypeScript 檢查）及 `git diff --check` 通過。沿用既有 dependency lock，本輪未修改後端行為，不重跑與此次手勢無關的全後端測試。
+- 最終三批 **18 passed**：根路徑 `competition-levels.spec.ts` 桌面／手機 8 passed（8312）；`/fucheng` 的 `mobile-workflows.spec.ts` 桌面 3 passed（8313）、手機 7 passed（8314）。三批 `.last-run.json` 均 passed。合成 DB 為 `data/mobile-card-20261005-e2e.db`，static 為 `frontend/dist-mobile-card`，全部循序執行。
+- 手機覆蓋整卡四邊與辨識註記命中、按鈕實際覆滿卡片、立即拉動、交換／插入／空格移動、輕點／雙點、7px 移動後返回原位不算 tap、Escape 失去 capture、650ms 長按、多指取消、右鍵隔離與明確 ⋯。900／901／1024px 檢查只在窄畫面隱藏把手並改變 touch-action。
+- 共用回歸覆蓋原生空白處橫捲與拖至第十欄、桌面姓名及把手拖曳、雙擊、右鍵／Shift+F10、浮動卡與來源淡化、取消／503 清理、pending 整場鎖、unknown 同 payload 重試、起拖後外來更新 409、範圍選取與歷史唯讀資訊。
+- 初批連續拖曳測試將可查看資訊的姓名按鈕誤當作 disabled 等待訊號，下一次起拖發生在 UI 讀回前。已改為等待卡片 `data-draggable=true`，沒有放寬產品的 busy guard；最終前綴手機整批通過。舊 E2E 的手機把手起拖改成姓名區，原生捲動案例明確從空白格開始，桌面測試保留原把手與姓名兩種入口。
+- 沿用 `/root/touch_review` 做獨立唯讀 diff 審查，未發現阻斷缺陷。已目視手機整卡與桌面拖曳截圖，卡片無把手殘留空隙，桌面仍有把手與原落點預告。
+
+證據目錄：`test-results/mobile-card-root-regression/`、`test-results/mobile-card-prefix-desktop/`、`test-results/mobile-card-prefix-mobile-final/`。初次診斷留在 `test-results/mobile-card-prefix/`；不得用其失敗批次取代最終結果。測試結束後 8310–8314 均無 listener，成品、合成 DB 與截圖留存。
+
+重現前綴手機最終批次（先核對 port 未占用，不能與同 DB 其他批次並行）：
+
+```bash
+PATH=/home/ubuntu/.hermes/bin:$PATH \
+PLAYWRIGHT_BROWSERS_PATH=/tmp/fucheng-mobile-browsers \
+FUCHENG_E2E_DATABASE_URL=sqlite:///data/mobile-card-20261005-e2e.db \
+FUCHENG_E2E_STATIC_DIR=frontend/dist-mobile-card \
+FUCHENG_E2E_PORT=8314 FUCHENG_BASE_PATH=/fucheng \
+npm --prefix frontend run test:e2e -- mobile-workflows.spec.ts --project mobile \
+  --grep '單一表格快速|拖曳未知|起拖後外來|較大觸控|整張選手卡|900px|手機長按方塊' \
+  --output ../test-results/mobile-card-prefix-mobile-final
+```
+
+這是 Chromium 觸控模擬及合成資料的工程證據，尚非 Android／iPhone 真機或 Safari 長按驗收。本階段本機開發完成，未合併、推送、發布 image 或部署，公開網站仍是先前版本。

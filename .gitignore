@@ -289,3 +289,5 @@ frontend/dist-base-path/
 /frontend/dist-mobile-grid-touch/
 
 /frontend/dist-roster-labels/
+
+/frontend/dist-mobile-card/
