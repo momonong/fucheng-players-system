@@ -133,7 +133,7 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
   function startDrag(event: React.PointerEvent<HTMLButtonElement>, row: ArrangementRow) {
     if (blocked || rangeMode || event.button !== 0) return
     setShadePanel(null); dragToken.current = stateToken
-    start(event, { id: row.registration_id, name: row.member_name, note: row.distinguishing_note })
+    start(event, { id: row.registration_id, name: row.member_name, note: row.distinguishing_note }, !compact)
   }
   useEffect(()=>{if(drag){playerClicks.current=null;setShadePanel(null)}},[!!drag])
   useEffect(() => { if (detailId) detailDialog.current?.showModal() },[detailId])
@@ -293,14 +293,15 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
             onContextMenu={event=>{if(blocked)return;event.preventDefault();event.stopPropagation();openShade(point,event.clientX,event.clientY)}}
             onKeyDown={e=>menuKeyboard(e,point)} onPointerDown={event=>startSelection(event,point)} onDoubleClick={event=>{if(!(event.target as HTMLElement).closest('.cell-name,.cell-grip'))beginEdit(point,undefined,true)}}
             onClick={event => { if ((event.target as HTMLElement).closest('.cell-name,.cell-grip')) return; select(point,event.shiftKey) }}>
-            {editing?.inline&&editing.point&&pointKey(editing.point)===k?inlineEditor():row ? <div data-draggable={!blocked} data-registration-id={row.registration_id} className={`arrangement-cell ${drag?.card.id===row.registration_id ? 'is-drag-source' : ''} ${change ? `net-${change.kind}` : ''} ${!match ? 'search-hidden' : search.trim() ? 'search-match' : ''} ${vegetarian && row.diet==='vegetarian' ? 'diet-highlight' : ''}`}>
+            {editing?.inline&&editing.point&&pointKey(editing.point)===k?inlineEditor():row ? <div data-draggable={!blocked && !(compact && rangeMode)} data-registration-id={row.registration_id} className={`arrangement-cell ${drag?.card.id===row.registration_id ? 'is-drag-source' : ''} ${change ? `net-${change.kind}` : ''} ${!match ? 'search-hidden' : search.trim() ? 'search-match' : ''} ${vegetarian && row.diet==='vegetarian' ? 'diet-highlight' : ''}`}>
               {!match ? <span className="search-occupied" aria-label="搜尋隱藏，已占用">已占用</span> : <>
               {!readonly && <button className="cell-grip" type="button" disabled={blocked} aria-label={`拖曳 ${row.member_name} ${row.distinguishing_note ?? ''}`} onPointerDown={event => startDrag(event,row)} onClick={()=>{playerClicks.current=null;selectPlayer(row.registration_id)}} onKeyDown={e=>keyPlayer(e,row.registration_id)} onContextMenu={event=>{event.preventDefault();event.stopPropagation()}}>⠿</button>}
               <button className="cell-name" type="button" aria-label={`${row.member_name}${row.distinguishing_note ? `・${row.distinguishing_note}` : ''}，單擊選取、雙擊查看`} title={row.member_name}
-                onPointerDown={event => {playerPointer.current=event.isPrimary?{x:event.clientX,y:event.clientY,id:event.pointerId}:null;if(event.pointerType==='mouse')startDrag(event,row)}}
-                onPointerMove={event=>{const p=playerPointer.current;if(p&&Math.hypot(event.clientX-p.x,event.clientY-p.y)>8){playerClicks.current=null;playerPointer.current=null}}}
-                onPointerUp={event=>{const p=playerPointer.current;playerPointer.current=null;if(event.pointerType==='touch'&&p?.id===event.pointerId&&Math.hypot(event.clientX-p.x,event.clientY-p.y)<=8)activatePlayer(row.registration_id,event.shiftKey,true)}}
+                onPointerDown={event => {playerPointer.current=event.isPrimary?{x:event.clientX,y:event.clientY,id:event.pointerId}:null;if(compact||event.pointerType==='mouse')startDrag(event,row)}}
+                onPointerMove={event=>{const p=playerPointer.current;if(p&&Math.hypot(event.clientX-p.x,event.clientY-p.y)>(compact?6:8)){playerClicks.current=null;playerPointer.current=null}}}
+                onPointerUp={event=>{const p=playerPointer.current;playerPointer.current=null;if(event.pointerType==='touch'&&p?.id===event.pointerId&&Math.hypot(event.clientX-p.x,event.clientY-p.y)<=(compact?6:8))activatePlayer(row.registration_id,event.shiftKey,true)}}
                 onPointerCancel={()=>{playerClicks.current=null;playerPointer.current=null}}
+                onLostPointerCapture={event=>{if(compact&&playerPointer.current?.id===event.pointerId){playerClicks.current=null;playerPointer.current=null}}}
                 onClick={event=>clickPlayer(event,row.registration_id)} onDoubleClick={()=>doubleClickPlayer(row.registration_id)} onKeyDown={event=>keyPlayer(event,row.registration_id)}><span className="cell-name-line"><span className="cell-person-name">{row.member_name}</span>{vegetarian&&row.diet==='vegetarian'&&<em className="diet-mark" aria-label="本場素食">素</em>}</span>{row.distinguishing_note&&<small>{row.distinguishing_note}</small>}</button>
               {change&&<span className="cell-change" aria-label={changeText(change)}>{change.kind==='added'?'+':change.kind==='position'?'↕':`${change.before}→${change.after}`}</span>}
 </> }

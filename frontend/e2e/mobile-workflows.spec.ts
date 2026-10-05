@@ -64,8 +64,11 @@ test('手機會員與公告分頁保留草稿，報名操作使用可關閉的�
 })
 
 
+const dragSurface = (page: Page, s: any, index = 0) => s.area.locator(`[data-registration-id="${s.people[index].id}"] ${page.viewportSize()!.width <= 900 ? '.cell-name' : '.cell-grip'}`)
+
 async function gridDrag(page: Page, info: TestInfo, s: any, source = 0, target = 1, options: { cancel?: boolean; context?: boolean; fraction?: number; point?: { row_id: string; column_id: string }; beforeRelease?: () => Promise<void> } = {}) {
-  const from = s.area.locator(`[data-registration-id="${s.people[source].id}"] .cell-grip`)
+  await expect(s.area.locator(`[data-registration-id="${s.people[source].id}"]`)).toHaveAttribute('data-draggable','true')
+  const from = dragSurface(page,s,source)
   const to = options.point ? s.area.locator(`td[data-grid-cell="${options.point.row_id}/${options.point.column_id}"]`) : s.area.locator(`td[data-drop-registration="${s.people[target].id}"]`)
   await from.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest'}))
   const a = (await from.boundingBox())!, b = (await to.boundingBox())!
@@ -97,7 +100,7 @@ test('單一表格快速拖曳不被觸控右鍵遮擋，點按取消與桌面�
   await expect(s.area.getByRole('table',{name:'當次級數表'})).toBeVisible()
   const before = await s.state(), writes: any[] = []
   page.on('request',r=>{if(r.method()==='POST' && r.url().endsWith('/arrangement/operations'))writes.push(r.postDataJSON())})
-  const grip = s.area.locator(`[data-registration-id="${s.people[0].id}"] .cell-grip`)
+  const grip = dragSurface(page,s)
   await activate(info,grip); expect(writes).toHaveLength(0)
   await s.area.getByRole('button',{name:'開啟儲存格操作',exact:true}).click()
   await expect(page.getByRole('dialog',{name:'儲存格操作',exact:true})).toBeVisible()
@@ -314,11 +317,11 @@ test('起拖後外來更新仍以起拖token拒絕，拖曳鍵盤選單不延後
   expect(position(await s.state(),s.people[0].id)).toEqual(position(before,s.people[0].id))
 })
 
-test('手機長按把手與第二指介入不留下選單或誤寫',async({page},info)=>{
+test('手機長按方塊與第二指介入不留下選單或誤寫',async({page},info)=>{
   test.skip(info.project.name!=='mobile','Touch pointer coverage')
   const s=await setup(page,info),before=await s.state(),writes:any[]=[]
   page.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/arrangement/operations'))writes.push(r.postDataJSON())})
-  const grip=s.area.locator(`[data-registration-id="${s.people[0].id}"] .cell-grip`)
+  const grip=dragSurface(page,s)
   await grip.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest'}))
   const a=(await grip.boundingBox())!,b=(await s.area.locator(`td[data-drop-registration="${s.people[1].id}"]`).boundingBox())!
   const start={x:a.x+a.width/2,y:a.y+a.height/2,id:0},end={x:b.x+b.width/2,y:b.y+b.height/2,id:0}
@@ -339,10 +342,79 @@ test('手機長按把手與第二指介入不留下選單或誤寫',async({page}
   const name=s.area.locator(`[data-registration-id="${s.people[0].id}"] .cell-name`)
   const nameBox=(await name.boundingBox())!,tap={x:nameBox.x+nameBox.width/2,y:nameBox.y+nameBox.height/2,id:0}
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[tap]})
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[tap,{...start,id:1}]})
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[tap,{x:20,y:20,id:1}]})
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]})
   await cdp.detach()
   await name.tap();await expect(page.getByRole('dialog')).toHaveCount(0)
   await name.tap();await expect(page.getByRole('dialog',{name:'合成同名操作',exact:true})).toBeVisible()
   expect(writes).toHaveLength(0);expect((await s.state()).state_token).toBe(before.state_token)
+})
+
+test('手機整張選手卡含四邊與註記可起拖，輕點雙點和取消不誤寫',async({page},info)=>{
+  test.skip(info.project.name!=='mobile','Narrow touch gestures')
+  const s=await setup(page,info),before=await s.state(),writes:any[]=[]
+  page.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/arrangement/operations'))writes.push(r.postDataJSON())})
+  const card=s.area.locator(`[data-registration-id="${s.people[0].id}"]`),name=card.locator('.cell-name')
+  await name.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest'}))
+  await expect(card.locator('.cell-grip')).toBeHidden()
+  const box=(await card.boundingBox())!,button=(await name.boundingBox())!,note=(await name.locator('small').boundingBox())!
+  expect(button).toEqual(box)
+  const target=(await s.area.locator(`td[data-drop-registration="${s.people[1].id}"]`).boundingBox())!
+  const finish={x:target.x+target.width/2,y:target.y+target.height/2}
+  const center={x:box.x+box.width/2,y:box.y+box.height/2}
+  const starts=[{x:box.x+1,y:center.y},{x:box.x+box.width-1,y:center.y},{x:center.x,y:box.y+1},{x:center.x,y:box.y+box.height-1},{x:note.x+note.width/2,y:note.y+note.height/2}]
+  const cdp=await page.context().newCDPSession(page)
+  for(const start of starts){
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[start]})
+    await expect(page.locator('.level-drag-ghost')).toHaveCount(0)
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[finish]})
+    await expect(page.locator('[data-drag-intent]')).toHaveAttribute('data-drag-intent','swap')
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]})
+    await expect(page.locator('.level-drag-ghost')).toHaveCount(0)
+  }
+  await name.tap();await expect(page.getByRole('dialog')).toHaveCount(0)
+  await name.tap();await expect(page.getByRole('dialog',{name:'合成同名操作',exact:true})).toBeVisible()
+  await page.keyboard.press('Escape')
+  // A 7px movement must not count as a tap; returning to the start still cancels it.
+  await name.tap()
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[center]})
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{...center,x:center.x+7}]})
+  await expect(page.locator('.level-drag-ghost')).toBeVisible()
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[center]})
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]})
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await name.tap();await expect(page.getByRole('dialog')).toHaveCount(0)
+  await name.tap();await expect(page.getByRole('dialog',{name:'合成同名操作',exact:true})).toBeVisible()
+  await page.keyboard.press('Escape')
+  // Losing capture before movement must also discard the tap sequence.
+  await name.tap()
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[center]})
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{...center,x:center.x+1}]})
+  await page.keyboard.press('Escape')
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]})
+  await name.tap();await expect(page.getByRole('dialog')).toHaveCount(0)
+  await name.tap();await expect(page.getByRole('dialog',{name:'合成同名操作',exact:true})).toBeVisible()
+  await page.keyboard.press('Escape');await cdp.detach()
+  expect(writes).toHaveLength(0);expect((await s.state()).state_token).toBe(before.state_token)
+  await page.screenshot({path:info.outputPath('whole-card-mobile.png'),fullPage:true})
+})
+
+test('900px整卡與901px桌面邊界保留把手樣式和姓名原生捲動',async({page},info)=>{
+  test.skip(info.project.name!=='mobile','Touch breakpoint coverage')
+  const s=await setup(page,info),before=await s.state()
+  const card=s.area.locator(`[data-registration-id="${s.people[0].id}"]`),name=card.locator('.cell-name'),grip=card.locator('.cell-grip')
+  for(const width of [900,901,900,1024]){
+    await page.setViewportSize({width,height:844})
+    if(width<=900){await expect(grip).toBeHidden();await expect(name).toHaveCSS('touch-action','none')}
+    else{await expect(grip).toBeVisible();await expect(grip).toHaveCSS('width','44px');await expect(name).toHaveCSS('touch-action','manipulation')}
+  }
+  await name.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest'}))
+  const box=(await name.boundingBox())!,cdp=await page.context().newCDPSession(page),start={x:box.x+box.width/2,y:box.y+box.height/2}
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[start]})
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:start.x+80,y:start.y}]})
+  await expect(page.locator('.level-drag-ghost')).toHaveCount(0)
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach()
+  expect((await s.state()).state_token).toBe(before.state_token)
+  await gridDrag(page,info,s)
+  await expect.poll(async()=>position(await s.state(),s.people[0].id)).toEqual(position(before,s.people[1].id))
 })

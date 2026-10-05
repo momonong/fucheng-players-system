@@ -975,3 +975,10 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: min(2800px, ca
   .admin-status-line .admin-backup { font-size: .72rem; padding: .35rem; }
   .admin-username { font-size: .8rem; }
 }
+
+/* Narrow screens drag the entire player card; wider touch screens keep handles. */
+@media screen and (max-width: 900px) {
+  .arrangement-cell .cell-grip { display: none; }
+  .arrangement-cell .cell-name { align-self: stretch; min-height: 46px; }
+  .arrangement-cell[data-draggable="true"] .cell-name { touch-action: none; }
+}

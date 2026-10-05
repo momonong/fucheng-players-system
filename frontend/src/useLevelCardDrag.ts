@@ -11,7 +11,7 @@ type Gesture = {
   x: number; y: number; active: boolean; touch: boolean; width: number; height: number; target: DropTarget | null
 }
 
-// Only the handle opts out of native touch scrolling. Cards and lane bodies still scroll.
+// Callers opt drag surfaces out of native touch scrolling; blank cells still scroll.
 export function useLevelCardDrag(onMove: (id: string, target: DropTarget) => void, enabled: boolean) {
   const [drag, setDrag] = useState<Drag | null>(null)
   const gesture = useRef<Gesture | null>(null)
@@ -134,7 +134,7 @@ export function useLevelCardDrag(onMove: (id: string, target: DropTarget) => voi
     }
   }, [])
 
-  function start(event: ReactPointerEvent<HTMLButtonElement>, card: Card) {
+  function start(event: ReactPointerEvent<HTMLButtonElement>, card: Card, touchPreview = true) {
     if (!latest.current.enabled || !event.isPrimary || event.button !== 0 || gesture.current) return
     const box = (event.currentTarget.closest('.arrangement-cell') ?? event.currentTarget).getBoundingClientRect()
     const current: Gesture = {
@@ -144,9 +144,9 @@ export function useLevelCardDrag(onMove: (id: string, target: DropTarget) => voi
     }
     gesture.current = current
     event.currentTarget.setPointerCapture(event.pointerId)
-    // A handle touch shows readiness immediately; movement beyond 6px starts a drag.
-    // No long-press timer competes with the platform context menu. A tap never writes.
-    if (current.touch) setDrag({ card, x: current.x, y: current.y, touch: true, width: current.width, height: current.height, target: null })
+    // Handles retain immediate readiness. Whole-card taps wait for movement so
+    // the preview does not clear the double-tap sequence. A tap never writes.
+    if (current.touch && touchPreview) setDrag({ card, x: current.x, y: current.y, touch: true, width: current.width, height: current.height, target: null })
   }
   return { drag, start }
 }
