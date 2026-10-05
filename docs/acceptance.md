@@ -809,3 +809,8 @@ npm --prefix frontend run test:e2e -- mobile-workflows.spec.ts --project mobile 
 ```
 
 這是 Chromium 觸控模擬及合成資料的工程證據，尚非 Android／iPhone 真機或 Safari 長按驗收。本階段本機開發完成，未合併、推送、發布 image 或部署，公開網站仍是先前版本。
+
+
+### 0.3.6 發布後補充
+
+上節「尚未發布」保留功能完成當時的狀態。後續依使用者明確授權，已完成 PR #11 合併、v0.3.6 與 Docker Hub 0.3.6/latest 發布，並完成 4090 保留資料升級。發布前全後端 211 passed、locked sync/build/audit 通過；映像 root/prefix smoke 通過且靜態成品與 18 項 E2E 相同。備份、資料指紋、image 身份與公開驗證詳見 [部署紀錄](home-deployment.md#036-手機整張方塊拖曳部署2026-10-05)。公開登入表單已驗，手勢仍待真機使用者接受。
