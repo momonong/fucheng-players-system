@@ -198,11 +198,11 @@ test('素食名單依顯示布局列出隊名，不受搜尋裁減；帳號在�
     const toggle=s.area.locator('.vegetarian-toggle'), trigger=s.area.getByRole('button',{name:'查看素食人員名單'})
     await trigger.scrollIntoViewIfNeeded()
     const badge=(await trigger.locator('.vegetarian-roster-badge').boundingBox())!, button=(await toggle.boundingBox())!, hit=(await trigger.boundingBox())!
-    expect(badge.width).toBe(28);expect(badge.height).toBe(28)
+    expect(badge.width).toBe(24);expect(badge.height).toBe(24)
     expect(badge.x).toBeLessThan(button.x+button.width)
-    expect(badge.x+badge.width).toBeGreaterThan(button.x+button.width)
-    expect(badge.y).toBeLessThan(button.y)
-    expect(badge.y+badge.height).toBeGreaterThan(button.y)
+    expect(badge.x+badge.width).toBeLessThan(button.x+button.width)
+    expect(badge.y).toBeGreaterThan(button.y)
+    expect(badge.y+badge.height).toBeLessThan(button.y+button.height)
     expect(hit.width).toBeGreaterThanOrEqual(44);expect(hit.height).toBeGreaterThanOrEqual(44)
     const textEnd=await toggle.evaluate(el=>{
       const range=document.createRange();range.selectNodeContents(el)

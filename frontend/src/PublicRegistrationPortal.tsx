@@ -54,8 +54,8 @@ export function PublicRegistrationPortal() {
     return () => { active = false }
   }, [retry, routeId])
   return <>
-    <header className="admin-header registration-header"><div><p className="eyebrow">府城球館</p><h1>比賽報名</h1></div><a href={appUrl("/admin")}>管理員入口</a></header>
     <main className="public-registration">
+      <h1 className="visually-hidden">比賽報名</h1>
       <p className="registration-intro">找到自己的名字，就能報名。不用帳號、不用密碼。</p>
       {loading ? <p role="status">載入比賽中…</p> : error ? <div className="notice error" role="alert">{error}<button onClick={() => setRetry(r => r + 1)}>重新載入</button></div> : selected ?
         <RegistrationForm key={selected.id} competition={selected} csrf={csrf} turnstileSitekey={turnstileSitekey} /> : <>

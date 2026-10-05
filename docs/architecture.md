@@ -65,7 +65,7 @@
 | --- | --- |
 | `competitions` | 比賽設定、狀態、版本及下一個穩定順位 |
 | `competition_audits` | 比賽設定前後值、操作者、理由與 UTC 時間 |
-| `competition_registrations` | 會員關聯、正取／候補／取消、當次餐食、硬實力快照、順位與版本 |
+| `competition_registrations` | 會員關聯、正取／候補／取消、當次餐食、報名時會員級數快照、順位與版本 |
 | `registration_audits` | 每次報名操作、理由、操作者、UTC 時間及唯一 idempotency key |
 
 管理介面固定顯示全場總數，另列篩選結果，避免搜尋後把局部筆數誤認為整場摘要。飲食姓名與管理列印只在登入後提供；沒有公開比賽名單 API。
@@ -91,7 +91,7 @@ API no-store、Referrer-Policy no-referrer。驗證及資料庫錯誤不輸出�
 
 ### 共用交易與稽核
 
-管理員與公開報名共同呼叫 `registrations.py` 的 create_registration_service；取得 BEGIN IMMEDIATE 後重新核對 session／visit 期限，才檢查會員啟用、比賽狀態、截止、正取及候補。報名、獨立餐食、硬實力快照、順位計數與稽核同一交易。公開 payload 不接受狀態、順位、級數或截止後理由。
+管理員與公開報名共同呼叫 `registrations.py` 的 create_registration_service；取得 BEGIN IMMEDIATE 後重新核對 session／visit 期限，才檢查會員啟用、比賽狀態、截止、正取及候補。報名、獨立餐食、報名時會員級數快照、順位計數與稽核同一交易。公開 payload 不接受狀態、順位、級數或截止後理由。
 
 沿用有效報名 partial unique index、有候補不搶空缺、取消不自動遞補、管理員確認第一有效候補，以及取消後新報名排尾。管理員取消／更正／遞補仍由 _mutate_registration 執行。idempotency key 綁定 action、target、payload 指紋及 actor visit/admin ID；跨訪客或內容重用回 409，換新 key 重複報同會員也被有效報名約束拒絕。已完成請求重送可讀取同筆目前結果，不再次修改。舊第二階段 key 沒指紋，保守回 409。
 

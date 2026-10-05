@@ -16,7 +16,7 @@ export function SiteNav() {
   const pathname = appPathname()
   return <nav className={`site-nav no-print ${pathname.startsWith('/admin') ? 'admin-site-nav' : ''}`} aria-label="網站導覽">
     <a className="site-brand" href={appUrl("/")}>府城球館<span>一起打球，一起進步。</span></a>
-    <div>{[['/', '最新消息'], ['/members', '會員分級'], ['/competitions', '比賽報名']].map(([href, label]) => <a key={href} href={appUrl(href)} aria-current={(pathname === href || (href === '/competitions' && pathname.startsWith('/register/'))) ? 'page' : undefined}>{label}</a>)}<a className="nav-admin" href={appUrl("/admin")}>管理後台</a></div>
+    <div>{[['/', '最新消息'], ['/members', '會員分級表'], ['/competitions', '比賽報名']].map(([href, label]) => <a key={href} href={appUrl(href)} aria-current={(pathname === href || (href === '/competitions' && pathname.startsWith('/register/'))) ? 'page' : undefined}>{label}</a>)}<a className="nav-admin" href={appUrl("/admin")}>管理後台</a></div>
   </nav>
 }
 
@@ -37,13 +37,13 @@ export function ClubHome() {
   const opening = schedule.filter(item => item.status === 'open').sort((a, b) => a.competition_date.localeCompare(b.competition_date))
   const ordered = [...opening, ...schedule.filter(item => item.status !== 'open')]
   return <>
-    <header className="club-hero"><div><p className="eyebrow">府城球館・球友資訊站</p><h1>球館大小事，<br />這裡都找得到。</h1><p>看公告、查分級、報名比賽。<br />不用帳號，隨時掌握球館消息。</p><a className="hero-action" href={appUrl("/competitions")}>查看比賽與報名 →</a></div><div className="club-hero-note"><span className="court-mark" aria-hidden="true">府城</span><p>來球館，找球友。<br />下一場，一起上桌。</p></div></header>
     <main className="club-home">
-      <section className="home-shortcuts" aria-label="常用功能"><a href={appUrl("/members")}><span>01 / 查名單</span><h2>會員分級名單</h2><p>全部級數、姓名搜尋，快速找到自己。</p><strong>查看分級 →</strong></a><a href={appUrl("/competitions")}><span>02 / 參加比賽</span><h2>比賽報名</h2><p>選比賽、找名字、選葷素，完成登記。</p><strong>前往報名 →</strong></a></section>
+      <h1 className="visually-hidden">府城球館最新消息</h1>
+      <section className="home-shortcuts" aria-label="常用功能"><a href={appUrl("/members")}><span>01 / 查名單</span><h2>會員分級表</h2><p>全部級數、姓名搜尋，快速找到自己。</p><strong>查看分級 →</strong></a><a href={appUrl("/competitions")}><span>02 / 參加比賽</span><h2>比賽報名</h2><p>選比賽、找名字、選葷素，完成登記。</p><strong>前往報名 →</strong></a></section>
       {loading && <p role="status">載入球館消息中…</p>}
       {error && <div className="notice error" role="alert">{error}<button onClick={() => setRetry(n => n + 1)}>重新載入</button></div>}
       {!loading && !error && <div className="home-columns"><section aria-labelledby="news-title"><div className="home-section-title"><p className="section-kicker">CLUB NEWS</p><h2 id="news-title">最新公告</h2></div>
-        {!announcements.length && <div className="panel"><p>目前沒有新公告。</p><p>比賽時程與會員分級仍可隨時查看。</p></div>}
+        {!announcements.length && <div className="panel"><p>目前沒有新公告。</p><p>比賽時程與會員分級表仍可隨時查看。</p></div>}
         {announcements.map(item => <article className="panel news-card" key={item.id}><div className="news-meta">{item.is_pinned && <span className="news-pin">置頂公告</span>}{item.published_at && <time dateTime={item.published_at}>{dateTime(item.published_at)}</time>}</div><h3>{item.title}</h3><AnnouncementBody item={item} />{item.photo_id && <img className="announcement-photo" src={appUrl(`/api/public/announcement-media/${item.photo_id}`)} alt={`${item.title}公告照片`} />}</article>)}
       </section><section aria-labelledby="schedule-title"><div className="home-section-title"><p className="section-kicker">MATCH CALENDAR</p><h2 id="schedule-title">比賽時程</h2></div>
         {!ordered.length && <div className="panel"><p>目前尚無已公告的比賽。</p><p>新比賽開放後，會顯示在這裡。</p></div>}
