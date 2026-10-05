@@ -1,5 +1,13 @@
 # Windows Docker 部署、搬移與維運
 
+## 0.3.6 發布與升級
+
+0.3.6 僅在 900px 以下改為整張選手方塊拖曳，雙點看資訊、右上 ⋯ 開選單，桌面行為及樣式保留。詳見 [0.3.6 發布說明](release-0.3.6.md)。部署使用核對後的 Docker Hub `momonong/fucheng-players-system:0.3.6` digest。
+
+從 0.3.5 升級無 migration；停止本 project app／backup，以原版 runtime 成組備份 DB＋媒體並驗 hash，同批更新 app／backup／ops image，保留 named volumes、帳密及設定。驗健康、業務資料指紋、資產、登入／Cookie 與備份後交付。後端與 schema 未變，程式回退可恢復 0.3.5；若需還原資料，仍在新目標恢復匹配 image/schema，保留後續寫入。
+
+同一 Linux/amd64 image 以 runtime 前綴支援根路徑或 `/fucheng/`；Windows／WSL2 開機恢復及手機真機手感須現場驗收。以下保留歷史發布流程。
+
 ## 0.3.4 發布與升級
 
 0.3.4 移除手機名單操作，改用表格專用觸控把手並隔離長按選單；新增素食名單及調整管理員名稱位置。版本細節與驗證見 [0.3.4 發布說明](release-0.3.4.md)。Docker Hub 標籤為 `momonong/fucheng-players-system:0.3.4`；部署使用核對後的 digest。
