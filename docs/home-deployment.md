@@ -1,6 +1,6 @@
 # 家中 4090 試用部署
 
-2026-10-05 12:00（台北）核對：4090 已更新至 0.3.7，既有帳密與業務資料保留。公開 HTTPS 已顯示「會員分級表」、精簡公開頁首與新版靜態資產；可信 loopback 登入／讀取／登出通過。手機實際操作手感仍待使用者驗收。
+2026-10-05 核對：4090 已更新至 0.3.8；深綠網站導覽與灰綠管理頁首已上線，帳密及業務資料保留。部署、公開 HTTPS 與可信 loopback 登入驗證通過；視覺效果待使用者試用。
 
 ## 主機與入口
 
@@ -143,3 +143,18 @@ Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器�
 - HP Caddy／cloudflared／OrderFlow forward 與 4090 府城 forward active。Caddy SHA 仍為 `0e9b6473c465309ea5fad4dde547b9f286d3a363acd69142a3bd3157505da209`；未變更 Caddy／Tunnel／DNS／SSH 或服務目錄。
 
 舊 0.3.6 映像、設定、資料卷與停寫備份保留；未執行回退、prune 或 down -v。公開瀏覽器沒有既有管理 session，本輪登入後檢查採可信 loopback；公開管理操作與 Android／iPhone 手感由使用者試用，未宣稱真機驗收完成。
+
+
+## 0.3.8 頁首配色部署（2026-10-05）
+
+[應用 PR #14](https://github.com/momonong/fucheng-players-system/pull/14) 合併並發布 [v0.3.8](https://github.com/momonong/fucheng-players-system/releases/tag/v0.3.8) 及 Docker Hub `0.3.8`／`latest` 後，更新 4090 既有 `fucheng-home` app／backup。最上方導覽採深綠，管理頁首採淺灰綠；連結、目前頁面、備份提示及鍵盤焦點同步配色，保留手機與桌面操作及響應式留白。
+
+- Source/tag：`12fdd5a0d4d5c02d56245454ab4003d2fc6922df`；digest：`sha256:10e016ac08c5fa7187dfa9ee3910041f38e8ccae2b711eded57e3839af6e739e`；image ID：`sha256:7e92c098e689cab27b1692ca3d1ecd4fe07a10c47c2ae55a3d30f74121f9b6ed`。
+- Source manifest：`58679e0cd4b05853c5fe8b660b8dc0f4ec02c4a832776153d1cd8bcab792cfc2`；75 個 allowlist context 檔案，乾淨已提交來源，無資料、秘密、備份或舊成品。
+- uv locked sync、typecheck／build、npm audit（0 vulnerabilities）、後端 211 passed、prefix 桌面／手機 4 passed；30 組 360–3840px 版面檢查與 9 組至少 5.11:1 文字對比核對通過。映像 root／prefix 合成驗證通過，資產與測試成品一致。未宣稱 GitHub Actions 測試或真機人工驗收。
+- 停止 app／backup 後由 runtime 成組備份／export；checkpoint `manual-export-20261005T063819720898Z-f06846e4.db`，archive 及全部成員 hash 已核對，原 env、映像、volume 及匯出保留於受限位置。
+- schema `0010_deployment_report`、integrity ok、FK error 0；16 張業務表 fingerprint 完全不變：342 會員、2 比賽、81 報名、3 保存版。app／backup healthy，無 migration 或資料重建。
+- 可信 loopback 登入／讀取／登出、Secure/HttpOnly 前綴 Cookie、匿名拒絕、錯誤 Host 與裸 API 邊界通過。HP Caddy 根首頁、OrderFlow、府城與 health 均 200；Caddy／Tunnel／SSH 設定不變。
+- 公開 HTTPS 瀏覽器已核對新版資產及深綠導覽，會員分級表與管理登入表單正常。管理配色由合成桌面／手機截圖驗證；公開登入後實際使用手感留待使用者試用。
+
+本機證據在 ignored `data/release-0.3.8/`，帳密、備份及資料庫不進 Git。手機真機、真正 Turnstile 報名、斷電恢復與異地備份仍不在本次驗證內。
