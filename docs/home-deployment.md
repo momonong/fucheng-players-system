@@ -1,6 +1,6 @@
 # 家中 4090 試用部署
 
-2026-10-05 狀態：4090 已更新至 0.3.6，GitHub／Docker Hub 已發布。手機整張選手方塊拖曳版本已上線，帳密與既有業務資料保留。公開 HTTPS 已載入新版資產、公告及管理登入表單；可信 loopback 登入／讀取／登出通過。Android／iPhone 真機手感仍待使用者驗收。
+2026-10-05 12:00（台北）核對：4090 已更新至 0.3.7，既有帳密與業務資料保留。公開 HTTPS 已顯示「會員分級表」、精簡公開頁首與新版靜態資產；可信 loopback 登入／讀取／登出通過。手機實際操作手感仍待使用者驗收。
 
 ## 主機與入口
 
@@ -129,3 +129,17 @@ Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器�
 - HP Caddy／cloudflared／OrderFlow forward、4090 府城 SSH forward active；Caddy SHA 仍為 `0e9b6473c465309ea5fad4dde547b9f286d3a363acd69142a3bd3157505da209`。沒有 Caddy／Tunnel／DNS／SSH／服務目錄或其他應用變更，ASUS 未承接府城 app。
 
 重新整理即可試用，帳密沿用。兩個合成 app 已停止，volumes、舊 image、原資料與備份保留，未 prune／down -v。未做 Android／iPhone 手感、Windows／斷電恢復或真實 Turnstile 驗收；同機備份不等於異地備份。程式回退可恢復 0.3.5；資料還原仍以匹配 image/schema 的新目標保留後續寫入。
+
+
+## 0.3.7 介面整理部署（2026-10-05）
+
+先前已完成 [PR #13](https://github.com/momonong/fucheng-players-system/pull/13)、[v0.3.7 Release](https://github.com/momonong/fucheng-players-system/releases/tag/v0.3.7) 與 Docker Hub 發布；本輪使用者另行授權部署後，才更新既有 4090 `fucheng-home`。HP 仍僅負責入口，ASUS 未承接應用。
+
+- Source/tag：`39f5d8e6359358495f7eff4009bfba1dc0840941`；digest：`sha256:47b9ab0978e8f2934a6efd82413d6b471286c1d2ee6781197768b6faccfda9aa`；image ID：`sha256:6ca47d6b397a45a8a69b1871a7e1f4fb0f988adf1802f2095ff37da962f9ac02`。
+- 停止 app／backup 後，由 0.3.6 runtime 建立 backup 與 export，核對 archive 及全部成員 hash；checkpoint `manual-export-20261005T035826098080Z-6fe2a11c.db`。受限 env／export／證據保存在 ignored `data/release-0.3.7/`。
+- app／backup／ops 同批固定新 digest，沿用 `fucheng-home_data` 與 `fucheng-home_home_backups`，無 migration／reseed。schema `0010_deployment_report`、integrity ok、FK errors 0；16 張業務表 fingerprint 前後相同，342 會員、2 場次、81 報名、3 個安排保存版、2 公告保留。
+- app／backup healthy，app 僅發布 127.0.0.1:8064；可信 loopback 登入、讀取、登出、Secure/HttpOnly 前綴 Cookie、匿名 401、錯誤 Host 400、裸 API 404 與備份狀態通過。HP Caddy 根首頁、OrderFlow、府城首頁及 health 均 200。
+- 公開瀏覽器重新載入確認 `index-DVvaf_nO.js`／`index-mPsL-t1K.css`、2 則公告、會員分級表 342 人及管理登入表單；公開首頁與會員頁無綠色標題區，會員頁無橫向溢出。沒有用真實資料進行拖曳、保存或報名。
+- HP Caddy／cloudflared／OrderFlow forward 與 4090 府城 forward active。Caddy SHA 仍為 `0e9b6473c465309ea5fad4dde547b9f286d3a363acd69142a3bd3157505da209`；未變更 Caddy／Tunnel／DNS／SSH 或服務目錄。
+
+舊 0.3.6 映像、設定、資料卷與停寫備份保留；未執行回退、prune 或 down -v。公開瀏覽器沒有既有管理 session，本輪登入後檢查採可信 loopback；公開管理操作與 Android／iPhone 手感由使用者試用，未宣稱真機驗收完成。

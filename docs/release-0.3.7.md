@@ -20,6 +20,11 @@ Python／npm 同步 0.3.7。後端功能、依賴及 schema `0010_deployment_rep
 
 發布檢查結果記錄於發布 PR／GitHub Release；本機證據位於受忽略的 `data/release-0.3.7/`。套件依 allowlist staging 與 source manifest 建置，不包含資料庫、帳密、備份或舊前端成品。
 
-## 發布範圍
+## 發布範圍（發布當時）
 
 本次授權為 GitHub 合併推送、v0.3.7 版本及 Docker Hub `momonong/fucheng-players-system:0.3.7`／`latest` 映像發布。**沒有部署到 4090，也沒有修改 HP／ASUS、Caddy、Tunnel 或既有服務。** 線上版本以 [家中部署紀錄](home-deployment.md) 與現場版本核對為準。後續部署需使用核對後的固定 digest，保留原 volume、備份與回退版本。
+
+
+## 後續部署
+
+2026-10-05 使用者另行授權後，4090 已完成 0.3.7 升級；16 張業務表內容不變、app／backup 健康、公開新版頁面及可信 loopback 登入檢查通過。詳見 [家中部署紀錄](home-deployment.md)。
