@@ -20,3 +20,8 @@
 ## 發布與部署
 
 依使用者授權合併 GitHub、發布 v0.3.8 與 Docker Hub `0.3.8`／`latest`，再以固定 digest 更新 4090 既有 project。建置採 allowlist staging，無資料、帳密、備份或舊成品。映像的 root／prefix 合成驗證、digest 及實際部署結果另記於 GitHub Release 與 [家中部署紀錄](home-deployment.md)，不以版本提交代表已部署。
+
+
+## 部署完成
+
+2026-10-05 已部署 4090；資料 fingerprint、健康檢查及公開 HTTPS 新版頁面驗證通過。映像固定 digest `sha256:10e016ac08c5fa7187dfa9ee3910041f38e8ccae2b711eded57e3839af6e739e`。詳見 [家中部署紀錄](home-deployment.md#038-頁首配色部署2026-10-05)。
