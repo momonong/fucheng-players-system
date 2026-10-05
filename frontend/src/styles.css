@@ -91,7 +91,7 @@ footer { border-top: 1px solid var(--line); padding: 2rem 1rem; text-align: cent
 .login form, .editor form { display: grid; gap: 1rem; }
 .header-actions { display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; }
 .header-actions a { color: white; }
-.admin-header { padding-top: 1.2rem; padding-bottom: 1.2rem; align-items: center; }
+.admin-header { background: #dce8df; color: var(--green); border-bottom: 1px solid #b7cbbd; padding-top: 1.2rem; padding-bottom: 1.2rem; align-items: center; }
 .admin-header h1 { font-size: 1.8rem; }
 .admin-main { display: grid; grid-template-columns: minmax(300px, .85fr) minmax(420px, 1.5fr); gap: 1.25rem; align-items: start; }
 .section-title { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
@@ -318,17 +318,20 @@ button.danger { background: #8c3026; }
   .public-registration input { font-size: 18px; }
 }
 
-.admin-header > a { color: #ffffff; }
+.admin-header > a { color: var(--green); }
+.admin-header .eyebrow { color: #416655; }
+.admin-header :focus-visible { outline-color: var(--green); }
 .registration-receipt .eyebrow { color: #416655; }
 
 /* Club-wide navigation and public information pages. */
-.site-nav { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem var(--page-inset); background:#fffdf7; border-bottom:1px solid var(--line); }
-.site-brand { font-size:1.4rem; font-weight:900; text-decoration:none; color:var(--green); white-space:nowrap; }
-.site-brand span { display:block; font-size:.8rem; font-weight:500; color:#626d64; }
+.site-nav { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem var(--page-inset); background:var(--green); color:#fffdf7; border-bottom:1px solid #416655; }
+.site-brand { font-size:1.4rem; font-weight:900; text-decoration:none; color:#fffdf7; white-space:nowrap; }
+.site-brand span { display:block; font-size:.8rem; font-weight:500; color:#c7dbce; }
 .site-nav > div { display:flex; gap:.5rem; flex-wrap:wrap; }
-.site-nav > div a { padding:.65rem .85rem; min-height:48px; display:flex; align-items:center; text-decoration:none; font-weight:700; border-radius:8px; }
-.site-nav a[aria-current=page] { background:var(--green); color:white; }
-.site-nav .nav-admin { font-size:.9rem; color:#5c665f; }
+.site-nav > div a { color:#fffdf7; padding:.65rem .85rem; min-height:48px; display:flex; align-items:center; text-decoration:none; font-weight:700; border-radius:8px; }
+.site-nav > div a:hover { background:#2c5147; }
+.site-nav a[aria-current=page], .site-nav a[aria-current=page]:hover { background:#f4c17d; color:#292016; }
+.site-nav .nav-admin { font-size:.9rem; }
 .club-hero { background:var(--green); color:#fffdf4; padding:3.5rem var(--page-inset); display:grid; grid-template-columns:3fr 2fr; align-items:center; gap:2rem; }
 .club-hero h1 { font-size:clamp(2.4rem,5.2vw,4.7rem); line-height:1.22; margin:1rem 0; letter-spacing:.025em; }
 .club-hero p:not(.eyebrow) { font-size:1.2rem; line-height:1.8; color:#d6e2d8; }
@@ -398,10 +401,10 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: var(--page-wid
 .editor-hint { font-size: .85rem; color: #57645d; }
 .admin-header-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .7rem var(--admin-control-gap); }
 .admin-nav, .admin-account { display: flex; align-items: center; flex-wrap: wrap; gap: var(--admin-control-gap); }
-.admin-nav a, .admin-account a { display: flex; align-items: center; justify-content: center; min-height: 48px; color: white; text-decoration: none; padding: .55rem .75rem; border-radius: 8px; font-weight: 700; }
-.admin-nav a:hover, .admin-account a:hover { background: #ffffff24; }
+.admin-nav a, .admin-account a { display: flex; align-items: center; justify-content: center; min-height: 48px; color: var(--green); text-decoration: none; padding: .55rem .75rem; border-radius: 8px; font-weight: 700; }
+.admin-nav a:hover, .admin-account a:hover { background: #c4d8ca; }
 .admin-nav a[aria-current=page], .admin-account a[aria-current=page] { background: #f4c17d; color: #292016; }
-.admin-backup { padding: .35rem .6rem; color: #fff; background: #ffffff20; border-radius: 7px; }
+.admin-backup { padding: .35rem .6rem; color: #244d3d; background: #c4d8ca; border-radius: 7px; }
 .admin-backup.failed, .admin-backup.stale { color: #2c2115; background: #ffd391; }
 .deployment-report-page { width: min(100% - 2rem, 1200px); margin: 1.5rem auto 4rem; display: grid; gap: 1rem; }
 .deployment-report-page > h2 { margin: 0; }
