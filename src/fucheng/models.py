@@ -72,9 +72,26 @@ class Admin(Base):
     __tablename__ = "admins"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    display_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("0"))
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+
+
+class AdminAudit(Base):
+    __tablename__ = "admin_audits"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    actor_admin_id: Mapped[str | None] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"), nullable=True)
+    target_admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"), index=True)
+    action: Mapped[str] = mapped_column(String(30))
+    source: Mapped[str] = mapped_column(String(20))
+    changes_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc, index=True)
+    actor: Mapped[Admin | None] = relationship(foreign_keys=[actor_admin_id])
+    target: Mapped[Admin] = relationship(foreign_keys=[target_admin_id])
 
 
 class LoginSession(Base):

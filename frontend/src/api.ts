@@ -10,6 +10,7 @@ import type {
   PublicMember,
   RegistrationMember,
   ArrangementState, ArrangementVersion, ArrangementSave,
+  AdminSession, AdminAccount, AdminAccountAudit,
 } from './types'
 
 import { appUrl } from './paths'
@@ -39,21 +40,45 @@ export async function publicMembers(search = '', level = ''): Promise<PublicMemb
 }
 
 export async function login(username: string, password: string): Promise<string> {
-  const auth = await request<{ username: string; csrf_token: string }>('/api/auth/login', {
+  return (await loginSession(username, password)).username
+}
+
+export async function loginSession(username: string, password: string): Promise<AdminSession> {
+  const auth = await request<AdminSession>('/api/auth/login', {
     method: 'POST', body: JSON.stringify({ username, password }),
   })
   csrfToken = auth.csrf_token
-  return auth.username
+  return auth
 }
 
 export async function restoreSession(): Promise<string> {
-  const auth = await request<{ username: string; csrf_token: string }>('/api/auth/me')
+  return (await restoreAdminSession()).username
+}
+
+export async function restoreAdminSession(): Promise<AdminSession> {
+  const auth = await request<AdminSession>('/api/auth/me')
   csrfToken = auth.csrf_token
-  return auth.username
+  return auth
 }
 
 export async function logout(): Promise<void> {
   await request('/api/auth/logout', { method: 'POST' })
+  csrfToken = ''
+}
+
+export const adminAccounts = () => request<AdminAccount[]>('/api/admin/admins')
+export const adminAccountAudits = (offset = 0) => request<AdminAccountAudit[]>(`/api/admin/admin-audits?limit=100&offset=${offset}`)
+export const createAdminAccount = (username: string, password: string, currentPassword: string, displayName = '') => request<AdminAccount>('/api/admin/admins', {
+  method: 'POST', body: JSON.stringify({ username, display_name: displayName.trim() || null, password, current_password: currentPassword }),
+})
+export const changeAdminStatus = (account: AdminAccount, isActive: boolean, currentPassword: string) => request<AdminAccount>(`/api/admin/admins/${account.id}/status`, {
+  method: 'PUT', body: JSON.stringify({ version: account.version, is_active: isActive, current_password: currentPassword }),
+})
+export const resetAdminPassword = (account: AdminAccount, password: string, currentPassword: string) => request<AdminAccount>(`/api/admin/admins/${account.id}/reset-password`, {
+  method: 'POST', body: JSON.stringify({ version: account.version, password, current_password: currentPassword }),
+})
+export async function changeOwnPassword(version: number, currentPassword: string, password: string): Promise<void> {
+  await request('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ version, current_password: currentPassword, password }) })
   csrfToken = ''
 }
 

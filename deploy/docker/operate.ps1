@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory)][ValidateSet('Init','RecoverInit','Admin','Start','StartTest','StartCloudflare','StartNgrok','Stop','Status','Logs','Backup','ImportBackup','Migrate','Restore','ExportBackups')][string]$Action,
     [string]$EnvFile,
-    [string]$Value
+    [string]$Value,
+    [string]$DisplayName,
+    [switch]$FirstAdminOnly
 )
 $ErrorActionPreference = 'Stop'
 Import-Module Microsoft.PowerShell.Utility -ErrorAction Stop
@@ -21,7 +23,10 @@ switch ($Action) {
     'RecoverInit' { Invoke-Compose @('run','--rm','ops','recover-init') }
     'Admin' {
         if (!$Value) { throw '-Value requires the administrator username; password will be prompted privately' }
-        Invoke-Compose @('run','--rm','ops','admin',$Value)
+        $adminArguments = @('run','--rm','ops','admin',$Value)
+        if ($DisplayName) { $adminArguments += @('--display-name',$DisplayName) }
+        if ($FirstAdminOnly) { $adminArguments += '--first-admin-only' }
+        Invoke-Compose $adminArguments
     }
     'Start' { Invoke-Compose @('up','-d','--wait','--wait-timeout','90','app','backup') }
     'StartTest' { Invoke-Compose @('--profile','https-test','up','-d','--wait','--wait-timeout','90','app','backup','https-test') }

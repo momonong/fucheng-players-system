@@ -129,7 +129,7 @@ task5 已於同一 eb24 完成 Windows 11／Python 3.14.6 受控更新：release
 
 環境：Windows、Node24.11.0、Playwright1.63.0 Chromium桌面與390px觸控模擬。Python使用既有uv鎖定環境。只用新 `dist-grid-interaction`、`data/grid-interaction-e2e.db`／8043；未測其他OS／實機手機／實體印表機。無dependency/migration變更，不重跑Docker/GPU或無關管理功能。
 
-- `npm --prefix frontend run build -- --outDir ../dist-grid-interaction`（tsc＋Vite）通過。後端 `uv run --locked pytest tests/test_grid_interaction.py tests/test_arrangement_grid.py tests/test_arrangements.py -q -p no:cacheprovider --basetemp .test-tmp-grid-interaction`：46 passed／25.67秒。涵蓋same/cross-column swap、上下insert與obstacle、empty拒占用、雙人audit第二筆失敗全回滾、replay/CAS/self no-op、level/version/hard snapshot、shade合法值／CSRF／terminal／old bytes／history、歷次exact member/同名/confirmed/取消重報/date cutoff/台北午夜/tie/limit5/匿名隔離/最小schema。審查發現audit關聯應符合既有before/after格式，修正後單項 `test_swap_two_levels_audits_versions_atomic_replay_and_noop`：1 passed／0.78秒，增加交換後GET稽核200與兩筆關聯response驗證。
+- `npm --prefix frontend run build -- --outDir ../dist-grid-interaction`（tsc＋Vite）通過。後端 `uv run --locked pytest tests/test_grid_interaction.py tests/test_arrangement_grid.py tests/test_arrangements.py -q -p no:cacheprovider --basetemp .test-tmp-grid-interaction`：46 passed／25.67秒。涵蓋same/cross-column swap、上下insert與obstacle、empty拒占用、雙人audit第二筆失敗全回滾、replay/CAS/self no-op、level/version/報名時級數快照、shade合法值／CSRF／terminal／old bytes／history、歷次exact member/同名/confirmed/取消重報/date cutoff/台北午夜/tie/limit5/匿名隔離/最小schema。審查發現audit關聯應符合既有before/after格式，修正後單項 `test_swap_two_levels_audits_versions_atomic_replay_and_noop`：1 passed／0.78秒，增加交換後GET稽核200與兩筆關聯response驗證。
 - 初輪相關E2E `--grep '表格互動|拖曳修正|格位八十人|格位未知小存|格位文字409|格位大存未知|格位送出前|表格新版|表格刪除' --output test-results/grid-interaction-first`：33 passed／1 failed，1.5分鐘。既有28項全通過；唯一新mobile drag測試目的格未捲入viewport。新6項補跑 `grid-interaction-final` 為5 passed／1 failed（20.8秒），mobile改捲入後仍貼下緣，截圖等待觸發auto-scroll使預告改變；調整測試將目的格置中並在放手前再核預告，未放寬結果斷言。
 - 拖曳另補強只採用已render preview，不取pending frame；最終 `--grep '表格互動：中央|拖曳修正|格位八十人' --output test-results/grid-interaction-drag`：8 passed／31.6秒。桌面/可信touch中央同欄及跨欄swap、上下before/after、empty、每次preview/action/實際格位、人數唯一、swap稽核GET，既有80人/ghost同尺寸/來源25%/click抑制/取消/503恢復/普通pan均通過。所有34個相關案例均有通過證據，不稱同一次34 pass。
 - 新UI案例驗證精簡＋hover/focus、右鍵/觸控整排選取與色盤、無新增文字/鉛筆、三灰max交叉/merge、保存還原無淨差、immutable歷史及print；歷次late A不污染B、關閉重開、換場、空/error、live參考與已存diet/level分離；詳情移級select80px與次要按鈕。文案採「歷次比賽級數／最近5場已結束比賽」，僅歷史有短註。
@@ -216,7 +216,7 @@ B 公開入口為 `https://eb24-140-116-158-107.ngrok-free.app/admin/competition
 
 B從A已推送提交 `89cae09754eaefa4dba6c3dce308482526f33ff2` 建立唯一worktree `D:\projects\fucheng-players-system-worktrees\arrangement-grid`，分支 `feat/competition-arrangement-grid`；自己的.venv與node_modules，未改依賴lock。A從主目錄src載入8041，因此B source/DB/static/port均隔離。未commit/merge/push、未公開部署，worktree保留待驗收。
 
-已實作與驗證：精確格位小存／重載，同欄位置也保存；有人格先挪來源留洞、目標插入向下，僅推必要選手，保留原空洞／文字／merge，必要時增列；點選／鍵盤落目標欄底。受影響選手version更新，舊直接level stale409；會員長期級數與hard snapshot不改。行列穩定ID，插空列不把每人視為重新分組。header/body分層保存，甲乙丙合併在數字級數標頭上方，左側文字隊名可對齊選手橫列。文字/空格可合併與解除，多文本/選手/既有merge/跨數字標头明確拒絕；原底格內容保留。
+已實作與驗證：精確格位小存／重載，同欄位置也保存；有人格先挪來源留洞、目標插入向下，僅推必要選手，保留原空洞／文字／merge，必要時增列；點選／鍵盤落目標欄底。受影響選手version更新，舊直接level stale409；會員長期級數與報名時級數快照不改。行列穩定ID，插空列不把每人視為重新分組。header/body分層保存，甲乙丙合併在數字級數標頭上方，左側文字隊名可對齊選手橫列。文字/空格可合併與解除，多文本/選手/既有merge/跨數字標头明確拒絕；原底格內容保留。
 
 搜尋只呈現匹配姓名，其他人顯「已占用」不壓縮格位；搜尋後拖進隱藏占位仍插入讓位。素食以本場diet計數/外框高亮，不篩人、不改異動色；詳細卡含本場餐食、當次/長期級數，舊history未記錄欄位為未知。位置/級數改回基準清色，完整保存含文字/行列/merge，歷史唯讀、返回不寫入。未知結果及成功待fresh GET整場鎖，固定payload原樣重送，不用舊receipt覆蓋較新布局；409重新核對，文字草稿跨場保留。純布局/文字修改有實際admin與時間audit。
 

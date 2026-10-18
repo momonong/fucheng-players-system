@@ -54,7 +54,7 @@ export function ClubHome() {
   </>
 }
 
-export function AnnouncementManager({ username, onLogout }: { username: string; onLogout: () => void }) {
+export function AnnouncementManager({ username, displayName, onLogout }: { username: string; displayName?: string | null; onLogout: () => void }) {
   const [items, setItems] = useState<AdminAnnouncement[]>([])
   const [selected, setSelected] = useState<AdminAnnouncement | null>(null)
   const [mobileEditor, setMobileEditor] = useState(false)
@@ -64,7 +64,7 @@ export function AnnouncementManager({ username, onLogout }: { username: string; 
   async function load() { try { setItems(await request<AdminAnnouncement[]>('/api/admin/announcements')); setError('') } catch (e) { setError((e as Error).message) } }
   async function signOut() { try { await logout(); onLogout() } catch (e) { setError((e as Error).message) } }
   useEffect(() => { load() }, [])
-  return <><AdminHeader section="announcements" username={username} onLogout={signOut} /><main className="announcement-main">
+  return <><AdminHeader section="announcements" username={username} displayName={displayName} onLogout={signOut} /><main className="announcement-main">
     {error && <div role="alert" className="notice error">{error}<button onClick={load}>重新載入</button></div>}{notice && <p role="status" className="notice success">{notice}</p>}
     <div className="section-title"><p>草稿不會公開；勾選發布後即顯示在首頁。取消發布即可下架。</p><button onClick={() => { setCreating(true); setSelected(null); setNotice(''); setMobileEditor(true) }}>新增公告</button></div>
     <div className={`announcement-workspace ${mobileEditor ? 'mobile-editing' : 'mobile-browsing'}`}><section className="panel"><h2>公告清單</h2>{(creating || selected) && !mobileEditor && <button className="secondary mobile-pane-back" onClick={() => setMobileEditor(true)}>繼續編輯公告</button>}{!items.length && <p>尚無公告，請新增第一則球館消息。</p>}{items.map(item => <button className="announcement-row" key={item.id} onClick={() => { setSelected(item); setCreating(false); setNotice(''); setMobileEditor(true) }}><strong>{item.title}</strong><span>{item.is_published ? '已發布' : '未發布'}{item.is_pinned ? '・置頂' : ''}</span></button>)}</section>

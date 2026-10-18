@@ -26,7 +26,7 @@ const emptyDraft: CompetitionDraft = {
   name: '', competition_date: '', capacity: 1, registration_deadline: '', notes: '', status: 'draft', reason: '',
 }
 
-export function CompetitionManager({ username, onLogout }: { username: string; onLogout: () => void }) {
+export function CompetitionManager({ username, displayName, onLogout }: { username: string; displayName?: string | null; onLogout: () => void }) {
   const [items, setItems] = useState<Competition[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<CompetitionDetail | null>(null)
@@ -80,7 +80,7 @@ export function CompetitionManager({ username, onLogout }: { username: string; o
   }
 
   return <>
-    <AdminHeader section="competitions" username={username} onLogout={signOut} />
+    <AdminHeader section="competitions" username={username} displayName={displayName} onLogout={signOut} />
     {notice && <div className={`toast ${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}><span>{notice.text}</span><button className="toast-close" onClick={() => setNotice(null)}>×</button></div>}
     <nav className="competition-mode no-print" aria-label="比賽工作區"><h2>比賽</h2><select aria-label="選擇比賽" value={selectedId ?? ''} onChange={event => loadDetail(event.target.value)}>{!items.length && <option value="">尚無比賽</option>}{items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="secondary" aria-pressed={view === 'arrangement'} onClick={() => { setView('arrangement'); if (selectedId) void loadDetail(selectedId) }}>排級數</button><button className="secondary" aria-pressed={view === 'management'} onClick={() => { setView('management'); if (selectedId) void loadDetail(selectedId) }}>報名與設定</button>{view === 'management' && detail && <a className="roster-shortcut" href={`${location.pathname}${location.search}#registration-roster`}>前往報名名單</a>}</nav>
     {view === 'arrangement' && <main className="arrangement-main">{detail ? <CompetitionLevels key={detail.competition.id} competition={detail.competition} controller={arrangements} username={username} /> : <p>請選擇比賽，或到「報名與設定」建立比賽。</p>}</main>}

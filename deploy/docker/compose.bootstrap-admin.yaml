@@ -1,0 +1,15 @@
+# Optional first-admin bootstrap. Add after the deployment or local-http Compose files.
+# The host file must be readable by container uid 10001 and have mode 0400/0600.
+# Compose local file secrets preserve the source file owner/mode; they do not
+# reliably apply a requested uid/gid/mode. Do not use a world-readable source.
+services:
+  app:
+    environment:
+      FUCHENG_BOOTSTRAP_ADMIN_USERNAME: ${FUCHENG_BOOTSTRAP_ADMIN_USERNAME:?Set the first administrator username}
+      FUCHENG_BOOTSTRAP_ADMIN_DISPLAY_NAME: ${FUCHENG_BOOTSTRAP_ADMIN_DISPLAY_NAME:-}
+      FUCHENG_BOOTSTRAP_ADMIN_PASSWORD_FILE: /run/secrets/bootstrap_admin_password
+    secrets:
+      - bootstrap_admin_password
+secrets:
+  bootstrap_admin_password:
+    file: ${FUCHENG_BOOTSTRAP_ADMIN_PASSWORD_FILE:?required}
