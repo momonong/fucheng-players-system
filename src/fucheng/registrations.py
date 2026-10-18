@@ -65,9 +65,9 @@ def _changes(before: dict[str, object], after: dict[str, object]) -> dict[str, d
     }
 
 
-def _begin_immediate(db: Session, auth) -> str | None:
+def _begin_immediate(db: Session, auth, *, allow_password_change=False, auth_snapshot=None) -> str | None:
     """驗證依賴已做過唯讀查詢；先結束該交易，再以 SQLite 寫鎖開始關鍵區段。"""
-    actor = actor_from_auth(auth)
+    actor = actor_from_auth(auth) if auth_snapshot is None else Actor("admin", admin_id=auth_snapshot[1])
     if actor.kind == "public":
         visit_id = auth.id
         db.rollback()
@@ -76,13 +76,17 @@ def _begin_immediate(db: Session, auth) -> str | None:
         if not visit or visit.expires_at <= now_utc():
             raise HTTPException(401, "頁面已逾時，請重新整理後再試")
         return None
-    session_id, admin_id = auth[1].id, auth[0].id
+    session_id, admin_id, actor_version = auth_snapshot or (auth[1].id, auth[0].id, auth[0].version)
     db.rollback()
     db.execute(text("BEGIN IMMEDIATE"))
     session = db.get(LoginSession, session_id)
     admin = db.get(Admin, admin_id)
-    if not session or not admin or not admin.is_active or session.expires_at <= now_utc():
+    if not session or not admin or session.admin_id != admin_id or not admin.is_active or session.expires_at <= now_utc():
         raise HTTPException(401, "登入已逾時，請重新登入")
+    if admin.version != actor_version:
+        raise HTTPException(409, "管理員資料已變更，請重新登入後再試")
+    if admin.must_change_password and not allow_password_change:
+        raise HTTPException(403, "請先變更密碼再使用管理功能")
     return admin_id
 
 

@@ -23,7 +23,7 @@ function dateTime(value: string) {
   }).format(date)
 }
 
-export function DeploymentReportPage({ username, onLogout }: { username: string; onLogout: () => void }) {
+export function DeploymentReportPage({ username, displayName, onLogout }: { username: string; displayName?: string | null; onLogout: () => void }) {
   const [state, setState] = useState<State | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
@@ -62,7 +62,7 @@ export function DeploymentReportPage({ username, onLogout }: { username: string;
     ? '主機檢查時間在未來或無法辨識，請核對主機時鐘。'
     : age > 7 * 24 * 60 * 60_000 ? '這份報告已超過 7 天；部署前請在目標主機重新執行。' : '')
   return <>
-    <AdminHeader section="status" username={username} onLogout={onLogout} />
+    <AdminHeader section="status" username={username} displayName={displayName} onLogout={onLogout} />
     <main className="deployment-report-page">
       <p className="eyebrow">管理後台 → 系統狀態</p><h2>部署檢查報告</h2>
       <p>在目標 Windows 主機的 Git Bash 執行唯讀健檢，再上傳產生的 <code>report.json</code>。伺服器只保存最新一份，不會執行上傳檔中的指令，也不會獨立驗證報告宣稱的主機身份。</p>

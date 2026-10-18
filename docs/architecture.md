@@ -174,7 +174,7 @@ legacy move插入路徑先移除來源留洞，目的為body級數格；遇選�
 
 ### 0008 JSON 相容擴充：顯示標題與列印
 
-columns增加可選 `title`（不變更layout schema_version或資料表）；`column_title`以stable column ID修改顯示文字，與其他operation共用完整token／actor-payload receipt／交易稽核。title不改kind/level、選手格位、registration.version或會員／hard snapshot。missing/null預設「n 級」或「文字／備註」，明確空字串仍是空標題；前後端signature採相同預設正規化，改回預設沒有淨差。GET及舊receipt讀取只解析response，原DB JSON bytes不回填；新完整版本凍結title，後續改名不影響歷史。
+columns增加可選 `title`（不變更layout schema_version或資料表）；`column_title`以stable column ID修改顯示文字，與其他operation共用完整token／actor-payload receipt／交易稽核。title不改kind/level、選手格位、registration.version或會員／報名時級數快照。missing/null預設「n 級」或「文字／備註」，明確空字串仍是空標題；前後端signature採相同預設正規化，改回預設沒有淨差。GET及舊receipt讀取只解析response，原DB JSON bytes不回填；新完整版本凍結title，後續改名不影響歷史。
 
 桌面框選與拖人分開hit ownership，前者從空白／文字／格邊起手，後者仍用name/grip。首次選取工具浮動而不推版面；手機明確二點選取保留原生pan。標題草稿使用competition/column stable ID，文字仍按competition/cell，成功fresh read才清除；unknown仍整場鎖並原樣重試。inline Enter排除IME composition，Escape取消此次編輯。
 
@@ -200,7 +200,7 @@ GridAxisMenu開啟時捕捉layout、token、axis ID，預覽及第二次確認�
 
 新前端以卡片中央作 `swap(registration_id,target_registration_id)`，上下各22%作 `insert(registration_id,target,side=before|after)`；空格用 `move_empty(registration_id,target)`。同格切換有4px遲滯，穩定上下插入線／交換對象提示；release取React layout effect已提交到畫面的preview，不重算mouseup座標，也不使用尚未渲染的frame。來源25%及單一同尺寸ghost、click抑制、取消／失敗清理沿用。legacy `move`仍為插入，不由backend猜新client意圖。空格API拒絕占用；insert錨定stable行欄格與before/after，下方尋下一合法body格，跳過header／文字／merge，不動無關欄。swap直接交換兩個合法body級數格；self／實際無變更拒絕422且無receipt或稽核。
 
-mutate_grid以操作前後所有registration座標比較，實際搬位者version各加1，跨級者competition_level及admin更新欄位同交易。跨級swap的兩個RegistrationAudit仍action=level，idempotency_key為SHA256({arrangement_request_id,registration_id})固定64字；changes中的arrangement_request_id用既有 `{before:null,after:原request_id}` 形狀，既有ActorAuditEntry可讀。整筆ArrangementOperation仍用原request_id、actor/payload fingerprint；receipt、兩人level/version/audit與布局/CompetitionAudit全成功或全回滾，重送先讀總receipt不交換第二次。會員level/hard snapshot不變。
+mutate_grid以操作前後所有registration座標比較，實際搬位者version各加1，跨級者competition_level及admin更新欄位同交易。跨級swap的兩個RegistrationAudit仍action=level，idempotency_key為SHA256({arrangement_request_id,registration_id})固定64字；changes中的arrangement_request_id用既有 `{before:null,after:原request_id}` 形狀，既有ActorAuditEntry可讀。整筆ArrangementOperation仍用原request_id、actor/payload fingerprint；receipt、兩人level/version/audit與布局/CompetitionAudit全成功或全回滾，重送先讀總receipt不交換第二次。會員level/報名時級數快照不變。
 
 `shade_row/shade_column(axis_id,shade)`僅允許strict integer 0..3；row含header/body，column僅自訂文字欄。LayoutRow/Column可省略shade，讀為0，前後端signature正規化0，還原色階可清淨差；GET不寫回舊JSON。顏色固定白／#ededed／#d9d9d9／#c4c4c4，交叉及merged涵蓋軸取max。無migration，歷史與receipt回應皆明確解析shade；舊backend會遺漏shade且不接受新operation，不能無損app-only回退。列印用底層SVG rect前景物件，不依賴CSS背景開關；內容黑字覆於其上，跨幅merged顏色仍按完整原merge計算。
 

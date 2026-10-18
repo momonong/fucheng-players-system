@@ -11,7 +11,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: 'line',
-  use: { baseURL: `http://127.0.0.1:${e2ePort}`, trace: 'off' },
+  use: { baseURL: `http://127.0.0.1:${e2ePort}`, trace: 'off', ...(process.env.FUCHENG_E2E_BROWSER_CHANNEL ? { channel: process.env.FUCHENG_E2E_BROWSER_CHANNEL } : {}) },
   projects: [
     { name: 'desktop', use: { viewport: { width: 1440, height: 900 } } },
     { name: 'mobile', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },

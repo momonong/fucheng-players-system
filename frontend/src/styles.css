@@ -89,6 +89,39 @@ footer { border-top: 1px solid var(--line); padding: 2rem 1rem; text-align: cent
 .login { margin-top: 1.5rem; padding: clamp(1.25rem, 5vw, 2.5rem); }
 .login h1 { margin-top: .25rem; }
 .login form, .editor form { display: grid; gap: 1rem; }
+.admin-management-workspace { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr); gap: 1.25rem; align-items: start; }
+.admin-management-workspace:not(:has(.admin-account-editor)) { grid-template-columns: minmax(0, 1fr); }
+.admin-management-actions, .admin-account-actions, .admin-account-identity { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.admin-management-actions { justify-content: flex-end; }
+.admin-account-list, .admin-audit-list { list-style: none; padding: 0; margin: 0; }
+.admin-account-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: .75rem; }
+.admin-account-list > li { padding: 1rem; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.admin-account-identity strong { overflow-wrap: anywhere; }
+.admin-self { font-size: .8rem; color: var(--teal); }
+.admin-account-list p { margin: .5rem 0; color: #59635e; }
+.admin-account-list small { display: block; margin-top: .25rem; }
+.admin-account-list .admin-self-help { font-size: .85rem; }
+.admin-account-actions button { flex: 1 1 auto; }
+button.danger-action { color: #8a3025; border-color: #b66c5f; }
+.admin-account-editor { scroll-margin-top: 1rem; }
+.admin-account-editor h2, .required-password-change h2 { margin-top: 0; overflow-wrap: anywhere; }
+.admin-account-editor form, .required-password-change form { display: grid; gap: 1rem; }
+.admin-account-editor label small, .required-password-change label small { color: #59635e; font-weight: 400; }
+.admin-account-history { margin-top: 1.25rem; }
+.admin-audit-list { display: grid; gap: .5rem; }
+.admin-audit-list > li { padding: .8rem; border-left: 4px solid var(--teal); background: #faf9f5; overflow-wrap: anywhere; }
+.admin-audit-list > li > div { display: flex; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.admin-audit-list p { margin: .4rem 0; }
+.admin-audit-list span, .admin-audit-list small { color: #59635e; }
+.required-password-change { max-width: 620px; }
+.required-password-change .eyebrow { color: #416655; }
+.required-password-change h2 { font-size: 1.2rem; }
+@media screen and (max-width: 850px) {
+  .admin-management-workspace { grid-template-columns: minmax(0, 1fr); }
+  .admin-management-intro { align-items: flex-start; flex-direction: column; }
+  .admin-management-intro > .admin-management-actions { width: 100%; }
+  .admin-management-intro > .admin-management-actions button { flex: 1; }
+}
 .header-actions { display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; }
 .header-actions a { color: white; }
 .admin-header { background: #dce8df; color: var(--green); border-bottom: 1px solid #b7cbbd; padding-top: 1.2rem; padding-bottom: 1.2rem; align-items: center; }
