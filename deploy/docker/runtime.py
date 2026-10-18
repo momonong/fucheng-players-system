@@ -282,6 +282,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=["init", "recover-init", "migrate", "serve", "health", "admin", "backup", "import-backup", "export", "backup-loop", "backup-health", "restore", "inspect"])
     parser.add_argument("argument", nargs="?")
+    parser.add_argument("--display-name", help="administrator display name (not a credential)")
+    parser.add_argument("--first-admin-only", action="store_true")
     args = parser.parse_args()
     from fucheng.config import Settings
     settings = Settings.from_env()
@@ -409,6 +411,20 @@ def main():
             inspect_db(path, match=True)
             if not settings.local_http_preview and (not settings.public_origin or not settings.session_cookie_secure):
                 raise SystemExit("HTTPS public origin and secure cookies required")
+            from fucheng.admin_management import bootstrap_first_admin
+            from fucheng.database import create_db_engine, make_session_factory
+            engine = create_db_engine(f"sqlite:///{path}")
+            try:
+                bootstrap_first_admin(
+                    make_session_factory(engine),
+                    os.getenv("FUCHENG_BOOTSTRAP_ADMIN_USERNAME"),
+                    os.getenv("FUCHENG_BOOTSTRAP_ADMIN_PASSWORD_FILE"),
+                    os.getenv("FUCHENG_BOOTSTRAP_ADMIN_DISPLAY_NAME"),
+                )
+            except RuntimeError as error:
+                raise SystemExit(f"First administrator bootstrap failed: {error}") from None
+            finally:
+                engine.dispose()
             env = dict(os.environ, FUCHENG_DATABASE_URL=f"sqlite:///{path}")
             child = subprocess.Popen([sys.executable, "-m", "uvicorn", "fucheng.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-proxy-headers", "--no-access-log"], env=env)
             def stop(_sig, _frame):
@@ -429,7 +445,12 @@ def main():
             inspect_db(path, match=True)
             env = dict(os.environ, FUCHENG_DATABASE_URL=f"sqlite:///{path}")
             # Password is prompted by getpass; no default or command-line password.
-            subprocess.run([sys.executable, "-m", "fucheng.cli", "create-admin", args.argument], env=env, check=True)
+            command = [sys.executable, "-m", "fucheng.cli", "create-admin", args.argument]
+            if args.display_name:
+                command.extend(["--display-name", args.display_name])
+            if args.first_admin_only:
+                command.append("--first-admin-only")
+            subprocess.run(command, env=env, check=True)
             return
         with lock("backup.lock"):
             if args.action in {"init", "recover-init"}:

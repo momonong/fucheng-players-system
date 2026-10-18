@@ -90,7 +90,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     async def get_db():
         with session_factory() as db:
-            yield db
+            try:
+                yield db
+            except DBAPIError:
+                # A failed DBAPI commit can leave a pending SQLite transaction
+                # on an inactive SQLAlchemy transaction. Do not return it to the pool.
+                db.invalidate()
+                raise
 
     Db = Annotated[Session, Depends(get_db)]
 
@@ -109,6 +115,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 db.delete(session)
                 db.commit()
             raise HTTPException(status_code=401, detail="登入已逾時，請重新登入")
+        from starlette._utils import get_route_path
+        if session.admin.must_change_password and get_route_path(request.scope) not in {
+            "/api/auth/me", "/api/auth/logout", "/api/auth/change-password",
+        }:
+            raise HTTPException(status_code=403, detail="請先變更密碼再使用管理功能")
         return session.admin, session
 
     Auth = Annotated[tuple[Admin, LoginSession], Depends(current_auth)]
@@ -173,11 +184,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             max_age=settings.session_hours * 3600,
             path=settings.base_path + "/",
         )
-        return AuthResponse(username=admin.username, csrf_token=csrf_token)
+        return AuthResponse(username=admin.username, display_name=admin.display_name, csrf_token=csrf_token,
+            admin_id=admin.id, version=admin.version, must_change_password=admin.must_change_password)
 
     @app.get("/api/auth/me", response_model=AuthResponse)
     def me(auth: Auth) -> AuthResponse:
-        return AuthResponse(username=auth[0].username, csrf_token=auth[1].csrf_token)
+        return AuthResponse(username=auth[0].username, display_name=auth[0].display_name, csrf_token=auth[1].csrf_token,
+            admin_id=auth[0].id, version=auth[0].version, must_change_password=auth[0].must_change_password)
 
     @app.get("/api/admin/backup-status")
     def backup_status(_auth: Auth):
@@ -199,7 +212,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/auth/logout", status_code=204)
     def logout(response: Response, db: Db, auth: CsrfAuth) -> None:
-        db.delete(auth[1])
+        session_id = auth[1].id
+        _begin_immediate(db, auth, allow_password_change=True)
+        db.delete(db.get(LoginSession, session_id))
         db.commit()
         response.delete_cookie(session_cookie, path=settings.base_path + "/")
 
@@ -209,6 +224,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/admin/members", response_model=AdminMember, status_code=201)
     def create_member(payload: MemberCreate, db: Db, auth: CsrfAuth) -> Member:
+        _begin_immediate(db, auth)
         try:
             member = Member(**payload.model_dump(), created_at=now_utc(), updated_at=now_utc())
             db.add(member)
@@ -463,6 +479,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     from .deployment_report import install_deployment_report_routes
     install_deployment_report_routes(app, get_db, current_auth, require_csrf)
+
+    from .admin_management import install_admin_management_routes
+    install_admin_management_routes(app, get_db, current_auth, require_csrf, session_cookie)
 
     static_dir = settings.static_dir
     assets_dir = static_dir / "assets"

@@ -1,5 +1,66 @@
 # Windows Docker 部署、搬移與維運
 
+## 0.4.0 管理員管理與首次啟動（待發布，未部署）
+
+本次管理員管理使用 `0011_admin_management` schema；下方 0.3.9／0010 等內容保留為歷史版本流程。更新現有部署時，先停止本 project 的 app／backup 寫入，用原版 runtime 成組備份 DB＋媒體並核對 hash，再用同版新版 image 明確執行 `ops migrate`，之後同批啟動 app／backup／ops。`serve`／Start 不做初始化或 migration。回退須保留故障庫，使用升級前備份在新目標恢復並搭配匹配 image／schema，不以 downgrade 刪除管理員稽核。
+
+管理員登入後可在「管理員」頁新增帳號、停用／啟用、重設密碼；不提供刪除帳號，也不允許停用最後一位啟用中的管理員。暫時密碼只供首次登入，使用者必須先改密碼才能進入其他管理功能。本人改密碼也需要目前密碼；改密碼、重設或停用會撤銷目標帳號原本的 sessions，請重新登入。帳號管理與稽核同一交易，密碼與 hash 不放進稽核回應。
+
+姓名是選填顯示資料；登入帳號與 ID 保持固定。升級時舊帳號的姓名維持未知，畫面改以帳號顯示，不根據帳號猜姓名。首次 bootstrap 可加 `FUCHENG_BOOTSTRAP_ADMIN_DISPLAY_NAME`；CLI 可用 `--display-name`，只有非秘密姓名會進入參數。
+
+### 球館首次部署：陳鎮濃／momonong
+
+使用 `deploy/docker/club.env.example` 作為全新球館部署的非秘密設定範例，複製到私有 `club.env`，核對正式發布的 0.4.0 image digest、入口與獨立 project／volume 後再設定。此範例只指定一個首位帳號：姓名「陳鎮濃」、登入帳號 `momonong`；不附其他帳號或固定密碼，也不會修改既有部署。
+
+Windows Docker Desktop 可完全不使用 Linux 密碼檔：在第一次 Start 前，先以同版 image 對**全新空 volume** 執行 Init，再互動建立唯一首位帳號。密碼至少 12 字元，當場由私密提示輸入，不放在命令列或聊天。請從互動式 PowerShell 終端執行，不重導向輸入；無可隱藏輸入的 TTY 時會拒絕建立，不退回回顯密碼。初始帳號使用本人設定的正式密碼，可直接登入；`-FirstAdminOnly` 在表內已有任何帳號時拒絕新增，避免重跑首設變成加帳號。
+
+```powershell
+powershell.exe -NoProfile -File deploy/docker/operate.ps1 -Action Init -EnvFile deploy/docker/club.env
+powershell.exe -NoProfile -File deploy/docker/operate.ps1 -Action Admin -EnvFile deploy/docker/club.env -Value momonong -DisplayName '陳鎮濃' -FirstAdminOnly
+```
+
+只有帳號建立成功後，才依已核對的入口種類執行 Start／StartCloudflare／StartNgrok；這條路徑**不載入** `compose.bootstrap-admin.yaml`。等價的維護命令為 `ops admin momonong --display-name '陳鎮濃' --first-admin-only`。密碼尚未設定前，空管理員表的 app 會拒絕服務，不存在預設密碼或公開註冊入口。
+
+若目標主機可提供權限正確的受保護檔案，也可沿下方 bootstrap 路徑，在私有 `club.env` 填入密碼檔路徑，最後載入 `compose.bootstrap-admin.yaml`。姓名／帳號都由上述範例帶入；不另跑 Admin，也不增加第二組帳號。球館部署與實機重開機驗證留待指定窗口進行。
+
+### 全新資料庫的第一位管理員
+
+先用同版 image 執行 `ops init`，建立空 schema；接著擇一建立第一位管理員：
+
+- 沿用互動式 `ops admin <username>`（PowerShell `operate.ps1 -Action Admin -Value <username>`）。密碼由安全提示輸入，適用於不能保留 Linux secret 檔權限的 Windows Docker Desktop 環境。
+- 選用 `compose.bootstrap-admin.yaml`，在第一次 `serve` 監聽前，由 runtime 的 `FUCHENG_BOOTSTRAP_ADMIN_USERNAME` 與 `FUCHENG_BOOTSTRAP_ADMIN_PASSWORD_FILE` 建立第一位管理員。密碼只由受保護檔案讀取，沒有預設帳密，也不接受密碼明文環境變數。bootstrap 使用部署負責人自設的首組密碼，可直接登入管理；網頁新增／重設或後續 CLI 新增帳號使用暫時密碼，才會要求先更換。
+
+只有 `admins` 表**完全為空**時才允許 bootstrap；已有任何帳號（包含全部停用的情況）會直接跳過，不讀密碼檔、不新增或覆寫帳密。空表缺少任一設定、檔案不可讀或密碼不合規時，app 會在監聽前失敗。不要以 bootstrap 當成重設密碼或解除停用的後門；離線復原仍使用明確授權的維護流程。
+
+bootstrap 沿用 runtime 的 `writer.lock`、maintenance、schema 與 HTTPS 守門；只有通過檢查後才在 `BEGIN IMMEDIATE` 中建立帳號及來源為 `bootstrap` 的稽核。`init`、`migrate`、`restore` 和 backup 不會讀取此密碼或偷偷建帳號。
+
+### 可選 Compose overlay 與密碼檔
+
+在**私有**部署 env 中只填帳號與主機密碼檔的絕對路徑；下例不是可直接使用的密碼：
+
+```dotenv
+FUCHENG_BOOTSTRAP_ADMIN_USERNAME=REPLACE_WITH_FIRST_USERNAME
+FUCHENG_BOOTSTRAP_ADMIN_DISPLAY_NAME=REPLACE_WITH_OPTIONAL_DISPLAY_NAME
+FUCHENG_BOOTSTRAP_ADMIN_PASSWORD_FILE=/ABSOLUTE/PROTECTED/bootstrap-admin-password
+```
+
+由部署負責人在套件與 repo 外的受保護位置建立密碼檔，以私密編輯器或密碼管理器寫入，不能把密碼放在指令列、聊天、`.env`、Dockerfile、image 或 Git。檔案必須是一般檔，Linux 權限 `0400`／`0600`，且容器 uid `10001` 能讀；父目錄也須限制存取。不要用 group／other 可讀的 `0444`／`0644`。本機 Compose file secret 實際沿用主機檔案 owner／mode，不能假設 `uid`／`gid`／`mode` 宣告會替你修正。Windows bind mount／WSL 路徑需在目標環境核對；無法保留這些權限時，改用上方互動式 Admin，不放寬檔權限檢查。
+
+以 repo 根目錄為工作目錄，在**原本已核對的 Compose 清單最後**加入此 overlay；下例以一般部署為基礎，代理 overlay 仍依原部署保留：
+
+```bash
+dc=(docker compose --env-file deploy/docker/release.env -f deploy/docker/compose.yaml -f deploy/docker/compose.bootstrap-admin.yaml)
+"${dc[@]}" config --quiet
+"${dc[@]}" run --rm ops init
+"${dc[@]}" up -d --wait --wait-timeout 120 app backup
+```
+
+這段只適用於已獲授權的全新部署；原有 volume 不執行 `init`。secret 只掛到 app 的 `/run/secrets/bootstrap_admin_password`，不掛 backup／ops／proxy；runtime 環境只看到檔案路徑。`compose.local-http.yaml` 的獨立合成預覽也可最後加入此 overlay，仍須使用其獨立 project／volume／port 與 `local-http` profile。
+
+首次成功建立後可在下次受控重建 app 時移除 overlay 及 bootstrap 設定，再依既有機密保存政策處理密碼檔。只要資料庫已有管理員，日後重啟、升級或從含管理員的備份還原都不需要 bootstrap secret。不要保留 overlay 卻移除 host 檔案，否則 Compose 會在 app 內判斷前先因缺少掛載來源而失敗。
+
+離線 kit 的 allowlist 包含 overlay，source manifest／build context／image／ZIP 不納入密碼檔；備份 metadata 也不記錄 bootstrap 設定或密碼。DB 備份仍含原有管理員驗證資料及稽核，屬受保護資料，須沿用既有備份保護規則。
+
 ## 0.3.9 級數欄自由調整
 
 空級數欄可刪除／加回，既有資料保留；無資料表 migration，但開始使用精簡欄位後不可直接降回強制十欄的舊 app。詳見 [發布說明](release-0.3.9.md)。2026-10-05 已完成 GitHub／Docker Hub 發布並部署4090；備份、16張業務表內容比對、登入及公開HTTPS讀取通過。詳見 [家中部署紀錄](home-deployment.md)。
@@ -702,7 +763,7 @@ Windows 限定私有 helper 沿用既有流程：`powershell -NoProfile -File da
 
 `start-app.ps1` 僅保存本次已知 origin／agent 的受控啟動，不是通用重建器；它拒絕占用中的 8044，沒有開機自啟、排程或自動恢復。ngrok 重建可能換網址，屆時必須重新核對 origin、代理、runtime 身份及安全驗證，不能只重用舊命令。當前服務已跨多次工具 shell 及瀏覽器操作仍存活；不承諾電腦重啟後持續可用。
 
-本庫只有 83 名合成會員、3 場、85 筆報名；授權 admin 以正常 CLI 建入新庫，未覆寫原管理員或歷史 actor。公開驗收只改 B 新庫的合成 02 當次級數／格位並新增完整保存版，會員長期級數與 hard snapshot 保持一致。A 帳密／session 及正式／真實資料不變。本次不包含 Git 提交／合併／推送、B image、正式資料 migration、Docker 演練或實機觸控；worktree 與兩個 B 預覽保留供人工驗收及後續修正。
+本庫只有 83 名合成會員、3 場、85 筆報名；授權 admin 以正常 CLI 建入新庫，未覆寫原管理員或歷史 actor。公開驗收只改 B 新庫的合成 02 當次級數／格位並新增完整保存版，會員長期級數與 報名時級數快照 保持一致。A 帳密／session 及正式／真實資料不變。本次不包含 Git 提交／合併／推送、B image、正式資料 migration、Docker 演練或實機觸控；worktree 與兩個 B 預覽保留供人工驗收及後續修正。
 
 
 ### B 編輯／列印增量交付契約（尚未更新公開執行版本）

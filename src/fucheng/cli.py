@@ -7,10 +7,12 @@ import json
 import secrets
 import shutil
 import sqlite3
+import warnings
 from contextlib import closing
 from pathlib import Path
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import DBAPIError
 
 from .config import Settings
 from .database import create_db_engine, make_session_factory
@@ -29,11 +31,37 @@ def _sqlite_path(database_url: str) -> Path:
 def create_admin(args: argparse.Namespace) -> None:
     settings = Settings.from_env()
     factory = make_session_factory(create_db_engine(settings.database_url))
-    password = args.password or getpass.getpass("密碼（至少 12 個字元）：")
-    with factory.begin() as db:
-        if db.scalar(select(Admin).where(Admin.username == args.username)):
-            raise SystemExit("此管理員帳號已存在")
-        db.add(Admin(username=args.username, password_hash=hash_password(password)))
+    from fastapi import HTTPException
+    from .admin_management import create_account
+    from sqlalchemy import text
+    try:
+        with factory() as db:
+            try:
+                db.execute(text("BEGIN IMMEDIATE"))
+                first = db.scalar(select(Admin.id).limit(1)) is None
+                if getattr(args, "first_admin_only", False) and not first:
+                    raise SystemExit("已有管理員；首次建立模式不新增或覆寫帳號")
+                if args.password:
+                    password = args.password
+                else:
+                    try:
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("error", getpass.GetPassWarning)
+                            password = getpass.getpass("密碼（至少 12 個字元）：")
+                    except (getpass.GetPassWarning, EOFError):
+                        raise SystemExit("無法私密讀取密碼；請在可隱藏輸入的互動式終端執行，不接受回顯輸入") from None
+                create_account(db, args.username, password, display_name=getattr(args, "display_name", None),
+                    source="cli", must_change_password=not first)
+                db.commit()
+            except DBAPIError:
+                db.invalidate()
+                raise
+    except HTTPException as error:
+        raise SystemExit(error.detail) from None
+    except ValueError as error:
+        raise SystemExit(str(error)) from None
+    except DBAPIError:
+        raise SystemExit("管理員建立失敗；請檢查資料庫狀態後重試") from None
     print(f"已建立管理員：{args.username}")
 
 
@@ -247,6 +275,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="fucheng")
     commands = parser.add_subparsers(required=True)
     admin = commands.add_parser("create-admin", help="建立管理員帳號")
+    admin.add_argument("--display-name", help="管理員姓名（可省略，不取代登入帳號）")
+    admin.add_argument("--first-admin-only", action="store_true", help="僅空管理員表可建立，不新增或覆寫既有帳號")
     admin.add_argument("username")
     admin.add_argument("--password", help="僅供自動化；互動使用請省略")
     admin.set_defaults(func=create_admin)

@@ -25,7 +25,11 @@ class LoginRequest(BaseModel):
 
 class AuthResponse(BaseModel):
     username: str
+    display_name: str | None = None
     csrf_token: str
+    admin_id: str
+    version: int
+    must_change_password: bool
 
 
 class MemberInput(BaseModel):

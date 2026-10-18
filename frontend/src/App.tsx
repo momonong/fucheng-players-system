@@ -1,12 +1,13 @@
 import { appUrl, appPathname } from './paths'
 import { useEffect, useMemo, useState } from 'react'
 import * as api from './api'
-import type { AdminMember, AuditEntry, Diet, MemberDraft, PublicMember } from './types'
+import type { AdminMember, AdminSession, AuditEntry, Diet, MemberDraft, PublicMember } from './types'
 import { CompetitionManager } from './CompetitionManager'
 import { PublicRegistrationPortal } from './PublicRegistrationPortal'
 import { SiteNav, ClubHome, AnnouncementManager } from './ClubWebsite'
 import { DeploymentReportPage } from './DeploymentReport'
 import { AdminHeader } from './AdminHeader'
+import { AdminManagement, RequiredPasswordChange } from './AdminManagement'
 
 const dietText: Record<Diet, string> = { unset: '未設定', omnivore: '葷食', vegetarian: '素食' }
 const fieldText: Record<string, string> = {
@@ -110,29 +111,37 @@ function PublicPage({ managed = false }: { managed?: boolean }) {
 }
 
 function AdminPage() {
-  const [username, setUsername] = useState<string | null>(null)
+  const [session, setSession] = useState<AdminSession | null>(null)
   const [checking, setChecking] = useState(true)
-  useEffect(() => { api.restoreSession().then(setUsername).catch(() => {}).finally(() => setChecking(false)) }, [])
+  const [loginNotice, setLoginNotice] = useState('')
+  const [logoutError, setLogoutError] = useState('')
+  useEffect(() => { api.restoreAdminSession().then(setSession).catch(() => {}).finally(() => setChecking(false)) }, [])
   if (checking) return <main><p>確認登入狀態中…</p></main>
-  if (!username) return <Login onLogin={setUsername} />
-  if (appPathname() === '/admin/announcements') return <AnnouncementManager username={username} onLogout={() => setUsername(null)} />
-  if (appPathname() === '/admin/system/deployment-report') return <DeploymentReportPage username={username} onLogout={() => setUsername(null)} />
-  if (appPathname() === '/admin/roster') return <><AdminHeader section="roster" username={username} onLogout={() => setUsername(null)} /><PublicPage managed /></>
-  if (appPathname().startsWith('/admin/competitions')) return <CompetitionManager username={username} onLogout={() => setUsername(null)} />
-  return <MemberManager username={username} onLogout={() => setUsername(null)} />
+  if (!session) return <Login onLogin={value => { setSession(value); setLoginNotice('') }} notice={loginNotice} />
+  const onLogout = () => { setSession(null); setLoginNotice('') }
+  const onPasswordChanged = () => { setSession(null); setLoginNotice('密碼已更新，請使用新密碼重新登入。') }
+  if (session.must_change_password) return <RequiredPasswordChange session={session} onLogout={onLogout} onPasswordChanged={onPasswordChanged} />
+  if (appPathname() === '/admin/admins') return <AdminManagement session={session} onLogout={onLogout} onPasswordChanged={onPasswordChanged} />
+  const { username, display_name: displayName } = session
+  if (appPathname() === '/admin/announcements') return <AnnouncementManager username={username} displayName={displayName} onLogout={onLogout} />
+  if (appPathname() === '/admin/system/deployment-report') return <DeploymentReportPage username={username} displayName={displayName} onLogout={onLogout} />
+  if (appPathname() === '/admin/roster') return <><AdminHeader section="roster" username={username} displayName={displayName} onLogout={async () => { try { await api.logout(); onLogout() } catch (e) { setLogoutError((e as Error).message) } }} />{logoutError && <main><Notice kind="error">{logoutError}</Notice></main>}<PublicPage managed /></>
+  if (appPathname().startsWith('/admin/competitions')) return <CompetitionManager username={username} displayName={displayName} onLogout={onLogout} />
+  return <MemberManager username={username} displayName={displayName} onLogout={onLogout} />
 }
 
-function Login({ onLogin }: { onLogin: (name: string) => void }) {
+function Login({ onLogin, notice }: { onLogin: (session: AdminSession) => void; notice: string }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError('')
-    try { onLogin(await api.login(username, password)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+    try { onLogin(await api.loginSession(username, password)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
   return <main className="login-shell"><a href={appUrl("/")}>← 返回首頁</a><form className="panel login" onSubmit={submit}>
     <p className="eyebrow">府城球館</p><h1>管理員登入</h1>
+    {notice && <Notice kind="success">{notice}</Notice>}
     {error && <Notice kind="error">{error}</Notice>}
     <label>帳號<input autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required /></label>
     <label>密碼<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required /></label>
@@ -140,7 +149,7 @@ function Login({ onLogin }: { onLogin: (name: string) => void }) {
   </form></main>
 }
 
-function MemberManager({ username, onLogout }: { username: string; onLogout: () => void }) {
+function MemberManager({ username, displayName, onLogout }: { username: string; displayName?: string | null; onLogout: () => void }) {
   const [members, setMembers] = useState<AdminMember[]>([])
   const [selected, setSelected] = useState<AdminMember | null>(null)
   const [adding, setAdding] = useState(false)
@@ -167,7 +176,7 @@ function MemberManager({ username, onLogout }: { username: string; onLogout: () 
   const shown = members.filter(member => `${member.name} ${member.distinguishing_note ?? ''} ${member.legacy_number ?? ''}`.includes(query))
   async function signOut() { try { await api.logout(); onLogout() } catch (e) { setNotice({ kind: 'error', text: (e as Error).message }) } }
   return <>
-    <AdminHeader section="members" username={username} onLogout={signOut} />
+    <AdminHeader section="members" username={username} displayName={displayName} onLogout={signOut} />
     {notice && <Toast kind={notice.kind} onClose={() => setNotice(null)}>{notice.text}</Toast>}
     <main className={`admin-main member-workspace ${mobileEditor ? 'mobile-editing' : 'mobile-browsing'}`}>
       <section className="member-list panel">

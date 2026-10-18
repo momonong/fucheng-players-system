@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory)][ValidateSet('Init','Admin','Start','Stop','Status','Logs')][string]$Action,
     [string]$EnvFile,
-    [string]$Username
+    [string]$Username,
+    [string]$DisplayName,
+    [switch]$FirstAdminOnly
 )
 $ErrorActionPreference = 'Stop'
 $kitDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -13,7 +15,10 @@ switch ($Action) {
     'Init' { & docker @base run --rm ops init }
     'Admin' {
         if (!$Username) { throw '-Username required; password is prompted privately' }
-        & docker @base run --rm ops admin $Username
+        $adminArguments = @('run','--rm','ops','admin',$Username)
+        if ($DisplayName) { $adminArguments += @('--display-name',$DisplayName) }
+        if ($FirstAdminOnly) { $adminArguments += '--first-admin-only' }
+        & docker @base @adminArguments
     }
     'Start' { & docker @base up -d --wait --wait-timeout 90 app }
     'Stop' { & docker @base stop }

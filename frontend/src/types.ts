@@ -1,5 +1,39 @@
 export type Diet = 'unset' | 'omnivore' | 'vegetarian'
 
+export interface AdminSession {
+  admin_id: string
+  username: string
+  display_name: string | null
+  csrf_token: string
+  version: number
+  must_change_password: boolean
+}
+
+export interface AdminAccount {
+  id: string
+  username: string
+  display_name: string | null
+  is_active: boolean
+  must_change_password: boolean
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminAccountAudit {
+  id: string
+  actor_admin_id: string | null
+  actor_username: string | null
+  actor_display_name: string | null
+  target_admin_id: string
+  target_username: string
+  target_display_name: string | null
+  action: 'create' | 'change_password' | 'reset_password' | 'disable' | 'enable' | 'bootstrap'
+  source: 'web' | 'cli' | 'bootstrap'
+  changes: Record<string, { before: unknown; after: unknown }>
+  created_at: string
+}
+
 export interface PublicMember {
   id: string
   name: string

@@ -221,6 +221,7 @@ __marimo__/
 .uv-cache/
 .uv-python/
 data/
+/deploy/docker/club.env
 backups/
 frontend/node_modules/
 frontend/dist/
