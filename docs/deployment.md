@@ -1,6 +1,6 @@
 # Windows Docker 部署、搬移與維運
 
-## 0.4.0 管理員管理與首次啟動（待發布，未部署）
+## 0.4.0 管理員管理與首次啟動（未部署）
 
 本次管理員管理使用 `0011_admin_management` schema；下方 0.3.9／0010 等內容保留為歷史版本流程。更新現有部署時，先停止本 project 的 app／backup 寫入，用原版 runtime 成組備份 DB＋媒體並核對 hash，再用同版新版 image 明確執行 `ops migrate`，之後同批啟動 app／backup／ops。`serve`／Start 不做初始化或 migration。回退須保留故障庫，使用升級前備份在新目標恢復並搭配匹配 image／schema，不以 downgrade 刪除管理員稽核。
 
