@@ -3,6 +3,7 @@ import * as api from './api'
 import { CompetitionLevels } from './CompetitionLevels'
 import { ResponsivePanel } from './ResponsivePanel'
 import { PrintPreview } from './PrintPreview'
+import { PrintedFill } from './gridShade'
 import { AdminHeader } from './AdminHeader'
 import { useArrangementWorkspace } from './useArrangementWorkspace'
 import type {
@@ -226,7 +227,7 @@ function CompetitionRoster({ detail, reload, notify }: {
     <PrintPreview open={printOpen} onOpen={() => setPrintOpen(true)} onClose={() => setPrintOpen(false)} label="管理報名名單" fontSize={14}>
       <header className="report-heading"><div><p className="report-eyebrow">府城球館・管理報名名單</p><h1>{competition.name}</h1></div><p>{competition.competition_date}<br />共 {registrations.length} 筆報名紀錄</p></header>
       <p className="report-caption">正取 {confirmed.length} 人／名額 {competition.capacity}・候補 {waitlisted.length} 人・已取消 {cancelled.length} 人・<span className="print-diet-legend"><b className="print-diet-symbol">素</b>素食</span></p>
-      <table className="report-table management-report"><thead><tr>{range(1, 10).map(n => <th key={n}>{n} 級</th>)}</tr></thead>
+      <table className="report-table management-report"><thead><tr>{range(1, 10).map(n => <th key={n}><PrintedFill color="#f0f3ee" /><span className="print-cell-content">{n} 級</span></th>)}</tr></thead>
         {([{ rows: confirmed, label: '正取' }, { rows: waitlisted, label: '候補（原始順位）' }, { rows: cancelled, label: '已取消' }]).filter(group => group.rows.length).map(group => <tbody key={group.label}><tr className="report-section"><th colSpan={10}>{group.label}・{group.rows.length} 人</th></tr><ManagementPrintRows rows={group.rows} /></tbody>)}
       </table>
     </PrintPreview>

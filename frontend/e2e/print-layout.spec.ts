@@ -4,6 +4,7 @@ const prefix = (process.env.FUCHENG_BASE_PATH ?? '').replace(/\/$/, '')
 const path = (value: string) => prefix + value
 const roster = (counts: number[]) => counts.flatMap((count, ci) => Array.from({ length: count }, (_, i) => ({ id: `print-${ci}-${i}`, name: `${'陳林王李吳黃劉'[i % 7]}${'甲乙丙丁戊己庚辛壬癸'[ci]}${'明志俊雅建淑承佳哲怡柏慧宗佩家詩信惠宇麗'[Math.floor(i / 7)]}`, level: ci + 1, distinguishing_note: i === 0 ? '合成辨識註記完整保留' : null })))
 async function verifyPdf(page: Page, file: string, names: string[], pages?: number) {
+  if (process.env.FUCHENG_PRINT_HEADER_QA) await page.pdf({ path: file.replace(/\.pdf$/, '-background-on.pdf'), preferCSSPageSize: true, printBackground: true })
   await page.pdf({ path: file, preferCSSPageSize: true, printBackground: false })
   const info = execFileSync('pdfinfo', [file], { encoding: 'utf8' })
   const count = Number(info.match(/Pages:\s+(\d+)/)![1])
@@ -144,7 +145,7 @@ test('合法500行50欄極端安排採可讀分頁，舊版未知不補現況', 
   await verifyPdf(page, info.outputPath('arrangement-legacy-unknown.pdf'), [...people.map(p => p.member_name), '舊版未保存格位'])
 })
 
-test('比賽A保留12行9欄、80人與四個合併格，16pt及素食底色一頁完整', async ({ page }, info) => {
+test('比賽A保留12行9欄、80人、分組與合併格，16pt及素食底色一頁完整', async ({ page }, info) => {
   await page.goto(path('/admin/competitions'))
   await page.getByLabel('帳號', { exact: true }).fill('e2e-admin'); await page.getByLabel('密碼', { exact: true }).fill(process.env.FUCHENG_E2E_ADMIN_PASSWORD!)
   await page.getByRole('button', { name: '登入', exact: true }).click(); await expect(page.getByRole('button', { name: '登出', exact: true })).toBeVisible()
@@ -157,10 +158,11 @@ test('比賽A保留12行9欄、80人與四個合併格，16pt及素食底色一�
   const columns = [{ id: 'a-team', kind: 'text', title: '隊伍' }, ...Array.from({ length: 8 }, (_, i) => ({ id: `a-level-${i+1}`, kind: 'level', level: i+1 }))]
   const cells: any[] = people.map((person, index) => ({ row_id: axes[1 + index % 10].id, column_id: columns[1 + Math.floor(index / 10)].id, kind: 'registration', registration_id: person.registration_id }))
   for (let i = 1; i <= 10; i++) cells.push({ row_id: axes[i].id, column_id: columns[0].id, kind: 'text', text: `${i} 隊` })
-  cells.push({ row_id: axes[0].id, column_id: columns[0].id, kind: 'text', text: '合成組' })
+  const groupMerges = Array.from({ length: 4 }, (_, i) => ({ start: { row_id: axes[0].id, column_id: columns[1 + i * 2].id }, end: { row_id: axes[0].id, column_id: columns[2 + i * 2].id } }))
+  groupMerges.forEach((merge, index) => cells.push({ ...merge.start, kind: 'text', text: '甲乙丙丁'[index] }))
   const merges = Array.from({ length: 4 }, (_, i) => ({ start: { row_id: axes[11].id, column_id: columns[1 + i * 2].id }, end: { row_id: axes[11].id, column_id: columns[2 + i * 2].id } }))
   merges.forEach((merge, index) => cells.push({ ...merge.start, kind: 'text', text: `備註${index + 1}` }))
-  const layout = { rows: axes, columns, cells, merges, header_merges: [], cell_shades: [{ row_id: axes[3].id, column_id: columns[1].id, shade: 0 }] }
+  const layout = { rows: axes, columns, cells, merges: [...groupMerges, ...merges], header_merges: [], cell_shades: [{ row_id: axes[3].id, column_id: columns[1].id, shade: 0 }] }
   const version: any = { id: 'a-version', sequence: 1, label: '合成保存版', created_at: '2099-10-01T00:00:00Z', rows: people, layout }
   const state = { schema_version: 2, layout, layout_baseline: layout, layout_revision: 1, layout_initialized_at: '2099-10-01T00:00:00Z', editable: true, rows: people, state_token: 'a-token', latest: version, versions: [version] }
   await page.route(`**/api/admin/competitions/${competition.id}/arrangement`, route => route.fulfill({ json: state }))
@@ -184,12 +186,13 @@ test('比賽A保留12行9欄、80人與四個合併格，16pt及素食底色一�
   await expect(preview).not.toContainText('素＝本場素食')
   const markersFit = await preview.locator('[data-print-registration] .print-vegetarian').evaluateAll(nodes => nodes.every(node => { const marker = node.getBoundingClientRect(), cell = node.closest('td')!.getBoundingClientRect(); return marker.left >= cell.left && marker.right <= cell.right && marker.top >= cell.top && marker.bottom <= cell.bottom }))
   expect(markersFit).toBe(true)
-  await expect(preview.locator('td[colspan="2"]')).toHaveCount(4)
+  await expect(preview.locator('td[colspan="2"]')).toHaveCount(8)
   await expect(preview.locator('[data-print-registration]').first()).toHaveCSS('font-size', '21.3333px')
   const ids = await preview.locator('[data-print-registration]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-print-registration')))
   expect(ids).toEqual(Array.from({ length: 10 }, (_, row) => Array.from({ length: 8 }, (_, col) => people[col * 10 + row].registration_id)).flat())
-  const borders = await preview.locator('th, td').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).borderTopWidth))
-  expect(new Set(borders)).toEqual(new Set(['1px']))
+  const borders = await preview.locator('th, td').evaluateAll(nodes => nodes.map(node => { const style = getComputedStyle(node); return [style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth] }))
+  expect(borders.every(([right, bottom, left]) => right === '1px' && bottom === '1px' && left === '0px')).toBe(true)
+  expect(await preview.locator('thead tr:first-child > *').evaluateAll(nodes => nodes.every(node => getComputedStyle(node).borderTopWidth === '1px'))).toBe(true)
   await expect(preview.locator('thead th .print-cell-content').first()).toHaveCSS('color', 'rgb(25, 79, 66)')
   await page.screenshot({ path: info.outputPath('competition-a-preview.png'), fullPage: true })
   await verifyPdf(page, info.outputPath('competition-a-80.pdf'), [...people.map(p => p.member_name), '備註1', '備註4', '素'], 1)
