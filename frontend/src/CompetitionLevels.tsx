@@ -17,14 +17,7 @@ export function CompetitionLevels({ competition, controller, username }: {
   const workspace = controller.workspaces[id]
   const state = workspace?.state
   const readonly = state ? !state.editable : !!competition.deleted_at || !['open', 'closed'].includes(competition.status)
-  const [printJob,setPrintJob]=useState<Parameters<typeof ArrangementPrint>[0]|null>(null)
-  useEffect(()=>{
-    if(!printJob)return
-    const clear=()=>setPrintJob(null)
-    window.addEventListener('afterprint',clear)
-    const frame=requestAnimationFrame(()=>{try{window.print()}catch{clear()}})
-    return()=>{cancelAnimationFrame(frame);window.removeEventListener('afterprint',clear)}
-  },[printJob])
+  const [printOpen, setPrintOpen] = useState(false)
   const [exporting,setExporting]=useState(false)
   const [exportError,setExportError]=useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -40,7 +33,7 @@ export function CompetitionLevels({ competition, controller, username }: {
   const [historical, setHistorical] = useState<{ current: ArrangementVersion; previous: ArrangementVersion | null } | null>(null)
   const [historyError, setHistoryError] = useState('')
   const [located, setLocated] = useState<{registrationId:string;points:GridPoint[];message:string} | null>(null)
-  useEffect(()=>setPrintJob(null),[id,selectedVersion])
+  useEffect(()=>setPrintOpen(false),[id,selectedVersion])
   useEffect(()=>{setLocated(null);setSelectedVersion(null);setHistorical(null)},[id])
   const [saveOpen, setSaveOpen] = useState(false)
   const [label, setLabel] = useState('')
@@ -127,9 +120,9 @@ export function CompetitionLevels({ competition, controller, username }: {
     finally{setExporting(false)}
   }
   return <section className="arrangement-workspace" aria-label="當次比賽級數安排">
-    {printJob&&<ArrangementPrint {...printJob}/>}
+    {(selectedVersion ? !!historical : !!state) && <ArrangementPrint rows={rows} layout={layout} title={competition.name} version={selectedVersion ? `歷史：${historical!.current.label}` : '目前安排'} open={printOpen} onOpen={() => setPrintOpen(true)} onClose={() => setPrintOpen(false)} />}
     <div className="arrangement-toolbar"><div><h2>{competition.name}</h2><small>{selectedVersion ? `回看：${historical?.current.label ?? '讀取中'}` : '目前安排'}</small></div><div className="arrangement-tools">
-      <button className="secondary" disabled={selectedVersion?!historical:!state||busy} onClick={()=>setPrintJob({rows,layout,title:competition.name,version:selectedVersion?`歷史：${historical!.current.label}`:'目前安排'})}>列印安排</button>
+      <button className="secondary" disabled={selectedVersion?!historical:!state||busy} onClick={() => setPrintOpen(true)}>列印安排</button>
       <button className="secondary" disabled={!canExport} onClick={()=>void exportExcel()}>{exporting?'匯出中…':'匯出 Excel'}</button>
       <div className="vegetarian-control"><button className="secondary vegetarian-toggle" aria-pressed={vegetarian} onClick={() => setVegetarian(!vegetarian)}>素食 {rows.filter(row => row.diet === 'vegetarian').length} 人{dietUnknown ? `（${dietUnknown} 人未記錄）` : ''}</button><VegetarianRoster key={`${id}/${selectedVersion ?? 'current'}`} rows={rows} layout={layout} historical={!!selectedVersion} /></div>
       <button className="secondary history-toggle" onClick={() => setHistoryOpen(!historyOpen)} aria-pressed={historyOpen} aria-expanded={historyOpen}>歷史</button>
@@ -147,7 +140,7 @@ export function CompetitionLevels({ competition, controller, username }: {
     {compact && <p className="touch-grid-hint no-print">拖動選手方塊移動・連點兩下看資訊・滑空白處捲表・點 ⋯ 開選單</p>}
     <div ref={contentRef} className={`arrangement-content ${historyOpen ? 'with-history' : ''}`}>
       <div className="arrangement-sheet" ref={sheetRef}><LevelCardBoard canUndo={!boardReadonly&&!!workspace?.undoStack?.length&&workspace?.undoToken===state?.state_token} onUndo={()=>controller.undo(id)} canRedo={!boardReadonly&&!!workspace?.redoStack?.length&&workspace?.undoToken===state?.state_token} onRedo={()=>controller.redo(id)} locatedChangeId={located?.registrationId??null} locatedPoints={located?.points??[]} onClearLocated={()=>setLocated(null)} confirmedGrid={workspace?.confirmedGrid} historical={!!selectedVersion} competitionId={id} key={`${id}/${selectedVersion ?? 'current'}`} stateToken={state?.state_token??''} rows={rows} layout={layout} baselineLayout={oldLayout} changes={changes} search={search} vegetarian={vegetarian} readonly={boardReadonly} busy={busy} textDrafts={workspace?.texts ?? {}} onTextDraft={(key, text) => controller.setTextDraft(id,key,text)} onOperate={(operation,token) => controller.operate(id, operation,token)} />
-        <details className="arrangement-help"><summary>操作說明</summary><p>{compact ? '拖動整個選手方塊移動人員，不必長按；滑動空白格或文字格捲動表格，拖到表格邊緣會自動捲動。' : '滑鼠拖動姓名；手機滑動姓名區捲動表格，直接拉動 ⠿ 把手移動人員，不必長按。'}手機只透過 ⋯ 開啟操作選單，拖動不會叫出右鍵選單。單擊／輕點姓名選取儲存格，雙擊／連點兩下查看本場餐食與級數。鍵盤 Space 選格、Enter 查看資訊；資訊內選級數可移到欄底。範圍選取時點姓名只延伸選區。拖到選手中央交換位置，上下邊界插入並讓下方選手向下移；拖到空格直接移動、來源留空。放手前請核對交換或插入提示。搜尋只顯示符合姓名，其他選手以已占用格表示，不改格位；素食以柔和底色及「素」標記提示。表格邊界的＋可在該處插入；級數標題上緣的＋新增表頭列。邊緣可右鍵或點選開啟整排／欄位刪除；空的級數欄可刪除，有選手時先移走，至少保留一個級數欄。表格上方可加回已刪除的級數欄；新增報名或調級用到未顯示級數時會在右側補回。表格上方工具列可對選取範圍設底色、合併或解除合併；復原上一個動作或重做（Ctrl／Command+Z、Ctrl／Command+Shift+Z；Ctrl+Y）可逐步復原本次編輯已確認的操作，大保存後開始新區段。滑鼠從空白、文字或格邊拖曳框選，表頭單擊選取後可用工具列改字／底色，不影響級數身份或下面格子；表頭與資料格不混選合併。雙擊文字或表頭直接編輯（Enter送出、點外面保存退出、Escape取消）；手機選格後按編輯文字或範圍選取。合併格可直接改字，解除保留原文字格位。列印安排與匯出 Excel 都包含完整名單，不受搜尋或素食開關影響；Excel 可離線編輯，不會回寫本系統。寬表與長表分幅接續列印。橙色表示位置或級數異動，綠色表示新增。保存完整安排後以該版為新基準。</p></details>
+        <details className="arrangement-help"><summary>操作說明</summary><p>{compact ? '拖動整個選手方塊移動人員，不必長按；滑動空白格或文字格捲動表格，拖到表格邊緣會自動捲動。' : '滑鼠拖動姓名；手機滑動姓名區捲動表格，直接拉動 ⠿ 把手移動人員，不必長按。'}手機只透過 ⋯ 開啟操作選單，拖動不會叫出右鍵選單。單擊／輕點姓名選取儲存格，雙擊／連點兩下查看本場餐食與級數。鍵盤 Space 選格、Enter 查看資訊；資訊內選級數可移到欄底。範圍選取時點姓名只延伸選區。拖到選手中央交換位置，上下邊界插入並讓下方選手向下移；拖到空格直接移動、來源留空。放手前請核對交換或插入提示。搜尋只顯示符合姓名，其他選手以已占用格表示，不改格位；素食以柔和底色及「素」標記提示。表格邊界的＋可在該處插入；級數標題上緣的＋新增表頭列。邊緣可右鍵或點選開啟整排／欄位刪除；空的級數欄可刪除，有選手時先移走，至少保留一個級數欄。表格上方可加回已刪除的級數欄；新增報名或調級用到未顯示級數時會在右側補回。表格上方工具列可對選取範圍設底色、合併或解除合併；復原上一個動作或重做（Ctrl／Command+Z、Ctrl／Command+Shift+Z；Ctrl+Y）可逐步復原本次編輯已確認的操作，大保存後開始新區段。滑鼠從空白、文字或格邊拖曳框選，表頭單擊選取後可用工具列改字／底色，不影響級數身份或下面格子；表頭與資料格不混選合併。雙擊文字或表頭直接編輯（Enter送出、點外面保存退出、Escape取消）；手機選格後按編輯文字或範圍選取。合併格可直接改字，解除保留原文字格位。列印安排與匯出 Excel 都包含完整名單，不受搜尋或素食開關影響；Excel 可離線編輯，不會回寫本系統。列印依原字級排成 A4 橫向，較大的表格會分頁；寬表按原欄位接續，合併格於交界標示續接。橙色表示位置或級數異動，綠色表示新增。保存完整安排後以該版為新基準。</p></details>
       </div>
       {historyOpen && <>
         <aside className="arrangement-diff" aria-label="該版本變動"><div className="arrangement-panel-heading"><h3>該版本變動</h3><p className="arrangement-diff-baseline">{selectedVersion ? `相較 ${historical?.previous?.label ?? '前一保存版本'}` : `相較 ${state?.latest?.label ?? '起始基準'}`}</p></div>

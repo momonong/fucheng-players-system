@@ -1033,3 +1033,89 @@ main:not(.arrangement-main):not(.arrangement-print-page) { width: var(--page-wid
   .arrangement-cell .cell-name { align-self: stretch; min-height: 46px; }
   .arrangement-cell[data-draggable="true"] .cell-name { touch-action: none; }
 }
+
+/* Screen cards keep each level distinct while retaining the A reading order. */
+main.member-roster-page { max-width: 1440px; padding-top: 1.25rem; }
+.member-roster-page .level-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: start; border: 0; }
+.member-roster-page .level-card { min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.member-roster-page .level-card h2 { padding: .65rem .5rem; font-size: 1.2rem; justify-content: center; color: white; background: var(--teal); border: 0; }
+.level-member-list { list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: column; margin: 0; padding: .25rem 0 .5rem; }
+.level-member-list li { min-width: 0; padding: .35rem .4rem; border-bottom: .75pt solid #d3dbd5; text-align: center; }
+.level-member-list .public-member-name { display: flex; flex-direction: column; align-items: center; gap: .1rem; white-space: normal; line-height: 1.45; overflow-wrap: anywhere; }
+.level-member-list strong { font-size: 1.125rem; font-weight: 500; }
+.level-member-list small { color: #52645a; font-size: .8rem; }
+form.login { display: grid; gap: 1rem; }
+form.login h1, form.login p { margin-bottom: 0; }
+@media (min-width: 560px) { .member-roster-page .level-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 800px) { .member-roster-page .level-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1050px) { .member-roster-page .level-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .member-roster-page .level-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .level-member-list li { padding: .45rem .5rem; }
+  .level-member-list strong { font-size: 1.25rem; }
+}
+
+/* One print portal owns the report. Only preview display scales; print type never does. */
+body > .print-output { display: block !important; visibility: hidden; position: fixed; left: -100000px; top: 0; color: #17231f; font-family: "Noto Sans CJK TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+body > .print-output.preview-open { visibility: visible; inset: 0; z-index: 2000; background: #e6eae7; display: flex !important; flex-direction: column; }
+.print-preview-toolbar { flex: 0 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem max(1rem, calc((100vw - 1200px) / 2)); background: #fff; border-bottom: 1px solid #c8d0cb; }
+.print-preview-toolbar h2 { margin: 0; font-size: 1.1rem; }
+.print-preview-toolbar p { margin: .25rem 0 0; color: #53635a; font-size: .85rem; }
+.print-preview-toolbar > div:last-child { display: flex; gap: .75rem; flex-shrink: 0; }
+.print-preview-scroll { overflow: auto; flex: 1; min-height: 0; padding: 1.5rem; }
+.print-preview-viewport { max-width: none; margin: auto; position: relative; }
+.print-paper { position: relative; width: 297mm; min-height: 210mm; padding: 6mm; background: #fff; transform-origin: top left; box-shadow: 0 5px 24px #243a3026; }
+.print-document { line-height: 1.2; }
+.print-document .print-sheet { display: block; }
+.print-document .print-page + .print-page { margin-top: 12mm; }
+.print-document .report-heading { border: 0; padding: 0; display: flex; align-items: end; justify-content: space-between; gap: 5mm; margin: 0 0 3mm; }
+.print-document .report-heading h1 { color: #194f42; font-size: 24pt; line-height: 1.2; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.print-document .report-heading p { margin: 0; font-size: 10pt; line-height: 1.4; text-align: right; }
+.print-document .report-heading .report-eyebrow { display: none; }
+.print-document .report-caption { margin: 0 0 4mm; font-size: 10pt; line-height: 1.4; }
+.print-document .report-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: inherit; line-height: 1.2; }
+.print-document .report-table th, .print-document .report-table td { position: relative; border: .75pt solid #68736d; padding: 2pt 3pt; color: #17231f; text-align: center; vertical-align: middle; white-space: pre-wrap; overflow: visible; overflow-wrap: anywhere; text-overflow: initial; }
+.print-document .report-table thead th { border: .75pt solid #68736d; height: 29pt; padding: 2pt 3pt; color: #194f42; font-size: 16pt; font-weight: 700; background: #f0f3ee; }
+.print-document .report-table small { display: block; margin: 1pt 0 0; font-size: 10pt; line-height: 1.2; color: #354a3e; }
+.print-document .report-table tbody tr:last-child td { border-bottom: .75pt solid #68736d; }
+.print-document .arrangement-report thead th { background: white; }
+.print-document .arrangement-report td { height: 38pt; font-size: 16pt; }
+.print-document .arrangement-report td strong { font-weight: 500; }
+.print-document .report-section th { text-align: left; font-size: 14pt; font-weight: 700; border-top: .75pt solid #68736d; }
+.print-document .print-cell-shade { display: block; position: absolute; inset: .375pt; width: calc(100% - .75pt); height: calc(100% - .75pt); z-index: 0; }
+.print-document .print-cell-content { position: relative; z-index: 1; color: inherit; }
+.print-document .print-vegetarian, .print-document .print-diet-symbol { display: inline-flex; align-items: center; justify-content: center; width: 16pt; height: 16pt; border: .75pt solid currentColor; border-radius: 50%; padding: 0; font-size: 12pt; line-height: 1; font-weight: 600; color: #194f42; vertical-align: -.05em; }
+.print-document .print-vegetarian { margin-left: 2pt; transform: translateY(-3pt); }
+.print-document .print-diet-legend { display: inline-flex; align-items: center; gap: 3pt; vertical-align: middle; }
+.print-document .member-print-page h1 { margin: 0; font-size: 22pt; line-height: 1.1; color: #194f42; }
+.print-document .member-print-caption { margin: 1pt 0 3pt; font-size: 10pt; line-height: 1.2; }
+.print-document .print-roster thead th { height: 24pt; font-size: 15pt; padding: 0 2pt; }
+.print-document .print-roster td { height: 21.5pt; padding: 0 2pt; font-size: 14pt; line-height: 1.1; }
+.print-document .print-roster sup { font-size: 10pt; margin-left: 1pt; line-height: 0; }
+.print-document .member-print-notes { margin-top: 3mm; font-size: 12pt; line-height: 1.4; }
+.print-document .member-print-notes h2 { margin: 0 0 2pt; font-size: 12pt; }
+.print-document .member-print-notes ol { margin: 0; padding-left: 18pt; columns: 2; column-gap: 5mm; }
+.print-document .member-print-notes li { break-inside: avoid; overflow-wrap: anywhere; }
+@media (max-width: 650px) {
+  .print-preview-toolbar { align-items: stretch; flex-direction: column; gap: .75rem; padding: .85rem; }
+  .print-preview-toolbar > div:last-child { justify-content: end; }
+  .print-preview-toolbar button { flex: 1; font-size: .9rem; }
+  .print-preview-scroll { padding: .75rem; }
+}
+@media print {
+  @page { size: A4 landscape; margin: 6mm; }
+  html, body { margin: 0 !important; padding: 0 !important; min-height: 0; width: auto; height: auto; }
+  body:has(> .print-output) > :not(.print-output) { display: none !important; }
+  body > .print-output { display: block !important; visibility: visible; position: static !important; margin: 0 !important; padding: 0 !important; background: white; width: 285mm; height: auto; }
+  .print-output .print-preview-toolbar { display: none !important; }
+  .print-output .print-preview-scroll { display: block; overflow: visible; padding: 0; }
+  .print-output .print-preview-viewport { width: 285mm !important; height: auto !important; margin: 0; aspect-ratio: auto !important; }
+  .print-output .print-paper { width: 285mm; min-height: 0; padding: 0; transform: none !important; box-shadow: none; height: auto; }
+  .print-output .print-document { display: block !important; }
+  .print-output .print-page { break-after: page; }
+  .print-output .print-page:last-of-type { break-after: auto; }
+  .print-output .print-page + .print-page { margin-top: 0; }
+  .print-output .report-table thead { display: table-header-group; }
+  .print-output .report-table tr { break-inside: auto; }
+  .print-output .report-table th, .print-output .report-table td { border-width: .75pt; }
+}

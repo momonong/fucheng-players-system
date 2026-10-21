@@ -470,7 +470,7 @@ test('表格新版：標題失敗保留與原樣恢復',async({page},info)=>{
   await s.save('只有標題');await s.idle();await expect(s.area.getByRole('button',{name:'保存完整安排',exact:true})).toBeDisabled()
 })
 
-test('表格新版：完整列印與歷史凍結、寬表長表分幅',async({page},info)=>{
+test('表格新版：完整列印與歷史凍結、寬表長表可讀分幅',async({page},info)=>{
   test.setTimeout(90000)
   const s=await setup(page,info,'edit-print',80)
   await s.op({action:'insert_header',before_id:null});let layout=(await s.state()).layout
@@ -509,11 +509,11 @@ test('表格新版：完整列印與歷史凍結、寬表長表分幅',async({pa
   for(let i=0;i<3;i++)await s.op({action:'insert_column',before_id:null})
   for(let i=0;i<12;i++)await s.op({action:'insert_row',before_id:null})
   layout=(await s.state()).layout
-  await s.op({action:'text',target:point(layout,0,11),text:'跨分幅合併'})
-  await s.op({action:'merge',start:point(layout,0,11),end:point(layout,0,13)})
+  await s.op({action:'text',target:point(layout,0,9),text:'跨分幅合併'})
+  await s.op({action:'merge',start:point(layout,0,9),end:point(layout,0,12)})
   await s.op({action:'move',registration_id:s.rows[39].id,target:point(layout,layout.rows.length-1,10)})
-  await s.op({action:'text',target:point(layout,17,0),text:'跨續頁隊名'})
-  await s.op({action:'merge',start:point(layout,17,0),end:point(layout,20,0)})
+  await s.op({action:'text',target:point(layout,10,0),text:'跨續頁隊名'})
+  await s.op({action:'merge',start:point(layout,10,0),end:point(layout,13,0)})
   await s.reload();await s.area.getByRole('button',{name:'列印安排',exact:true}).click()
   await expect(printed.locator('.arrangement-print-page')).toHaveCount(4)
   const ids=await printed.locator('[data-print-registration]').evaluateAll(els=>els.map(e=>e.getAttribute('data-print-registration')))

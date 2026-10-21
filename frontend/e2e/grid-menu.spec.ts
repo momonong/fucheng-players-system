@@ -151,11 +151,11 @@ test('F選單未知合併原樣恢復與真409保護',async({page},info)=>{
   await activate(info,s.area.getByRole('button',{name:'重新讀取並核對',exact:true}));await s.idle()
 })
 
-test('F跨分幅表頭與淡橘異動完整輸出',async({page},info)=>{
+test('F跨寬表合併表頭與淡橘異動完整分幅輸出',async({page},info)=>{
   const s=await setup(page,info,'edit-menu-wide',3)
   for(let i=0;i<3;i++)await s.op({action:'insert_column',before_id:null})
   const l=(await s.state()).layout
-  await s.op({action:'merge_header',start_column_id:l.columns[10].id,end_column_id:l.columns[12].id})
+  await s.op({action:'merge_header',start_column_id:l.columns[9].id,end_column_id:l.columns[12].id})
   const m=(await s.state()).layout.header_merges[0]
   await s.op({action:'header_text',merge_id:m.id,text:'跨幅共同標題'})
   await s.op({action:'move_empty',registration_id:s.rows[0].id,target:point(l,4,2)});await s.reload()

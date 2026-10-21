@@ -292,3 +292,10 @@ frontend/dist-base-path/
 /frontend/dist-roster-labels/
 
 /frontend/dist-mobile-card/
+
+/frontend/dist-print-redesign-20261020/
+
+/frontend/dist-print-a-20261020/
+
+# Retained local design samples; excluded from release source and image context.
+/output/table-design-samples-20261020/

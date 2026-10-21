@@ -42,10 +42,10 @@ test('管理員新增修改，公開名單可搜尋篩選並支援列印', async
   await expect(page.getByRole('heading', { name: '5 級' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '10 級' })).toBeVisible()
   if (testInfo.project.name === 'mobile') {
-    const mobileColumns = await page.locator('.level-card').first().locator('tbody').evaluate(element =>
+    const mobileColumns = await page.locator('.level-card').first().locator('.level-member-list').evaluate(element =>
       getComputedStyle(element).gridTemplateColumns.split(' ').length,
     )
-    expect(mobileColumns).toBe(3)
+    expect(mobileColumns).toBe(2)
     const namesAreNotClipped = await page.locator('.public-member-name').evaluateAll(elements =>
       elements.every(element => element.scrollWidth <= element.clientWidth && element.scrollHeight <= element.clientHeight),
     )
@@ -81,9 +81,9 @@ test('管理員新增修改，公開名單可搜尋篩選並支援列印', async
   await expect(page.getByText('共 327 位會員')).toBeVisible()
   await page.emulateMedia({ media: 'print' })
   await expect(page.getByRole('button', { name: '列印／另存 PDF' })).toBeHidden()
-  await expect(page.locator('.print-sheet')).toBeVisible()
-  await expect(page.locator('.print-roster thead th')).toHaveCount(11)
-  await expect(page.locator('.print-roster tbody tr')).toHaveCount(42)
+  await expect(page.locator('.print-sheet').first()).toBeVisible()
+  await expect(page.locator('.print-roster thead th')).toHaveCount(10)
+  await expect(page.locator('.print-roster tbody tr')).toHaveCount(38)
   if (testInfo.project.name === 'desktop') {
     await page.pdf({
       path: testInfo.outputPath('a4-roster.pdf'),

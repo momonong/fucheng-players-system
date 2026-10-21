@@ -1,6 +1,14 @@
 # Windows Docker 部署、搬移與維運
 
-## 0.4.0 管理員管理與首次啟動（未部署）
+## 0.4.1 表格閱讀與列印
+
+會員與比賽採可讀的 A4 橫向列印，保持姓名字級並讓長表自然分頁；會員網頁用分離深綠卡片，圈素與姓名垂直對齊。見[發布說明](release-0.4.1.md)與[驗證紀錄](print-layout-verification-20261020.md)。
+
+從 0.4.0 或 10/20–10/21 同 schema 試用 snapshot 更新不需 migration，schema 維持 `0011_admin_management`。使用發布頁已核對的 `0.4.1` digest；先停寫並用原 runtime 成組備份 DB／媒體，保留原 volumes、帳密與回退映像，同批切換 app／backup，確認資料、登入、資產與備份健康。更舊版本仍依相應 migration 流程。球館電腦部署仍待現場窗口。
+
+## 0.4.0 管理員管理與首次啟動
+
+2026-10-20 已部署至既有家中 4090 試用站，保留資料與登入帳密；尚未部署到球館。映像、遷移與驗證見[家中部署紀錄](home-deployment.md#040-管理員管理部署2026-10-20)。
 
 本次管理員管理使用 `0011_admin_management` schema；下方 0.3.9／0010 等內容保留為歷史版本流程。更新現有部署時，先停止本 project 的 app／backup 寫入，用原版 runtime 成組備份 DB＋媒體並核對 hash，再用同版新版 image 明確執行 `ops migrate`，之後同批啟動 app／backup／ops。`serve`／Start 不做初始化或 migration。回退須保留故障庫，使用升級前備份在新目標恢復並搭配匹配 image／schema，不以 downgrade 刪除管理員稽核。
 
@@ -10,7 +18,7 @@
 
 ### 球館首次部署：陳鎮濃／momonong
 
-使用 `deploy/docker/club.env.example` 作為全新球館部署的非秘密設定範例，複製到私有 `club.env`，核對正式發布的 0.4.0 image digest、入口與獨立 project／volume 後再設定。此範例只指定一個首位帳號：姓名「陳鎮濃」、登入帳號 `momonong`；不附其他帳號或固定密碼，也不會修改既有部署。
+使用 `deploy/docker/club.env.example` 作為全新球館部署的非秘密設定範例，複製到私有 `club.env`，核對正式發布的 0.4.1 image digest、入口與獨立 project／volume 後再設定。此範例只指定一個首位帳號：姓名「陳鎮濃」、登入帳號 `momonong`；不附其他帳號或固定密碼，也不會修改既有部署。
 
 Windows Docker Desktop 可完全不使用 Linux 密碼檔：在第一次 Start 前，先以同版 image 對**全新空 volume** 執行 Init，再互動建立唯一首位帳號。密碼至少 12 字元，當場由私密提示輸入，不放在命令列或聊天。請從互動式 PowerShell 終端執行，不重導向輸入；無可隱藏輸入的 TTY 時會拒絕建立，不退回回顯密碼。初始帳號使用本人設定的正式密碼，可直接登入；`-FirstAdminOnly` 在表內已有任何帳號時拒絕新增，避免重跑首設變成加帳號。
 
