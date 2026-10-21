@@ -1,6 +1,6 @@
 # 家中 4090 試用部署
 
-2026-10-21 核對：4090 已部署正式 0.4.1，使用已合併來源及 Docker Hub 固定 manifest digest，schema 仍為 `0011_admin_management`。接受的會員卡片／A 版列印保留，人名旁圈素上移 3 pt，圖例不移動；會員筆畫排序與原比賽安排不變。原有資料與帳密保留，app／backup 健康，既有登入與管理 API 讀取通過。入口仍為 [momonong.me/fucheng/](https://momonong.me/fucheng/)；實體手機、真正 Turnstile 報名及重開機恢復待驗收。詳見文末 0.4.1 紀錄，前述 snapshot 段落保留為歷史。
+2026-10-21 核對：4090 已部署正式 0.4.2，以 SVG 前景保留列印表頭底色，並統一共用格線及整列分頁；原字級、格位與圈素位置保留。使用已合併來源及 Docker Hub 固定 manifest digest，schema 仍為 `0011_admin_management`。原有資料與帳密保留，app／backup 健康，既有登入與管理 API 讀取通過。入口仍為 [momonong.me/fucheng/](https://momonong.me/fucheng/)；原生 Chrome／Edge 系統列印對話框、實體手機、真正 Turnstile 報名及重開機恢復待驗收。詳見文末 0.4.2 紀錄；先前版本段落保留為歷史。
 
 ## 主機與入口
 
@@ -237,3 +237,18 @@ Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器�
 - 沿用既有 8064／`/fucheng/`／HP forward／Caddy／Tunnel／DNS 與其他服務；未重試 HP SSH、未清理或發布服務目錄。同階段共用契約仍為 `selfhost-servers@5a8894ed3c00719f5fed613c706520e2d2c1b4cf`。同 schema 且資料確認正常時可停寫回舊 snapshot；資料有疑慮則保留故障庫，以匹配備份還原新目標。
 
 完整 typed registry chain、build／smoke、受限 env／export 與資料保留收據位於 ignored `data/release-0.4.1/`；`image/source-manifest.json` 對應正式來源，`home-deployment/` 保存部署證據。registry digest 與 config/image ID 分開記錄，不將 Docker Desktop store ID 代替 registry digest。實站 DOM、合成 PDF、實體列印與真機驗收維持分層；沒有實體列印、真正 Turnstile、重開機、球館 Windows 或異地備份驗收。
+
+
+## 0.4.2 列印表頭與格線部署（2026-10-21）
+
+[PR #22](https://github.com/momonong/fucheng-players-system/pull/22)、`v0.4.2` tag 與 [GitHub Release](https://github.com/momonong/fucheng-players-system/releases/tag/v0.4.2) 的正式來源為 `08b12bff6a8976434b55300f7cb1d9f1dde9e3b0`。乾淨已提交來源經 allowlist 建置及 79 檔 context audit 後，發布 Docker Hub `0.4.2`／`latest`；台北時間 17:21（UTC 09:21）同批更新既有 app／backup。產品後端、runtime、migration、Compose 與依賴未變。
+
+- Registry **manifest digest**：`sha256:faaa578ad5fa48a642f6ee80892986b20af82286111bf9f1f5309556236752cd`，Docker manifest v2、linux/amd64，無額外 index；兩個遠端 tag 相同。固定 digest 拉回後的 **config/native image ID** 為 `sha256:0bb6bdcdfab16b0c627589cd895f140bd3bd52ccbf1358b085d0748361e2d46f`，與已測映像一致。現站固定使用該 registry digest，發布前確認版本 tag 不存在、原 latest manifest／config 未漂移。
+- Source manifest：`92c4bde59dd918f75707a43096c151248ab616cc0922c46187ab252ae46c9e0a`。最終資產 `index-Bq87i6rl.css`／`index-DR8KBonb.js` 與工程 freeze byte 相同；獨立 root／`/fucheng` 合成 smoke 的 health、登入／GET／登出、Cookie、匿名權限與 schema 檢查通過，測試容器已停止。
+- 停止本 project app／backup 寫入後，以原 0.4.1 runtime 成組備份 DB＋媒體並 export，archive 及所有成員 hash 已驗；私密原 env、checkpoint 與 export 保留於受限 `data/release-0.4.2/home-deployment/`。只改 `FUCHENG_IMAGE`，原 data／backup volumes 保留；沒有 init、migration、bootstrap 或管理員修改。
+- Schema 仍 `0011_admin_management`，integrity ok、FK errors 0，app／backup healthy。登入前 21 表全欄／全值及原 sessions、帳密完全相同；既有帳號登入→管理 GET→登出後，16 業務表及 admins／admin_audits 共 18 表仍相同，新版成組備份成功。342 會員、2 場次、81 報名、6 保存版及 4 管理員保留，沒有真實業務寫入。
+- 原 0.4.1 pinned image `sha256:d9a75ee568e651ce9dbaf7877dcdeda8acad1b57a5c75aebec481324146d7b74`、舊 snapshot／context、原 env 與所有備份均保留。同 schema 程式回退須先停寫並核對資料；如有資料疑慮，保留故障 volume，以匹配備份透過 runtime 還原至新目標。既有 `/fucheng/`、loopback 8064、HP 入口與其他服務未改，沒有清理或重試 HP SSH。
+
+原目標對話已從公開網址完成瀏覽器驗證：會員預覽 342 人、兩頁、十個淺綠 SVG 表頭、14 pt；會內賽預覽 80 人、一頁、四個雙欄分組、16 pt、兩個圈素與原上移位置。表頭／body 共用邊均 0.75 pt，公開 CSS／JS 名稱符合本次映像；既有帳號登入、唯讀檢視與登出成功。只讀取既有名單，未編輯或保存業務資料。
+
+工程 PDF 證據及原生列印限制見[本次驗證紀錄](print-headers-verification-20261021.md)。公開 DOM 預覽與合成實際 PDF、原生系統列印及實體驗收分開記錄。完整 build、registry typed chain、資料保留、備份及 `public-browser-verification.json` 收據在 ignored `data/release-0.4.2/`。
