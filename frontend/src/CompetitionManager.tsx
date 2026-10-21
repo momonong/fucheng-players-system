@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { CompetitionLevels } from './CompetitionLevels'
 import { ResponsivePanel } from './ResponsivePanel'
+import { PrintPreview } from './PrintPreview'
 import { AdminHeader } from './AdminHeader'
 import { useArrangementWorkspace } from './useArrangementWorkspace'
 import type {
@@ -187,6 +188,7 @@ function CompetitionRoster({ detail, reload, notify }: {
   const [candidates, setCandidates] = useState<RegistrationMember[]>([])
   const [dietOverride, setDietOverride] = useState<'' | Diet>('')
   const [busy, setBusy] = useState('')
+  const [printOpen, setPrintOpen] = useState(false)
   const [showWaitlisted, setShowWaitlisted] = useState(false)
   const [showCancelled, setShowCancelled] = useState(false)
   const [selectedRegistrationId, setSelectedRegistrationId] = useState<string | null>(null)
@@ -220,8 +222,14 @@ function CompetitionRoster({ detail, reload, notify }: {
   }
 
   return <section id="registration-roster" className="panel roster-panel competition-print">
-    <div className="section-title no-print"><div><h2>報名名單</h2><p>摘要固定顯示全場總數，不隨下方篩選改變</p></div><button className="secondary" onClick={() => window.print()}>列印管理名單</button></div>
-    <div className="print-only print-title"><h1>{competition.name}</h1><p>{competition.competition_date}・管理用名單</p></div>
+    <div className="section-title no-print"><div><h2>報名名單</h2><p>摘要固定顯示全場總數，不隨下方篩選改變</p></div><button className="secondary" onClick={() => setPrintOpen(true)}>列印管理名單</button></div>
+    <PrintPreview open={printOpen} onOpen={() => setPrintOpen(true)} onClose={() => setPrintOpen(false)} label="管理報名名單" fontSize={14}>
+      <header className="report-heading"><div><p className="report-eyebrow">府城球館・管理報名名單</p><h1>{competition.name}</h1></div><p>{competition.competition_date}<br />共 {registrations.length} 筆報名紀錄</p></header>
+      <p className="report-caption">正取 {confirmed.length} 人／名額 {competition.capacity}・候補 {waitlisted.length} 人・已取消 {cancelled.length} 人・<span className="print-diet-legend"><b className="print-diet-symbol">素</b>素食</span></p>
+      <table className="report-table management-report"><thead><tr>{range(1, 10).map(n => <th key={n}>{n} 級</th>)}</tr></thead>
+        {([{ rows: confirmed, label: '正取' }, { rows: waitlisted, label: '候補（原始順位）' }, { rows: cancelled, label: '已取消' }]).filter(group => group.rows.length).map(group => <tbody key={group.label}><tr className="report-section"><th colSpan={10}>{group.label}・{group.rows.length} 人</th></tr><ManagementPrintRows rows={group.rows} /></tbody>)}
+      </table>
+    </PrintPreview>
     <div className="summary-grid" aria-label="全場總數">
       <Summary label="正取／名額" value={`${competition.summary.confirmed}/${competition.capacity}`} />
       <Summary label="候補" value={competition.summary.waitlisted} />
@@ -261,6 +269,14 @@ function CompetitionRoster({ detail, reload, notify }: {
       {!readonly && selectedRegistration.status === 'waitlisted' && firstWaiting?.id === selectedRegistration.id && <button disabled={!!busy} onClick={() => mutate(selectedRegistration, 'promote')}>確認遞補</button>}</div>
     </ResponsivePanel>}
   </section>
+}
+
+function ManagementPrintRows({ rows }: { rows: CompetitionRegistration[] }) {
+  const columns = range(1, 10).map(level => rows.filter(row => row.hard_level_snapshot === level))
+  return <>{Array.from({ length: Math.max(0, ...columns.map(column => column.length)) }, (_, index) => <tr key={index}>{columns.map((column, ci) => {
+    const item = column[index]
+    return <td key={ci} data-print-registration={item?.id}>{item && <><strong>{item.member_name}</strong>{item.diet === 'vegetarian' && <b className="print-vegetarian">素</b>}{item.distinguishing_note && <small>{item.distinguishing_note}</small>}<small>順位 {item.queue_sequence}</small></>}</td>
+  })}</tr>)}</>
 }
 
 function RosterGridRows({ rows, status, search, level, onSelect }: {

@@ -7,7 +7,13 @@ import { PublicRegistrationPortal } from './PublicRegistrationPortal'
 import { SiteNav, ClubHome, AnnouncementManager } from './ClubWebsite'
 import { DeploymentReportPage } from './DeploymentReport'
 import { AdminHeader } from './AdminHeader'
+import { PrintPreview } from './PrintPreview'
 import { AdminManagement, RequiredPasswordChange } from './AdminManagement'
+
+const memberNameOrder = new Intl.Collator('zh-Hant-TW-u-co-stroke')
+function compareMembers(a: PublicMember, b: PublicMember) {
+  return memberNameOrder.compare(a.name, b.name) || memberNameOrder.compare(a.distinguishing_note ?? '', b.distinguishing_note ?? '') || a.id.localeCompare(b.id)
+}
 
 const dietText: Record<Diet, string> = { unset: '未設定', omnivore: '葷食', vegetarian: '素食' }
 const fieldText: Record<string, string> = {
@@ -31,6 +37,7 @@ function PublicPage({ managed = false }: { managed?: boolean }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [preparingPrint, setPreparingPrint] = useState(false)
+  const [printOpen, setPrintOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -51,22 +58,22 @@ function PublicPage({ managed = false }: { managed?: boolean }) {
 
   const groups = useMemo(() => {
     const map = new Map<number, PublicMember[]>()
-    members.forEach(member => map.set(member.level, [...(map.get(member.level) ?? []), member]))
+    for (const member of [...members].sort(compareMembers)) map.set(member.level, [...(map.get(member.level) ?? []), member])
     return [...map.entries()].sort(([a], [b]) => a - b)
   }, [members])
   const printColumns = useMemo(
-    () => range(1, 10).map(groupLevel => printMembers.filter(member => member.level === groupLevel)),
+    () => range(1, 10).map(groupLevel => printMembers.filter(member => member.level === groupLevel).sort(compareMembers)),
     [printMembers],
   )
-  const printRowCount = Math.max(0, ...printColumns.map(list => list.length))
+  const printNotes = printColumns.flat().filter(member => member.distinguishing_note)
+  const noteNumbers = new Map(printNotes.map((member, index) => [member.id, index + 1]))
 
   async function printRoster() {
     setPreparingPrint(true)
     setError('')
     try {
       setPrintMembers(await api.publicMembers('', ''))
-      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-      window.print()
+      setPrintOpen(true)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -75,7 +82,7 @@ function PublicPage({ managed = false }: { managed?: boolean }) {
   }
 
   return <>
-    <main>
+    <main className="member-roster-page">
       {!managed && <h1 className="visually-hidden">會員分級表</h1>}
       <section className="filters no-print" aria-label="搜尋與篩選">
         <label>搜尋姓名或辨識註記<input value={search} onChange={e => setSearch(e.target.value)} placeholder="例如：林先生" type="search" /></label>
@@ -86,26 +93,34 @@ function PublicPage({ managed = false }: { managed?: boolean }) {
       {error && <Notice kind="error">{error}</Notice>}
       {!loading && !members.length && <div className="empty">目前沒有符合條件的會員。</div>}
       <div className="level-grid">{groups.map(([groupLevel, list]) => <section className="level-card" key={groupLevel}>
-        <h2>{groupLevel} 級 <span>{list.length} 人</span></h2>
-        <table><thead><tr><th>姓名</th></tr></thead><tbody>{list.map(member => <tr key={member.id}>
-          <td><span className="public-member-name"><strong>{member.name}</strong>{member.distinguishing_note && <small>{member.distinguishing_note}</small>}</span></td>
-        </tr>)}</tbody></table>
+        <h2>{groupLevel} 級</h2>
+        <ul className="level-member-list" style={{ gridTemplateRows: `repeat(${Math.ceil(list.length / 2)}, auto)` }}>{list.map(member => <li key={member.id} data-member-id={member.id}>
+          <span className="public-member-name"><strong>{member.name}</strong>{member.distinguishing_note && <small>{member.distinguishing_note}</small>}</span>
+        </li>)}</ul>
       </section>)}</div>
     </main>
-    <section className="print-sheet" aria-label="府城會員分級表">
-      <div className="print-heading"><h1>府城會員分級表</h1><p>共 {printMembers.length} 位啟用會員</p></div>
-      <table className="print-roster">
-        <colgroup><col className="print-row-number" />{range(1, 10).map(n => <col key={n} />)}</colgroup>
-        <thead><tr><th scope="col">序</th>{range(1, 10).map(n => <th scope="col" key={n}>{n}級</th>)}</tr></thead>
-        <tbody>{range(0, printRowCount - 1).map(row => <tr key={row}>
-          <th scope="row">{row + 1}</th>
-          {printColumns.map((list, column) => {
-            const member = list[row]
-            return <td key={column}>{member && <span>{member.name}{member.distinguishing_note && <small>（{member.distinguishing_note}）</small>}</span>}</td>
-          })}
-        </tr>)}</tbody>
-      </table>
-    </section>
+    <PrintPreview open={printOpen} onOpen={() => void printRoster()} onClose={() => setPrintOpen(false)} label="府城會員分級表" fontSize={14}>
+    {[0, 5].map(start => {
+      const columns = printColumns.slice(start, start + 5)
+      const rowCount = Math.max(1, ...columns.map(list => Math.ceil(list.length / 2)))
+      return <section className="print-sheet print-page member-print-page" key={start}>
+        <h1>府城球館會員分級表</h1>
+        <p className="member-print-caption">{start + 1}–{start + 5} 級・各級先左欄往下，再讀右欄・姓名依筆畫排列・共 {printMembers.length} 位啟用會員</p>
+        <table className="report-table print-roster">
+          <colgroup>{range(1, 10).map(n => <col key={n} />)}</colgroup>
+          <thead><tr>{columns.map((_, index) => <th scope="colgroup" colSpan={2} key={index}>{start + index + 1} 級</th>)}</tr></thead>
+          <tbody>{range(0, rowCount - 1).map(row => <tr key={row}>
+            {columns.flatMap((list, column) => [0, 1].map(half => {
+              const halfRows = Math.ceil(list.length / 2)
+              const member = row < halfRows ? list[row + half * halfRows] : undefined
+              return <td key={`${column}-${half}`} data-print-member={member?.id}>{member && <span>{member.name}{noteNumbers.has(member.id) && <sup>{noteNumbers.get(member.id)}</sup>}</span>}</td>
+            }))}
+          </tr>)}</tbody>
+        </table>
+      </section>
+    })}
+    {printNotes.length > 0 && <aside className="member-print-notes"><h2>同名辨識註記</h2><ol>{printNotes.map(member => <li key={member.id} value={noteNumbers.get(member.id)}>{member.name}：{member.distinguishing_note}</li>)}</ol></aside>}
+    </PrintPreview>
     <footer>資料如有疑問，請洽球館管理員。</footer>
   </>
 }
@@ -173,7 +188,7 @@ function MemberManager({ username, displayName, onLogout }: { username: string; 
   }
   useEffect(() => { load() }, [])
   const [mobileEditor, setMobileEditor] = useState(false)
-  const shown = members.filter(member => `${member.name} ${member.distinguishing_note ?? ''} ${member.legacy_number ?? ''}`.includes(query))
+  const shown = members.filter(member => `${member.name} ${member.distinguishing_note ?? ''} ${member.legacy_number ?? ''}`.includes(query)).sort(compareMembers)
   async function signOut() { try { await api.logout(); onLogout() } catch (e) { setNotice({ kind: 'error', text: (e as Error).message }) } }
   return <>
     <AdminHeader section="members" username={username} displayName={displayName} onLogout={signOut} />

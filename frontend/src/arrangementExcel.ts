@@ -44,5 +44,15 @@ export async function exportArrangementExcel({rows,layout:known,title,version}:A
     data[first][left]=textCell(parts.join(' '),{...gridStyle,columnSpan:right-left+1,rowSpan:last-first+1,backgroundColor:shades[shade(top,left,bottom-top+1,right-left+1)],height:40})
   }
   const fileName=`${title}-${version}`.replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').slice(0,100)+'.xlsx'
-  await writeExcelFile(data,{sheet:'比賽安排',columns:layout.columns.map(()=>({width:20})),orientation:'landscape',showGridLines:false},{fontFamily:'Microsoft JhengHei',fontSize:11}).toFile(fileName)
+  await writeExcelFile(data,{sheet:'比賽安排',columns:layout.columns.map(()=>({width:20})),orientation:'landscape',showGridLines:false},{fontFamily:'Microsoft JhengHei',fontSize:11,features:[{files:{transform:{'xl/worksheets/sheet{id}.xml':{
+    transformElementAttributes:(tag,attributes)=>tag==='pageSetup'?{...attributes,fitToWidth:1,fitToHeight:0}:attributes,
+    transform:xml=>{
+      // The installed writer exposes these OOXML extension hooks; keep the workbook editable.
+      const doc=new DOMParser().parseFromString(xml,'application/xml'),ns=doc.documentElement.namespaceURI!
+      let properties=doc.getElementsByTagNameNS(ns,'sheetPr')[0]
+      if(!properties){properties=doc.createElementNS(ns,'sheetPr');doc.documentElement.insertBefore(properties,doc.documentElement.firstChild)}
+      const setup=doc.createElementNS(ns,'pageSetUpPr');setup.setAttribute('fitToPage','1');properties.appendChild(setup)
+      return new XMLSerializer().serializeToString(doc)
+    }
+  }}}}]}).toFile(fileName)
 }

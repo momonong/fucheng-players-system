@@ -26,6 +26,9 @@ def verify(path):
     rows, cols = layout['rows'], layout['columns']
     source = {(c['row_id'],c['column_id']):c for c in layout['cells']}
     local = {(c['row_id'],c['column_id']):c['shade'] for c in layout.get('cell_shades',[])}
+    assert ws.page_setup.orientation == 'landscape' and ws.page_setup.paperSize == int(ws.PAPERSIZE_A4)
+    assert ws.page_setup.fitToWidth == 1 and ws.page_setup.fitToHeight == 0
+    assert ws.sheet_properties.pageSetUpPr.fitToPage is True
     expected, fills, mapped = {}, {}, {}
     def put(r,c,value,shade):
         expected[r,c]=value; fills[r,c]=COLORS[shade]

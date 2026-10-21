@@ -1,6 +1,6 @@
 # 家中 4090 試用部署
 
-2026-10-05 核對：4090 已更新至 0.3.9；空級數欄刪除／加回已上線，帳密與16張業務表內容完整保留。映像、部署、登入及公開HTTPS讀取驗證通過；實際操作待使用者試用。
+2026-10-21 核對：4090 現用以 0.4.0 為基礎的卡片／圓圈素標記未提交 snapshot，schema 仍為 `0011_admin_management`。會員網頁恢復深綠分離緊湊卡片，會員／比賽 A 版列印排版保留，比賽列印使用圓圈「素」與圖例；僅會員名單依筆畫排序，既有比賽安排不重排。原有資料與帳密保留，app／backup 健康，既有登入與管理 API 讀取通過。入口仍為 [momonong.me/fucheng/](https://momonong.me/fucheng/)；實體手機、真正 Turnstile 報名及重開機恢復待驗收。詳見文末 snapshot 更新紀錄。
 
 ## 主機與入口
 
@@ -176,3 +176,50 @@ Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器�
 - 4090轉送、HP Caddy／cloudflared／OrderFlow轉送 active。Caddy SHA保持 `0e9b6473c465309ea5fad4dde547b9f286d3a363acd69142a3bd3157505da209`；無入口、DNS、SSH、其他應用或ASUS變更，服務目錄沿用。
 
 精簡欄位開始使用後，不可因schema相同就直接降回強制十欄的舊app；新版啟動後不自動降版，先保留資料排查並向前修復。必要還原使用匹配備份與新目標，保留後續操作及故障庫。帳密沿用；同機備份仍不代表異地備份。
+
+
+## 0.4.0 管理員管理部署（2026-10-20）
+
+使用者選擇升級既有家中試用站並保留目前資料與登入帳號後，更新原生 Linux Docker Engine（context `default`）的 `fucheng-home` app／backup；球館電腦未操作。
+
+- Image digest：`sha256:bf9126c1d3302474a639999b8987648aa4c813e97edbc22cdc2c0f3f2f37cfe8`；linux/amd64 manifest `sha256:2fbb98aa541a0e6f553adbeefe3cf9ed6f0de99552a079327a55b76577adf049`、native image ID `sha256:0d9c339683c7b60f1bf9c3fc3fe8a9853be4b6d45da0b85e50754e18897f2375` 與 source manifest `71cc92a0a535037a9348afc343e4fda6ec9155224460f090a3e3631b11fa6138` 均已核對。
+- 先停止 app／backup，用 0.3.9 runtime 成組備份 DB＋媒體並 export；archive 及全部成員 hash 通過。停寫 checkpoint 為 `manual-export-20261020T093411276937Z-eef84249.db`。原 env、export、舊 image、原 volumes 與新目標回退設定／方案保存在受限位置，未執行回退。
+- 由新版 runtime 經 writer／maintenance guard 明確 `ops migrate` 至 `0011_admin_management`，沒有 init、bootstrap、重設密碼或新增管理員。啟動前 20 張舊表的所有既有欄位逐列一致，包含 4 個管理員、帳密及原 sessions；新增欄位預設正確，`admin_audits` 為空，未補造歷史。
+- app／backup 同批固定新版 image，沿用 `fucheng-home_data`／`fucheng-home_home_backups`，兩者 healthy；schema、integrity ok、FK errors 0 及新版 runtime 成組備份通過。驗證後 16 張業務表最終指紋仍相同：342 會員、2 場次、81 報名、6 個安排保存版、82 個安排操作及 2 則公告保留。
+- 可信 loopback 的既有帳密登入／管理 GET／登出、4 個既有管理員清單與空稽核、Secure／HttpOnly／`/fucheng/` Cookie、匿名管理 401、錯誤 Host 400、裸 API 404 及前綴重新導向通過；JS `index-gKPFKSNq.js`、CSS `index-BFqDcH_A.css` 與已驗證 release 成品一致。未在真實資料新增、拖曳、保存或修改會員／比賽／報名。
+- 公開內建瀏覽器重新載入 `/fucheng/admin`，登入表單與新版 JS／CSS 正常；透過導覽開啟首頁後，公告與比賽時程完整渲染並完成視覺核對，截圖保存於 `data/deployment-20261020/public-home-v040.jpg`。未在公開瀏覽器登入、新增管理員或報名。
+- 入口、8064 loopback、HP 專用 SSH forward、Caddy／Tunnel／DNS 與其他服務均沿用，沒有入口設定變更。本機持續 forward active／enabled；一般 `hp-server` SSH 登入本輪被拒絕，未換金鑰或變更 SSH，因此未宣稱重新查驗 HP 服務或設定 hash。
+- 已依本次清理授權移除本專案結束的測試資源：default context 22 個容器、16 個空網路、8 個舊映像；desktop-linux context 4 個容器、3 個舊映像。全部資料卷、回退所需版本／備份及其他服務保留，沒有 prune 或 down -v。
+
+部署與驗證證據位於 ignored `data/deployment-20261020/v040-home/`；私密目錄 0700，原 env、DB 與 export 0600，不提交憑證、密碼 hash 或資料庫。真實 Turnstile 成功報名、公開登入後管理操作、Android／iPhone 手感、斷電／重開機與球館 Windows 實機尚未驗收；同機備份不等於異地備份。0.3.9 不可直接啟動現有 0011 資料；必要回退須保留故障庫，使用升級前備份還原至新目標並配匹配 image/schema。
+
+
+## 名單 A 版 snapshot 更新（2026-10-20）
+
+使用者指定會員／比賽均採 A 版、不顯示級數人數，並確認只有會員名單按姓名筆畫排序，比賽名單及既有格位不重排。台北時間 23:33（UTC 15:33）完成既有 `fucheng-home` 更新；球館電腦未操作。
+
+- 本次為 `fix/print-roster-layout` 的未提交工作樹 snapshot，HEAD `b1859eaf13d6ce0028fd749880d6819ce09258a3` 不是完整來源。現用 `local/fucheng:snapshot-1115779cac0436ff`，native image ID `sha256:6727f8c404a4576b9c4e7930f332ec605c595e7a508b2700bcb8a63cb595c5b1`；source manifest `1115779cac0436ff8054e8c1973089ec8d408069a7b97735651e5f809513cb85`。沒有 Git commit／push、tag／Release 或 registry 發布。
+- 明確以 `DOCKER_CONTEXT=default` 執行 `scripts/deployment_package.py`；79 檔 allowlist context、context-audit、freeze 與內嵌 manifest 一致，未包含 data、output、憑證、DB、備份或既有 dist。原 tracked source manifest 原樣保留，完整 snapshot context 留在本輪證據。後端、migration、runtime、Dockerfile 及依賴等 42 檔與 0.4.0 相同。
+- 獨立合成目標 `fucheng-print-a-smoke-1115779c`／loopback 8067 通過 `/fucheng` health、登入／登出、匿名拒絕、Cookie 路徑、資產與 schema／integrity／FK。合成容器已停止，兩個合成 volumes 保留。映像與實測成品 JS `index-BrNtzusK.js`、CSS `index-Cv2u8fR5.css` 逐位元一致。
+- 停止現站 app／backup，以舊 0.4.0 runtime 成組備份 DB＋媒體並 export，archive 及全部成員 hash 通過。停寫 checkpoint：`manual-export-20261020T153243382115Z-fb8f42f9.db`。原 env、舊 image、原 volumes 及成組備份保留；現站只修改 `FUCHENG_IMAGE`，沒有 init、migration、bootstrap 或帳號變更。
+- 同 image 的 app／backup 均 healthy，schema 仍為 `0011_admin_management`、integrity ok、FK errors 0。啟動前後 21 張現有資料表全部欄位逐列相同，含管理員密碼及原 sessions；登入／GET／登出後，16 張業務表及管理員／管理稽核仍相同。342 會員、2 場次、81 報名、6 保存版、82 安排操作、4 管理員、2 公告及停寫時的 1 張媒體完整保留；未為驗證寫入真實業務資料。新版 runtime 成組備份也通過。
+- 可信 loopback 的 health、既有帳密登入／管理 GET／登出、Secure／HttpOnly／前綴 Cookie、匿名管理 401、錯誤 Host 400、裸 API 404 及資產 hash 通過。列印、會員筆畫、白色 override／跨頁 merge 與 XLSX 等同來源驗證詳見 [列印驗證紀錄](print-layout-verification-20261020.md)；未把較廣手機舊互動流程的前置 timeout／422 記成全套通過。
+- 公開內建瀏覽器確認新版 JS／CSS、342 位會員、10 個不帶人數的級數標頭；會員預覽 DOM 為 2 個 A4 頁區塊、完整 342 姓名、14 pt、所有格線 1 CSS px，登入表單 gap 為 16 px。以既有部署帳號登入後唯讀查看原 80 人場次的安排預覽：1 個 A4 頁區塊、80 個非空人員格、11 個 body 行、甲乙丙丁四個雙欄合併、姓名 16 pt（21.3333 px）、th／td 四邊均為 1 CSS px；登出回登入頁。沒有編輯、保存、拖曳或實際列印。`public-members-preview.png`／`public-competition-preview.png` 位於本輪受限證據；實際 PDF 頁數／字元邊界證據使用合成 342／80 人樣本，與實站 DOM 檢查分開。21 表及原 sessions 保留檢查的時間界線為 UTC 15:33:18、後續登入驗證前；不把之後的正常 session 建立／撤銷當成資料不符。
+- 共用契約固定為 `momonong/selfhost-servers@5a8894ed3c00719f5fed613c706520e2d2c1b4cf`，2026-10-20 經可信遠端 default branch 核對，按該 SHA 讀取全文。既有 `/fucheng/`、8064、HP forward／Caddy／Tunnel／DNS、其他服務與拓樸均未改；未重試已拒絕的一般 HP SSH，也未宣稱重驗現用 Caddy hash。無服務目錄發布或 Docker 清理。
+
+受限 ignored 證據位於 `data/deployment-20261020/print-a-home/`，最終映像與 context 在 `release-readable/`；原 env、DB／媒體 export 權限受限，秘密不進文件或 Git。沒有實體列印、Android／iPhone 真機、真正 Turnstile 成功報名、斷電／重開機或異地備份驗收。本次 schema 與後端相同，資料確認正常時可停寫後只回舊 0.4.0 image 並保留原 volume；若有資料疑慮，仍須保留故障庫，以匹配備份還原新目標。
+
+
+## 會員卡片與圓圈素標記 snapshot 更新（2026-10-21）
+
+沿同一表格／試用站目標更新，台北時間 11:04（UTC 03:04）完成。會員網頁恢復深綠分離緊湊卡片，A 版列印頁面結構保留；圓圈直徑 16 pt、框線 0.75 pt、旁距 2 pt，圈內「素」為 12 pt／600，兩處列印圖例同步。
+
+- 現用 `local/fucheng:snapshot-a8b9f2243c65a79c`，native image ID `sha256:2f9d5f3bcd874684d71687e6202265cd01ad06677b043db41f046e09a8105014`；source manifest `a8b9f2243c65a79c512fd3fb16bb94578aaffc331f8245d68797eb9f923b1ce9`。這是未提交工作樹 snapshot，HEAD 不代表完整來源，沒有 commit／push、版本或 registry 發布。舊 `snapshot-1115779cac0436ff`／`6727f8c4…` 及其 context 保留。
+- 以原生 default context 的 allowlist builder 建置，父證據目錄 0700、builder umask 022。79 檔 context／audit／freeze／內嵌 manifest 一致，排除資料、憑證、備份、output 與既有 dist；原 tracked source manifest 還原。相對前一 snapshot 只改 `styles.css` 與 `ArrangementPrint.tsx`／`CompetitionManager.tsx` 各一處 legend；後端、schema、runtime 及依賴等 42 檔相同，Compose 沿用。
+- 最終測試 freeze 為 `data/print-circle-type-20261021/freeze.json`；JS `index-COwDRJex.js`、CSS `index-B3QvLKWe.css` 與映像及現站資產逐位元一致。獨立合成目標 `fucheng-cards-veg-smoke-a8b9f224`／8067 通過 prefix、health、登入／登出、匿名拒絕、Cookie、資產與完整性；合成容器已停，volumes 保留。
+- 停止現站 app／backup，以原 snapshot runtime 成組備份 DB＋媒體並 export，archive 及全部成員 hash 通過。停寫 checkpoint：`manual-export-20261021T030332093317Z-bc470e4a.db`。只替換私密 env 的 `FUCHENG_IMAGE`，同批更新 app／backup，沒有 init、migration、bootstrap、密碼或帳號變更，原 data／backup volumes 保留。
+- app／backup healthy，schema `0011_admin_management`、integrity ok、FK errors 0。登入前 21 張現表所有欄位及原 sessions 逐列一致；既有帳號登入／管理 GET／登出後，16 張業務表、管理員及管理稽核不變。342 會員、2 場次、81 報名、6 保存版、82 安排操作、4 管理員、2 公告與 1 張媒體保留。新 runtime 成組備份與健康檢查通過；沒有真實業務寫入。
+- 公開內建瀏覽器載入指定新資產：1280 px 會員頁為 5 欄、10 px gap、12 px 圓角、`#246b5e` 深綠白字、18 px 姓名且無橫向溢出，10 級表頭無人數；會員預覽 DOM 保留 2 個頁區塊／342 姓名／14 pt。既有帳號登入後只讀查看原 80 人安排：1 個預覽頁區塊、80 個人員格、4 個雙欄合併、2 個選手圈素及 1 個圖例圈素。圓徑 16 pt、圈內 12 pt／600、邊框 0.75 pt／50% 圓角，姓名 16 pt，th／td 四邊均為 1 CSS px；圖例僅圈素加「素食」。已登出並停在會員頁，沒有編輯、保存、拖曳或實際列印。實站只核對預覽 DOM，實際 PDF 頁數／字元邊界來自分開的合成證據；收據為 `public-browser-verification.json`，截圖為 `public-members-cards.png`／`public-competition-circle.png`。
+- 既有 `/fucheng/`、loopback 8064、SSH forward、Caddy／Tunnel／DNS、其他服務均未變；無清理、HP SSH 重試或服務目錄發布。同階段沿用已全文核讀的 `selfhost-servers@5a8894ed3c00719f5fed613c706520e2d2c1b4cf` 契約與指南 pin `25791af93cadffdbf9b41be902f8da063f32ffde`，不宣稱重驗 live Caddy hash。
+
+受限證據在 ignored `data/deployment-20261021/cards-vegetarian-home/`，包含 snapshot／manifest、合成 smoke、停寫成組 export、21 表／帳密保留布林、登入與備份收據；DB、媒體 archive 及 env 保持 0600，不保存秘密到文件或 Git。實際 PDF 規格驗證使用 freeze 的合成樣本，實站預覽 DOM 與其分開記錄。沒有實體列印、真機、真正 Turnstile、斷電／重開機或異地備份驗收。必要回復可在確認 schema／資料正常後停寫只回原 snapshot；資料有疑慮時仍以匹配備份還原新目標並保留故障庫。
