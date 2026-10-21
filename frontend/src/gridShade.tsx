@@ -27,6 +27,9 @@ export function ShadePalette({value,disabled=false,onChoose}:{value?:number;loca
   return <div className="shade-palette">{shades.map((color,shade)=><button key={shade} type="button" aria-label={shade?`淺灰 ${shade}`:'白色'} title={shade?`淺灰 ${shade}`:'白色'} aria-pressed={value===shade} disabled={disabled} style={{background:color}} onClick={()=>{if(value!==shade)onChoose(shade)}}/>)}</div>
 }
 // SVG is foreground content, so PDF/print retains gray when background graphics are off.
+export function PrintedFill({color,shade}:{color:string;shade?:number}) {
+  return <svg className="print-cell-shade" data-print-shade={shade} data-print-fill={color} aria-hidden="true" viewBox="0 0 1 1" preserveAspectRatio="none"><rect width="1" height="1" fill={color}/></svg>
+}
 export function PrintedShade({shade}:{shade:number}) {
-  return shade>0?<svg className="print-cell-shade" data-print-shade={shade} aria-hidden="true" viewBox="0 0 1 1" preserveAspectRatio="none"><rect width="1" height="1" fill={shades[shade]}/></svg>:null
+  return shade>0?<PrintedFill color={shades[shade]} shade={shade}/>:null
 }

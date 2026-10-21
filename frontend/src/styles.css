@@ -1073,15 +1073,16 @@ body > .print-output.preview-open { visibility: visible; inset: 0; z-index: 2000
 .print-document .report-heading p { margin: 0; font-size: 10pt; line-height: 1.4; text-align: right; }
 .print-document .report-heading .report-eyebrow { display: none; }
 .print-document .report-caption { margin: 0 0 4mm; font-size: 10pt; line-height: 1.4; }
-.print-document .report-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: inherit; line-height: 1.2; }
-.print-document .report-table th, .print-document .report-table td { position: relative; border: .75pt solid #68736d; padding: 2pt 3pt; color: #17231f; text-align: center; vertical-align: middle; white-space: pre-wrap; overflow: visible; overflow-wrap: anywhere; text-overflow: initial; }
-.print-document .report-table thead th { border: .75pt solid #68736d; height: 29pt; padding: 2pt 3pt; color: #194f42; font-size: 16pt; font-weight: 700; background: #f0f3ee; }
+.print-document .report-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border-left: .75pt solid #68736d; font-size: inherit; line-height: 1.2; }
+.print-document .report-table th, .print-document .report-table td { position: relative; border: solid #68736d; border-width: 0 .75pt .75pt 0; padding: 2pt 3pt; color: #17231f; text-align: center; vertical-align: middle; white-space: pre-wrap; overflow: visible; overflow-wrap: anywhere; text-overflow: initial; }
+.print-document .report-table thead th { height: 29pt; padding: 2pt 3pt; color: #194f42; font-size: 16pt; font-weight: 700; background: transparent; }
+/* Each shared edge belongs to one cell; repeated thead also closes the top. */
+.print-document .report-table thead tr:first-child > * { border-top-width: .75pt; }
 .print-document .report-table small { display: block; margin: 1pt 0 0; font-size: 10pt; line-height: 1.2; color: #354a3e; }
-.print-document .report-table tbody tr:last-child td { border-bottom: .75pt solid #68736d; }
-.print-document .arrangement-report thead th { background: white; }
+.print-document .report-table th { background: transparent; }
 .print-document .arrangement-report td { height: 38pt; font-size: 16pt; }
 .print-document .arrangement-report td strong { font-weight: 500; }
-.print-document .report-section th { text-align: left; font-size: 14pt; font-weight: 700; border-top: .75pt solid #68736d; }
+.print-document .report-section th { text-align: left; font-size: 14pt; font-weight: 700; }
 .print-document .print-cell-shade { display: block; position: absolute; inset: .375pt; width: calc(100% - .75pt); height: calc(100% - .75pt); z-index: 0; }
 .print-document .print-cell-content { position: relative; z-index: 1; color: inherit; }
 .print-document .print-vegetarian, .print-document .print-diet-symbol { display: inline-flex; align-items: center; justify-content: center; width: 16pt; height: 16pt; border: .75pt solid currentColor; border-radius: 50%; padding: 0; font-size: 12pt; line-height: 1; font-weight: 600; color: #194f42; vertical-align: -.05em; }
@@ -1116,6 +1117,5 @@ body > .print-output.preview-open { visibility: visible; inset: 0; z-index: 2000
   .print-output .print-page:last-of-type { break-after: auto; }
   .print-output .print-page + .print-page { margin-top: 0; }
   .print-output .report-table thead { display: table-header-group; }
-  .print-output .report-table tr { break-inside: auto; }
-  .print-output .report-table th, .print-output .report-table td { border-width: .75pt; }
+  .print-output .report-table tr { break-inside: avoid; }
 }

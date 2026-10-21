@@ -132,7 +132,7 @@ test('F白色跨區單筆保存、軸色覆蓋、歷史列印與Excel一致',asy
   await page.evaluate(()=>window.print=()=>{});await activate(info,s.area.getByRole('button',{name:'列印安排',exact:true}))
   const print=page.locator('.arrangement-print');await expect(print.locator(`[data-print-header="${l.columns[0].id}"]`)).toHaveAttribute('colspan','2')
   await expect(print.locator(`[data-print-cell="${a.row_id}/${a.column_id}"] .print-cell-shade`)).toHaveCount(0)
-  await page.emulateMedia({media:'print'});await expect(print.locator('th').first()).toHaveCSS('background-color','rgb(255, 255, 255)')
+  await page.emulateMedia({media:'print'});await expect(print.locator('th').first()).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(print.locator('th').first().locator('.print-cell-shade')).toHaveCount(0)
   if(info.project.name==='desktop')await page.pdf({path:info.outputPath('white-history.pdf'),preferCSSPageSize:true,printBackground:false})
 })
 

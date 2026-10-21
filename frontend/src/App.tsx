@@ -8,6 +8,7 @@ import { SiteNav, ClubHome, AnnouncementManager } from './ClubWebsite'
 import { DeploymentReportPage } from './DeploymentReport'
 import { AdminHeader } from './AdminHeader'
 import { PrintPreview } from './PrintPreview'
+import { PrintedFill } from './gridShade'
 import { AdminManagement, RequiredPasswordChange } from './AdminManagement'
 
 const memberNameOrder = new Intl.Collator('zh-Hant-TW-u-co-stroke')
@@ -108,7 +109,7 @@ function PublicPage({ managed = false }: { managed?: boolean }) {
         <p className="member-print-caption">{start + 1}–{start + 5} 級・各級先左欄往下，再讀右欄・姓名依筆畫排列・共 {printMembers.length} 位啟用會員</p>
         <table className="report-table print-roster">
           <colgroup>{range(1, 10).map(n => <col key={n} />)}</colgroup>
-          <thead><tr>{columns.map((_, index) => <th scope="colgroup" colSpan={2} key={index}>{start + index + 1} 級</th>)}</tr></thead>
+          <thead><tr>{columns.map((_, index) => <th scope="colgroup" colSpan={2} key={index}><PrintedFill color="#f0f3ee" /><span className="print-cell-content">{start + index + 1} 級</span></th>)}</tr></thead>
           <tbody>{range(0, rowCount - 1).map(row => <tr key={row}>
             {columns.flatMap((list, column) => [0, 1].map(half => {
               const halfRows = Math.ceil(list.length / 2)
