@@ -11,3 +11,13 @@ Python／npm 版本同步為 0.4.1；發布前 audit 發現 Vite 相關弱點，
 乾淨 `npm ci`、`npm audit --audit-level=high` 通過，所有嚴重度合計 0 個弱點。驗證包含 typecheck／build、既有後端、桌面與手機列印、筆畫排序、歷史凍結、白色 override、跨幅合併與 XLSX 讀回。0.4.1 後端全套 257 項通過；Vite 7.3.7 最終六項桌面／手機列印測試通過（11.9 秒），十份實際 PDF 的頁數、所有文字位置與字級皆與已接受版相同。完整證據與先前廣泛手機編輯測試的已知限制見[列印驗證紀錄](print-layout-verification-20261020.md)。未把該三項印前互動失敗宣稱通過；本次不改其拖曳／歷史控制器或 merge API。
 
 版本標籤、建置來源與 Docker Hub digest 以 [GitHub 發布頁](https://github.com/momonong/fucheng-players-system/releases/tag/v0.4.1)的實際結果為準；現站更新另記於[家中部署紀錄](home-deployment.md)。GitHub 沒有 CI workflow，列出的檢查為本機及隔離合成驗證。使用者已接受表格設計；實體列印、手機真機及球館 Windows 尚未驗證。
+
+## 發布與家中試用站結果（2026-10-21）
+
+已由 [PR #20](https://github.com/momonong/fucheng-players-system/pull/20) 合併的乾淨來源 `2a4ff1aec8d4554cce13473db0624d75bc4def8a` 建置，`v0.4.1` tag／GitHub Release 指向同一來源。source manifest 為 `d3730a219832da470d7850f7c4103fbba5b07fcfd676716e1cda7abd4ce971c8`；根路徑與 `/fucheng` 合成映像 smoke、資產與最終測試成品 byte 比對通過。
+
+Docker Hub `0.4.1`／`latest` 的實際 registry manifest digest 均為 `sha256:d9a75ee568e651ce9dbaf7877dcdeda8acad1b57a5c75aebec481324146d7b74`（Docker manifest v2、linux/amd64，無額外 index）；pinned pull 的 config/image ID 為 `sha256:67d7830411fdbe0e4505fe2d49f2271c5fc7c1ab105c3015b9830cc79d0b095b`，與已測映像相同。
+
+家中既有站已於台北時間 15:52 同批更新 app／backup 至固定 digest，兩者 healthy；無 migration，登入前 21 表及原 sessions／帳密全值相同，認證後業務與管理員資料仍相同，新備份通過。原 volume、舊 snapshot、原 env、DB＋媒體備份保留；沒有入口、SSH 或其他服務變更。詳細界線與回復方式見[家中部署紀錄](home-deployment.md)，受限完整證據在 `data/release-0.4.1/`。
+
+公開 HTTPS 已核對正式資產、會員卡片及原帳號登入／只讀／登出；80 人安排預覽維持 1 頁區塊、姓名 16 pt，選手圈素上移 3 pt、圖例不動，342 人會員預覽維持 2 頁區塊／14 pt。這是實站 DOM 驗證，實際 PDF 頁數與位置來自上述合成樣本證據。
