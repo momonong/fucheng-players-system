@@ -117,3 +117,11 @@ E2E 使用不同 project／大量真寫入 fixture，連續接在 80 人案例�
 - 原目標對話執行同版 0.4.1 後端全套：**257 passed，67.49 秒**，兩則既有 deprecation warning；`uv lock --check --offline` 通過。本次不重跑後端或無關手機編輯案例。
 
 **最終發布 freeze**：Vite 7.3.7 重建仍產生 `index-PsSUwEnH.css`／`index-tvNyHE5u.js`。證據保留 `data/print-release041-final/`：`npm-audit.json`、`lockfile-diff.json`、`source-before.json`、`freeze.json`、`pdf-verification.json`、desktop／mobile PDF／截圖與紙面 PNG。原 E2E 收據 `frontend/test-results/print-release041-final/`。本段只記錄實作與本機驗證，Git 合併／推送／版本映像發布／部署由原目標對話接續執行。
+
+### 0.4.1 正式映像與部署完成
+
+上段記錄工程 freeze 交付時點；其後 PR #20／`v0.4.1`／GitHub Release 已完成，乾淨建置來源為 `2a4ff1aec8d4554cce13473db0624d75bc4def8a`。allowlist image 的實際資產與最終 freeze 逐位元相同，root／prefix 隔離 smoke 通過；Docker Hub `0.4.1`／`latest` 同指 manifest `sha256:d9a75ee568e651ce9dbaf7877dcdeda8acad1b57a5c75aebec481324146d7b74`，pinned pull 的 config/image ID 與已測建置相同。
+
+2026-10-21 台北時間 15:52 已部署家中試用站，21 表／原 sessions／帳密保留、登入只讀及新備份通過；詳見[家中部署紀錄](home-deployment.md)。原 PDF／歷史樣張及本機測試證據均保留，不把實站預覽 DOM 當作實際 PDF 或真機驗收。
+
+正式公開 HTTPS 重新載入已確認 `index-PsSUwEnH.css`／`index-tvNyHE5u.js`。原帳號只讀查看 80 人場次：預覽 DOM 1 頁區塊、2 個選手圈素 `translateY(-4px)`（3 pt），姓名 16 pt、圖例不動；會員 342 姓名預覽 2 頁區塊／14 pt。已關閉預覽並登出，沒有編輯或列印。收據 `data/release-0.4.1/public-browser-verification.json` 與 `public-arrangement-preview.png` 保留，實際 PDF 頁數及非標記文字不動的證據仍來自合成樣本。

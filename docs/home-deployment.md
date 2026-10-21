@@ -1,6 +1,6 @@
 # 家中 4090 試用部署
 
-2026-10-21 核對：4090 現用以 0.4.0 為基礎的卡片／圓圈素標記未提交 snapshot，schema 仍為 `0011_admin_management`。會員網頁恢復深綠分離緊湊卡片，會員／比賽 A 版列印排版保留，比賽列印使用圓圈「素」與圖例；僅會員名單依筆畫排序，既有比賽安排不重排。原有資料與帳密保留，app／backup 健康，既有登入與管理 API 讀取通過。入口仍為 [momonong.me/fucheng/](https://momonong.me/fucheng/)；實體手機、真正 Turnstile 報名及重開機恢復待驗收。詳見文末 snapshot 更新紀錄。
+2026-10-21 核對：4090 已部署正式 0.4.1，使用已合併來源及 Docker Hub 固定 manifest digest，schema 仍為 `0011_admin_management`。接受的會員卡片／A 版列印保留，人名旁圈素上移 3 pt，圖例不移動；會員筆畫排序與原比賽安排不變。原有資料與帳密保留，app／backup 健康，既有登入與管理 API 讀取通過。入口仍為 [momonong.me/fucheng/](https://momonong.me/fucheng/)；實體手機、真正 Turnstile 報名及重開機恢復待驗收。詳見文末 0.4.1 紀錄，前述 snapshot 段落保留為歷史。
 
 ## 主機與入口
 
@@ -223,3 +223,17 @@ Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器�
 - 既有 `/fucheng/`、loopback 8064、SSH forward、Caddy／Tunnel／DNS、其他服務均未變；無清理、HP SSH 重試或服務目錄發布。同階段沿用已全文核讀的 `selfhost-servers@5a8894ed3c00719f5fed613c706520e2d2c1b4cf` 契約與指南 pin `25791af93cadffdbf9b41be902f8da063f32ffde`，不宣稱重驗 live Caddy hash。
 
 受限證據在 ignored `data/deployment-20261021/cards-vegetarian-home/`，包含 snapshot／manifest、合成 smoke、停寫成組 export、21 表／帳密保留布林、登入與備份收據；DB、媒體 archive 及 env 保持 0600，不保存秘密到文件或 Git。實際 PDF 規格驗證使用 freeze 的合成樣本，實站預覽 DOM 與其分開記錄。沒有實體列印、真機、真正 Turnstile、斷電／重開機或異地備份驗收。必要回復可在確認 schema／資料正常後停寫只回原 snapshot；資料有疑慮時仍以匹配備份還原新目標並保留故障庫。
+
+
+## 0.4.1 正式發布與部署（2026-10-21）
+
+[PR #20](https://github.com/momonong/fucheng-players-system/pull/20) 合併來源、`v0.4.1` tag 與 [GitHub Release](https://github.com/momonong/fucheng-players-system/releases/tag/v0.4.1) 指向 `2a4ff1aec8d4554cce13473db0624d75bc4def8a`。從乾淨已提交來源建置後發布 Docker Hub `0.4.1`／`latest`，台北時間 15:52（UTC 07:52）更新既有 `fucheng-home`；後續維運文件提交不改此產品建置來源。
+
+- Registry **manifest digest**：`sha256:d9a75ee568e651ce9dbaf7877dcdeda8acad1b57a5c75aebec481324146d7b74`，media type 為 Docker distribution manifest v2，沒有額外 index；linux/amd64 manifest 即同值。兩個遠端 tag digest 相同，固定 digest 拉回後的 **config/native image ID** 為 `sha256:67d7830411fdbe0e4505fe2d49f2271c5fc7c1ab105c3015b9830cc79d0b095b`，與已測建置一致。現站固定使用 `momonong/fucheng-players-system@sha256:d9a75ee568e651ce9dbaf7877dcdeda8acad1b57a5c75aebec481324146d7b74`，不使用浮動 tag。
+- Source manifest `d3730a219832da470d7850f7c4103fbba5b07fcfd676716e1cda7abd4ce971c8` 標記 `committed-git-release`；79 檔 allowlist、freeze、context-audit 與內嵌 manifest 一致，原 tracked manifest 已還原，新 manifest 保留供發布紀錄。最終 JS `index-tvNyHE5u.js`／CSS `index-PsSUwEnH.css` 與 Vite 7.3.7 最終測試成品逐位元相同。根路徑與 `/fucheng` 使用獨立合成 data／secret volumes，health、登入／登出、Cookie 路徑、匿名拒絕、資產及完整性均通過；兩個合成容器已停止，資料卷保留。
+- 更新前停 app／backup，由舊 `snapshot-a8b9f2243c65a79c` runtime 成組備份 DB＋媒體並 export，archive 及每個成員 hash 通過；checkpoint `manual-export-20261021T075145123714Z-57412afa.db`。只修改私密 env 的 `FUCHENG_IMAGE`，同批 app／backup 換固定 registry digest，無 init、migration、bootstrap 或帳密修改，保留原 volumes、舊 snapshot／image／context 與原 env。
+- schema 0011、integrity ok、FK errors 0，app／backup healthy。登入驗證前 21 張現表所有欄位及原 sessions 逐列相同；登入／GET／登出後，16 張業務表與 admins／admin_audits 共 18 表仍相同。342 會員、2 場次、81 報名、6 保存版、82 安排操作、4 管理員、2 公告及 1 媒體保留；新版成組備份、Secure／HttpOnly／前綴 Cookie、匿名 401、錯誤 Host 400 與裸 API 404 通過，沒有真實業務寫入。
+- 公開 HTTPS 瀏覽器重新載入確認新資產、342 會員／10 張深綠卡片及 10 px gap；原帳號登入後，80 人安排預覽 DOM 為 1 頁區塊，2 個選手圈素上移 4 CSS px（3 pt），姓名 16 pt、圖例未移動；會員預覽為 2 頁區塊／342 姓名／14 pt。已關閉預覽並登出，停在公開會員頁，沒有業務寫入或真實 PDF／實體列印。收據 `public-browser-verification.json`／`root-container-verification.json` 與截圖 `public-arrangement-preview.png` 位於本輪證據；合成 PDF 與實站 DOM 分開核對。
+- 沿用既有 8064／`/fucheng/`／HP forward／Caddy／Tunnel／DNS 與其他服務；未重試 HP SSH、未清理或發布服務目錄。同階段共用契約仍為 `selfhost-servers@5a8894ed3c00719f5fed613c706520e2d2c1b4cf`。同 schema 且資料確認正常時可停寫回舊 snapshot；資料有疑慮則保留故障庫，以匹配備份還原新目標。
+
+完整 typed registry chain、build／smoke、受限 env／export 與資料保留收據位於 ignored `data/release-0.4.1/`；`image/source-manifest.json` 對應正式來源，`home-deployment/` 保存部署證據。registry digest 與 config/image ID 分開記錄，不將 Docker Desktop store ID 代替 registry digest。實站 DOM、合成 PDF、實體列印與真機驗收維持分層；沒有實體列印、真正 Turnstile、重開機、球館 Windows 或異地備份驗收。
