@@ -17,7 +17,7 @@
 
 ## 相容與升級
 
-SQLite schema 延用 0.4.4 的 `0013_announcement_deletion`。從現站 0.4.3／0012 更新，須先停寫並成組備份資料庫與媒體，再透過 runtime guard 明確執行 migration；啟動不會自動初始化或遷移。既有資料與帳號保留，公告新增的刪除時間預設為空。
+SQLite schema 延用 0.4.4 的 `0013_announcement_deletion`。從 0.4.3／0012 更新，須先停寫並成組備份資料庫與媒體，再透過 runtime guard 明確執行 migration；啟動不會自動初始化或遷移。既有資料與帳號保留，公告新增的刪除時間預設為空。
 
 表格 JSON 新增 schema 2，僅在支援新版的成功寫入交易升級；讀取及資料庫 migration 不改寫舊布局與歷史。新版前端送出明確的布局能力版本，已升級安排會拒絕舊分頁的表格操作（grid operation）新寫入並要求重新整理；原請求仍可核對既有收據。
 
@@ -27,6 +27,8 @@ SQLite schema 延用 0.4.4 的 `0013_announcement_deletion`。從現站 0.4.3／
 
 2026-10-22 的最終原始碼通過完整後端測試 300 項；6 項 PowerShell 原生傳輸測試因環境缺少 PowerShell 略過。前端型別檢查與建置通過，npm audit 無漏洞。最終成品的桌機／手機與根路徑／子路徑回歸共 37 項通過，另有 1 項既有桌機專用 viewport 測試於手機組略過；涵蓋空白欄拖曳、級數／Undo／Redo、保存與歷史、列印／Excel、公告開關／斜體／刪除還原、比賽刪除及報名連動。桌機與手機截圖已核對，測試全程使用隔離合成資料。
 
-本檔記錄發布前工程驗證；映像與現站結果另由本輪發布及部署收據記錄，不將工程通過視為部署完成。版本及映像分別以 [GitHub Release v0.4.5](https://github.com/momonong/fucheng-players-system/releases/tag/v0.4.5)與 [Docker Hub 0.4.5](https://hub.docker.com/r/momonong/fucheng-players-system/tags?name=0.4.5)的實際發布收據為準。
+已發布 [GitHub Release v0.4.5](https://github.com/momonong/fucheng-players-system/releases/tag/v0.4.5)與 [Docker Hub 0.4.5](https://hub.docker.com/r/momonong/fucheng-players-system/tags?name=0.4.5)；tag及映像來源固定為`a148dd6274c83d5f70c12c6286ed7f22ebbaebb1`，後續純文件提交不改變建置來源。`0.4.5`／`latest`的registry manifest digest均為`sha256:e41abbf2ac3484a8404c59f4a545efc20d3cd78d57fc2542eceadca81672c97a`，固定digest拉回後與已測native config及source manifest一致。
+
+2026-10-22台北時間23:44:16，既有 [momonong.me/fucheng/](https://momonong.me/fucheng/) 已從0.4.3／0012經停寫、成組備份及runtime guard遷移至0.4.5／`0013_announcement_deletion`，app／backup健康。22表全部舊欄、帳密及媒體保留，新增`deleted_at`全NULL；HTTPS既有管理員登入／唯讀查詢／登出後，19張非認證表舊欄仍相同，既有報告下載digest與新版備份通過。原volumes、receiver設定與共用入口保留，公開JS／CSS byte hash符合已測成品。映像身份、資料筆數、收據與回復限制見[家中部署紀錄](home-deployment.md#045-空白欄與公告操作正式發布及部署2026-10-22)。
 
 球館 Windows 電腦、真正 Turnstile 報名、實體手機、印表機及斷電／重開機仍需現場驗收；本輪在隔離合成資料驗證寫入流程，現站只作原資料讀取與保留核對。
