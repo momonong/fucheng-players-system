@@ -126,12 +126,13 @@ def main():
                      "nginx-test.conf", "nginx-host-ngrok.conf", "release.env.example", "ngrok.yml.example",
                      "operate.ps1", "preflight.ps1", "load-images.ps1", "test-tls.ps1",
                      "compose.local-http.yaml", "local-http.ps1", "local-http.env.example",
-                     "compose.bootstrap-admin.yaml", "club.env.example"]:
+                     "compose.bootstrap-admin.yaml", "club.env.example", "compose.report-upload.yaml"]:
             text = (ROOT / "deploy/docker" / name).read_text(encoding="utf-8")
             for support in tagged:
                 text = text.replace(support["reference"], support["tag"])
             (out / name).write_text(text, encoding="utf-8")
         (out / "deployment.md").write_bytes((ROOT / "docs/deployment.md").read_bytes())
+        (out / "host-report-upload.md").write_bytes((ROOT / "docs/host-report-upload.md").read_bytes())
         names = list(frozen_manifest["files"]) + ["deploy/docker/source-manifest.json"]
         if args.action == "export":
             with zipfile.ZipFile(out / "source-snapshot.zip", "x", compression=zipfile.ZIP_DEFLATED) as zf:

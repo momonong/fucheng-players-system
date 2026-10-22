@@ -32,6 +32,7 @@ class IngressLimiter:
         "login": (20, 0.35, 120, 2.0),
         "admin-read": (180, 3.0, 800, 16.0),
         "admin-write": (200, 1.4, 320, 5.0),
+        "device-write": (20, 0.1, 40, 0.2),
     }
 
     def __init__(self, *, max_clients: int = 4096, idle_seconds: float = 180):
@@ -45,6 +46,8 @@ class IngressLimiter:
 
     @staticmethod
     def category(path: str, method: str) -> str | None:
+        if path.startswith("/api/deployment-reports/"):
+            return "device-write"
         if path.startswith("/api/public/"):
             return "public-read" if method in {"GET", "HEAD"} else "public-write"
         if path == "/api/auth/login":
@@ -121,7 +124,8 @@ class PublicGuard:
             return await reject(503, "目前使用人數較多，請稍候再試", "2")
         try:
             if method not in {"GET", "HEAD", "OPTIONS"}:
-                limit = (6 * 1024 * 1024 if "/announcements/" in path and
+                limit = (256 * 1024 if category == "device-write" or path == "/api/admin/deployment-report" else
+                         6 * 1024 * 1024 if "/announcements/" in path and
                          (path.endswith("/photo") or path.endswith("/images")) else
                          1024 * 1024 if path.endswith("/import-confirmed-roster") else
                          8 * 1024 if category == "public-write" else 64 * 1024)

@@ -118,6 +118,18 @@ class DeploymentReport(Base):
     uploaded_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
+class DeviceDeploymentReport(Base):
+    """Immutable device upload; it never replaces the manually reviewed report."""
+    __tablename__ = "device_deployment_reports"
+    __table_args__ = (CheckConstraint("size_bytes > 0 AND size_bytes <= 262144", name="ck_device_report_size"),)
+    report_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(64), index=True)
+    digest: Mapped[str] = mapped_column(String(64))
+    report_json: Mapped[str] = mapped_column(Text)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    received_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
+
+
 class DeploymentReportAudit(Base):
     __tablename__ = "deployment_report_audits"
     __table_args__ = (CheckConstraint("version >= 1", name="ck_deployment_report_audit_version"),

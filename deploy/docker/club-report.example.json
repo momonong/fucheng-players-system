@@ -1,0 +1,6 @@
+{
+  "endpoint": "https://momonong.me/fucheng/api/deployment-reports",
+  "device_id": "club-windows-01",
+  "token_file": "report-upload-token.txt",
+  "image_ref": "momonong/fucheng-players-system@sha256:faaa578ad5fa48a642f6ee80892986b20af82286111bf9f1f5309556236752cd"
+}
