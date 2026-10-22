@@ -1,6 +1,8 @@
 # 府城球館會員管理系統
 
-0.4.3 整合球館健檢自動回傳：Windows 一鍵工具先留存本機 JSON／Markdown，再以獨立裝置憑證傳送；失敗保留原 UUID／內容重試，報告限管理員讀取。接收功能預設關閉，需顯式升級 schema `0012_device_reports` 並配置秘密檔；既有手動上傳畫面保持原用法。公開報名與管理端連動已補永久回歸；已開管理頁需切換「報名與設定」「排級數」或重新載入讀回，候補由管理員手動遞補。詳見 [0.4.3 發布說明](docs/release-0.4.3.md)、[健檢報告回傳](docs/host-report-upload.md)與[報名連動驗證](docs/registration-linkage-verification-20261022.md)。Git／映像與實際部署身份依發布及[家中部署紀錄](docs/home-deployment.md)分別核對。
+0.4.3 已合併、推送並發布 [GitHub Release](https://github.com/momonong/fucheng-players-system/releases/tag/v0.4.3)及 Docker Hub `0.4.3`／`latest`；2026-10-22 台北時間19:58更新既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)，app／backup健康，原資料、帳密及既有健檢報告保留。Windows工具先保存本機 JSON／Markdown，再以獨立裝置憑證回傳；失敗保留原 UUID／內容重試。接收功能預設關閉，家中站已沿用先前配置啟用，schema為`0012_device_reports`；本次只換正式映像，沒有再遷移或重建資料。詳見 [0.4.3 發布說明](docs/release-0.4.3.md)、[健檢報告回傳](docs/host-report-upload.md)與[家中部署紀錄](docs/home-deployment.md#043-健檢回傳正式發布與部署2026-10-22)。
+
+公開報名與管理端連動已補永久回歸：後端273項與正式桌面／手機、根路徑／`/fucheng`四組連動測試通過。已開管理頁需切換「報名與設定」「排級數」或重新載入讀回，候補由管理員手動遞補；舊測試及現場驗收限制見[報名連動驗證](docs/registration-linkage-verification-20261022.md)。
 
 [府城公開使用指南](https://momonong.me/slides/fucheng/)已上線，提供手機報名、管理名單與安排操作說明；球館 Windows 實機與人工驗收狀態仍依當次紀錄核對。
 
