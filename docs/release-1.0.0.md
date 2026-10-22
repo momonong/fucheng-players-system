@@ -12,7 +12,7 @@
 
 SQLite維持`0013_announcement_deletion`，安排layout JSON維持schema 2，沒有migration。資料、帳號、媒體及既有布局不因版本提升改寫；schema 2仍須搭配相容前後端，回復沿用匹配映像／備份及保留故障庫的既有流程。
 
-本次為版本發布，現站維持0.4.6（功能相同），詳見[家中部署紀錄](home-deployment.md#046-表格新增入口精簡部署2026-10-23)。版本與映像識別見 [GitHub Release v1.0.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.0.0)與 [Docker Hub 1.0.0](https://hub.docker.com/r/momonong/fucheng-players-system/tags?name=1.0.0)。
+2026-10-23 台北時間 00:43:14 已部署至既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)，只更換映像，沒有 migration；app／backup 健康；更新前成組備份與 22 表所有欄位、帳號及媒體核對一致，原帳號 HTTPS 登入／讀取／登出後 19 張非認證表仍相同，既有報告與新版備份驗證通過。公開頁面與 JS／CSS 核對正常，瀏覽器首頁與 342 位會員名單顯示正常。詳見[家中部署紀錄](home-deployment.md#100-第一版正式部署2026-10-23)。版本與映像識別見 [GitHub Release v1.0.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.0.0)與 [Docker Hub 1.0.0](https://hub.docker.com/r/momonong/fucheng-players-system/tags?name=1.0.0)。
 
 ## 驗證界線
 
