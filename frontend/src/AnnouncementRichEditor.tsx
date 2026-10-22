@@ -33,6 +33,8 @@ export function AnnouncementRichEditor({ initial, disabled, canUpload, onChange,
   const [linkOpen, setLinkOpen] = useState(false)
   const [link, setLink] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [retryUpload, setRetryUpload] = useState(false)
+  const pendingUpload = useRef<{ file: File; replacement: HTMLElement | null; block: HTMLElement | null } | null>(null)
   const [blockType, setBlockType] = useState('')
 
   useEffect(() => {
@@ -127,10 +129,13 @@ export function AnnouncementRichEditor({ initial, disabled, canUpload, onChange,
   }
   async function selectedFile(file: File | undefined) {
     if (!file || !editor.current) return
-    const replacement = selectedBlock.current?.tagName === 'FIGURE' ? selectedBlock.current : null
+    if (!pendingUpload.current) pendingUpload.current = { file,
+      replacement: selectedBlock.current?.tagName === 'FIGURE' ? selectedBlock.current : null, block: selectedBlock.current }
+    const operation = pendingUpload.current
+    const replacement = operation.replacement
     setUploading(true)
     try {
-      const id = await onUpload(file)
+      const id = await onUpload(operation.file)
       const figure = document.createElement('figure')
       figure.dataset.mediaId = id
       figure.dataset.align = replacement?.getAttribute('data-align') ?? 'center'
@@ -138,14 +143,20 @@ export function AnnouncementRichEditor({ initial, disabled, canUpload, onChange,
       hydrateAnnouncementImages(figure, 'admin')
       if (replacement) replacement.replaceWith(figure)
       else {
-        const block = selectedBlock.current
+        const block = operation.block
         if (block?.parentElement === editor.current) block.after(figure)
         else editor.current.append(figure)
       }
       selectedBlock.current = figure
       setBlockType('figure')
       onChange(editor.current.innerHTML)
-    } catch (error) { onError((error as Error).message) }
+      pendingUpload.current = null; setRetryUpload(false)
+    } catch (error) {
+      onError((error as Error).message)
+      const status = (error as { status?: number }).status
+      if (status === undefined || status >= 500) setRetryUpload(true)
+      else { pendingUpload.current = null; setRetryUpload(false) }
+    }
     finally { setUploading(false); if (picker.current) picker.current.value = '' }
   }
   const controlsDisabled = disabled || uploading
@@ -160,6 +171,7 @@ export function AnnouncementRichEditor({ initial, disabled, canUpload, onChange,
     </div>
     {linkOpen && <div className="rich-link"><label>連結網址<input type="url" value={link} onChange={event => setLink(event.target.value)} placeholder="https://example.com" /></label><button type="button" disabled={controlsDisabled} onClick={applyLink}>套用連結</button><button type="button" className="secondary" onClick={() => setLinkOpen(false)}>取消</button></div>}
     {!canUpload && <p className="editor-hint">先儲存草稿，即可在段落間插入圖片。</p>}
+    {retryUpload && <button type="button" className="secondary" disabled={uploading} onClick={() => void selectedFile(pendingUpload.current?.file)}>原樣重試圖片上傳</button>}
     <div ref={editor} className="rich-input rich-body" contentEditable={!controlsDisabled} role="textbox" aria-label="公告內容" aria-multiline="true" onInput={changed} onKeyUp={remember} onMouseUp={remember} onTouchEnd={remember} onClick={event => { const figure = (event.target as HTMLElement).closest('figure'); editor.current?.querySelectorAll('figure[data-selected]').forEach(item => item.removeAttribute('data-selected')); if (figure && editor.current?.contains(figure)) { figure.setAttribute('data-selected', 'true'); const range = document.createRange(); range.selectNodeContents(figure); range.collapse(true); const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); savedRange.current = range; selectedBlock.current = figure; setBlockType('figure') } else { selectedBlock.current = directBlock(event.target as Node); setBlockType(selectedBlock.current?.tagName.toLowerCase() ?? '') } }} data-placeholder="輸入公告內容" />
     {blockType === 'figure' && <div className="mobile-image-actions" role="group" aria-label="圖片操作"><span>已選圖片</span><button type="button" disabled={controlsDisabled} onClick={() => move(-1)}>上移圖片</button><button type="button" disabled={controlsDisabled} onClick={() => move(1)}>下移圖片</button><button type="button" disabled={controlsDisabled} onClick={removeImage}>移除圖片</button><button type="button" className="secondary" onClick={clearImageSelection}>完成</button></div>}
   </div>

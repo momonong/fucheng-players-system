@@ -1,5 +1,9 @@
 # 府城球館會員管理系統
 
+0.4.4 新增公告可還原刪除：在「公告管理」的「目前公告」選取公告後按「刪除公告」，可從「已刪除」清單唯讀檢視內容、圖片與歷史，再按「還原公告」回到未發布狀態。一般下架仍是取消「發布到首頁」並儲存。本輪未部署，現站維持 0.4.3／`0012_device_reports`；升級需先停寫、成組備份，再顯式遷移至0013。詳見 [0.4.4 發布說明](docs/release-0.4.4.md)；正式版本與映像身份以 [GitHub Release](https://github.com/momonong/fucheng-players-system/releases/tag/v0.4.4)及 [Docker Hub 0.4.4 標籤](https://hub.docker.com/r/momonong/fucheng-players-system/tags?name=0.4.4)為準。
+
+0.4.4 本輪後端281個案例取得通過證據，另6個PowerShell案例跳過；同份前端成品分spec、獨立合成DB的UI驗證合計27 passed、1個既有skip，涵蓋公告、報名連動及比賽刪除／還原。鎖檔檢查、typecheck、build與npm audit通過；詳細範圍及驗收界線見上述發布說明。
+
 0.4.3 已合併、推送並發布 [GitHub Release](https://github.com/momonong/fucheng-players-system/releases/tag/v0.4.3)及 Docker Hub `0.4.3`／`latest`；2026-10-22 台北時間19:58更新既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)，app／backup健康，原資料、帳密及既有健檢報告保留。Windows工具先保存本機 JSON／Markdown，再以獨立裝置憑證回傳；失敗保留原 UUID／內容重試。接收功能預設關閉，家中站已沿用先前配置啟用，schema為`0012_device_reports`；本次只換正式映像，沒有再遷移或重建資料。詳見 [0.4.3 發布說明](docs/release-0.4.3.md)、[健檢報告回傳](docs/host-report-upload.md)與[家中部署紀錄](docs/home-deployment.md#043-健檢回傳正式發布與部署2026-10-22)。
 
 公開報名與管理端連動已補永久回歸：後端273項與正式桌面／手機、根路徑／`/fucheng`四組連動測試通過。已開管理頁需切換「報名與設定」「排級數」或重新載入讀回，候補由管理員手動遞補；舊測試及現場驗收限制見[報名連動驗證](docs/registration-linkage-verification-20261022.md)。

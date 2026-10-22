@@ -52,6 +52,10 @@ class PhotoRemoval(BaseModel):
     request_id: str = Field(min_length=8, max_length=64)
 
 
+class AnnouncementDeletion(PhotoRemoval):
+    confirmed: Literal[True]
+
+
 class PublicAnnouncement(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -75,6 +79,7 @@ class AdminAnnouncement(BaseModel):
     is_published: bool
     version: int
     published_at: datetime | None
+    deleted_at: datetime | None
     updated_at: datetime
 
 
@@ -149,12 +154,13 @@ class ScheduleItem(BaseModel):
 
 def save_announcement(db, auth, payload, announcement_id=None):
     admin_id = _begin_immediate(db, auth)
+    action = "update" if announcement_id else "create"
     fingerprint = hashlib.sha256(json.dumps(
         {"target": announcement_id, **payload.model_dump(exclude={"request_id"})},
         ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     previous = db.scalar(select(AnnouncementAudit).where(AnnouncementAudit.request_id == payload.request_id))
     if previous:
-        if previous.admin_id != admin_id or previous.fingerprint != fingerprint:
+        if previous.admin_id != admin_id or previous.fingerprint != fingerprint or previous.action != action:
             raise HTTPException(409, "請重新送出這次操作")
         return db.get(Announcement, previous.announcement_id)
     values = payload.model_dump(exclude={"request_id", "version"})
@@ -166,6 +172,8 @@ def save_announcement(db, auth, payload, announcement_id=None):
     if announcement_id:
         if not row:
             raise HTTPException(404, "找不到公告")
+        if row.deleted_at is not None:
+            raise HTTPException(409, "公告已刪除，請先還原再編輯；目前輸入已保留")
         if row.version != payload.version:
             raise HTTPException(409, "公告已被其他管理員更新，請重新載入後再編輯；目前輸入已保留")
         if media_ids:
@@ -187,7 +195,7 @@ def save_announcement(db, auth, payload, announcement_id=None):
     row.updated_at = now_utc()
     db.flush()
     db.add(AnnouncementAudit(announcement_id=row.id, admin_id=admin_id,
-        action="update" if announcement_id else "create",
+        action=action,
         changes_json=json.dumps(_changes(before, values), ensure_ascii=False),
         request_id=payload.request_id, fingerprint=fingerprint))
     db.commit()
@@ -239,7 +247,7 @@ def install_website_routes(app, get_db, current_auth, require_csrf):
 
     @app.get("/api/public/announcements", response_model=list[PublicAnnouncement])
     def announcements(db: Db):
-        return list(db.scalars(select(Announcement).where(Announcement.is_published.is_(True))
+        return list(db.scalars(select(Announcement).where(Announcement.deleted_at.is_(None), Announcement.is_published.is_(True))
             .order_by(Announcement.is_pinned.desc(), Announcement.published_at.desc(), Announcement.id)))
 
     @app.get("/api/public/schedule", response_model=list[ScheduleItem])
@@ -254,8 +262,10 @@ def install_website_routes(app, get_db, current_auth, require_csrf):
             for row in rows]
 
     @app.get("/api/admin/announcements", response_model=list[AdminAnnouncement])
-    def admin_announcements(db: Db, _auth: Auth):
-        return list(db.scalars(select(Announcement).order_by(Announcement.updated_at.desc(), Announcement.id)))
+    def admin_announcements(db: Db, _auth: Auth, deleted: bool = False):
+        return list(db.scalars(select(Announcement).where(
+            Announcement.deleted_at.is_not(None) if deleted else Announcement.deleted_at.is_(None))
+            .order_by(Announcement.updated_at.desc(), Announcement.id)))
 
     @app.post("/api/admin/announcements", response_model=AdminAnnouncement, status_code=201)
     def create(payload: AnnouncementInput, db: Db, auth: Write):
@@ -265,6 +275,46 @@ def install_website_routes(app, get_db, current_auth, require_csrf):
     def update(announcement_id: str, payload: AnnouncementUpdate, db: Db, auth: Write):
         return save_announcement(db, auth, payload, announcement_id)
 
+    def change_deletion(announcement_id, payload, db, auth, *, restore):
+        admin_id = _begin_immediate(db, auth)
+        action = "restore" if restore else "delete"
+        fingerprint = hashlib.sha256(json.dumps({"target": announcement_id, "action": action,
+            **payload.model_dump(exclude={"request_id"})}, sort_keys=True).encode()).hexdigest()
+        previous = db.scalar(select(AnnouncementAudit).where(AnnouncementAudit.request_id == payload.request_id))
+        if previous:
+            if previous.admin_id != admin_id or previous.fingerprint != fingerprint or previous.action != action:
+                raise HTTPException(409, "請重新送出這次操作")
+            return db.get(Announcement, previous.announcement_id)
+        row = db.get(Announcement, announcement_id)
+        if not row:
+            raise HTTPException(404, "找不到公告")
+        if row.version != payload.version:
+            raise HTTPException(409, "公告已被其他管理員更新，請重新核對後再操作；目前輸入已保留")
+        if (row.deleted_at is not None) != restore:
+            raise HTTPException(409, "公告狀態已變更，請重新核對後再操作")
+        before = {"deleted_at": row.deleted_at.isoformat() if row.deleted_at else None,
+            "is_published": row.is_published}
+        row.deleted_at = None if restore else now_utc()
+        # Restoring never republishes potentially outdated club information.
+        row.is_published = False
+        row.version += 1
+        row.updated_at = now_utc()
+        after = {"deleted_at": row.deleted_at.isoformat() if row.deleted_at else None,
+            "is_published": row.is_published}
+        db.add(AnnouncementAudit(announcement_id=row.id, admin_id=admin_id, action=action,
+            changes_json=json.dumps(_changes(before, after), ensure_ascii=False),
+            request_id=payload.request_id, fingerprint=fingerprint))
+        db.commit()
+        return row
+
+    @app.post("/api/admin/announcements/{announcement_id}/delete", response_model=AdminAnnouncement)
+    def delete(announcement_id: str, payload: AnnouncementDeletion, db: Db, auth: Write):
+        return change_deletion(announcement_id, payload, db, auth, restore=False)
+
+    @app.post("/api/admin/announcements/{announcement_id}/restore", response_model=AdminAnnouncement)
+    def restore(announcement_id: str, payload: AnnouncementDeletion, db: Db, auth: Write):
+        return change_deletion(announcement_id, payload, db, auth, restore=True)
+
     def change_photo(db, auth, announcement_id: str, version: int, request_id: str,
                      content: tuple[bytes, str, str] | None, request: Request):
         admin_id = _begin_immediate(db, auth)
@@ -273,12 +323,14 @@ def install_website_routes(app, get_db, current_auth, require_csrf):
             "photo_sha256": digest}, sort_keys=True).encode()).hexdigest()
         previous = db.scalar(select(AnnouncementAudit).where(AnnouncementAudit.request_id == request_id))
         if previous:
-            if previous.admin_id != admin_id or previous.fingerprint != fingerprint:
+            if previous.admin_id != admin_id or previous.fingerprint != fingerprint or previous.action != "photo":
                 raise HTTPException(409, "請重新送出這次操作")
             return db.get(Announcement, previous.announcement_id)
         row = db.get(Announcement, announcement_id)
         if not row:
             raise HTTPException(404, "找不到公告")
+        if row.deleted_at is not None:
+            raise HTTPException(409, "公告已刪除，請先還原再修改照片")
         if row.version != version:
             raise HTTPException(409, "公告已被其他管理員更新，照片與輸入已保留")
         old_id = row.photo_id
@@ -343,6 +395,8 @@ def install_website_routes(app, get_db, current_auth, require_csrf):
         row = db.get(Announcement, announcement_id)
         if not row:
             raise HTTPException(404, "找不到公告")
+        if row.deleted_at is not None:
+            raise HTTPException(409, "公告已刪除，請先還原再插入圖片")
         if row.version != version:
             raise HTTPException(409, "公告已被其他管理員更新，圖片與輸入已保留")
         media_id = new_id()
@@ -379,7 +433,7 @@ def install_website_routes(app, get_db, current_auth, require_csrf):
         if not media:
             raise HTTPException(404, "找不到照片")
         row = db.get(Announcement, media.announcement_id)
-        if not row or (public and (not row.is_published or
+        if not row or (public and (row.deleted_at is not None or not row.is_published or
             (row.photo_id != media_id and media_id not in inline_media_ids(row.body)))):
             raise HTTPException(404, "找不到照片")
         directory = media_directory(request.app).resolve()

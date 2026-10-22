@@ -83,7 +83,7 @@ test('公告內嵌圖片、段落順序、連結與公開顯示', async ({ page,
   await expect(editor.locator('figure')).toHaveCount(2)
   await expect.poll(() => editor.locator('figure').first().getAttribute('data-media-id')).not.toBe(previousId)
   await editor.locator('figure').last().click()
-  await page.getByRole('button', { name: '移除圖片' }).click()
+  await page.getByRole('toolbar', { name: '公告格式' }).getByRole('button', { name: '移除圖片', exact: true }).click()
   await expect(editor.locator('figure')).toHaveCount(1)
   await page.getByRole('button', { name: '儲存公告', exact: true }).click()
   await visitor.reload()
