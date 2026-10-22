@@ -260,7 +260,6 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
     onCompositionStart={()=>{composing.current=true}} onCompositionEnd={()=>{composing.current=false}} onChange={e=>{setText(e.target.value);if(editing)onTextDraft(editing.key,e.target.value)}} onClick={e=>e.stopPropagation()}
     onKeyDown={e=>{if(e.nativeEvent.isComposing)return;if(e.key==='Enter'){e.preventDefault();commitText()}if(e.key==='Escape'){e.preventDefault();cancelEdit()}}}/>
   return <>
-    {!readonly&&<div className="level-column-controls no-print"><button type="button" className="secondary" disabled={blocked||!!drag} onClick={()=>operate({action:'insert_column',before_id:null})}>＋ 新增空白欄</button><small>空白欄只換位置，保留當次級數；移入級數欄會調整當次級數。</small></div>}
     <div className={`arrangement-table-scroll ${drag ? 'is-dragging' : ''}`} tabIndex={0} role="region" aria-label="級數表格，可水平捲動"
       onPointerDownCapture={event=>{lastPointer.current=event.pointerType}}
       onContextMenuCapture={event=>{
