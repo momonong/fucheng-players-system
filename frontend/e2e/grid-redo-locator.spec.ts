@@ -31,7 +31,7 @@ async function setup(page:Page,info:TestInfo,suffix:string,count=4){
   await expect.poll(async()=>!!(await state()).layout).toBe(true)
   const slot=(address:Point)=>area.locator(`[data-grid-cell="${address.row_id}/${address.column_id}"]`)
   const cell=(id:string)=>area.locator(`[data-registration-id="${id}"]`)
-  const op=async(operation:any)=>{const current=await state(),response=await page.request.post(endpoint+'/operations',{headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,operation}});expect(response.status()).toBe(200,response.statusText());return response.json()}
+  const op=async(operation:any)=>{const current=await state(),response=await page.request.post(endpoint+'/operations',{headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,layout_schema_version:2,operation}});expect(response.status()).toBe(200,response.statusText());return response.json()}
   const idle=async()=>{await expect(area.locator('.cell-grip').first()).toBeEnabled();await expect(area.locator('.arrangement-recovery')).toHaveCount(0)}
   const reload=async()=>{await page.reload();await choose();await expect.poll(async()=>!!(await state()).layout).toBe(true)}
   const save=async(label:string)=>{await area.getByRole('button',{name:'保存完整安排',exact:true}).click();const dialog=page.getByRole('dialog',{name:'保存完整安排'});await dialog.getByLabel('版本名稱').fill(label);await dialog.getByRole('button',{name:'保存',exact:true}).click();await expect(area.locator('.arrangement-status')).toContainText(`已保存「${label}」`)}

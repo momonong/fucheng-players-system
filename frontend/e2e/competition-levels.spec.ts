@@ -39,7 +39,7 @@ async function setup(page: Page, info: TestInfo, suffix: string, count=4) {
   await expect.poll(async()=>!!(await state()).layout).toBe(true)
   const cell=(i:number)=>area.locator(`[data-registration-id="${rows[i].id}"]`)
   const slot=(point:any)=>area.locator(`[data-grid-cell="${point.row_id}/${point.column_id}"]`)
-  const op=async(operation:any)=>{const current=await state();const res=await page.request.post(endpoint+'/operations',{headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,operation}});expect(res.status()).toBe(200);return res.json()}
+  const op=async(operation:any)=>{const current=await state();const res=await page.request.post(endpoint+'/operations',{headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,layout_schema_version:2,operation}});expect(res.status()).toBe(200);return res.json()}
   const reload=async()=>{await choose(true);const loaded=page.waitForResponse(r=>r.url().endsWith(endpoint)&&r.request().method()==='GET');await choose();await loaded;if((await state()).editable)await expect(area.locator('.cell-grip').first()).toBeEnabled()}
   const idle=async()=>{await expect(area.locator('.cell-grip').first()).toBeEnabled();await expect(area.locator('.arrangement-recovery')).toHaveCount(0)}
   const save=async(label='格位版本')=>{await area.getByRole('button',{name:'保存完整安排',exact:true}).click();const dialog=page.getByRole('dialog',{name:'保存完整安排'});await dialog.getByLabel('版本名稱').fill(label);await dialog.getByRole('button',{name:'保存',exact:true}).click()}
@@ -192,7 +192,7 @@ test('格位大存未知舊receipt不回退較新布局與基準',async({page},i
   const peer=await apiRequest.newContext({baseURL:info.project.use.baseURL})
   const login=await (await peer.post('/api/auth/login',{data:{username:'e2e-arrangement-peer',password:process.env.FUCHENG_E2E_ADMIN_PASSWORD!}})).json()
   const peerHeaders={'X-CSRF-Token':login.csrf_token}
-  const peerOp=async(operation:any)=>{const state=await s.state();expect((await peer.post(s.endpoint+'/operations',{headers:peerHeaders,data:{request_id:crypto.randomUUID(),state_token:state.state_token,operation}})).status()).toBe(200)}
+  const peerOp=async(operation:any)=>{const state=await s.state();expect((await peer.post(s.endpoint+'/operations',{headers:peerHeaders,data:{request_id:crypto.randomUUID(),state_token:state.state_token,layout_schema_version:2,operation}})).status()).toBe(200)}
   await peerOp({action:'insert_column',before_id:null})
   const current=await s.state()
   const newer=await peer.post(s.endpoint+'/versions',{headers:peerHeaders,data:{request_id:crypto.randomUUID(),state_token:current.state_token,base_version_id:current.latest.id,label:'較新保存'}})
@@ -375,7 +375,7 @@ test('表格新版：邊界插入、直接標題與合併原位文字、框選',
   await editLabel(page,info,s,0,'1 級');await s.idle()
   await expect(s.area.getByRole('button',{name:'保存完整安排',exact:true})).toBeDisabled()
   await s.area.getByRole('button',{name:'在級數標題上方插入表頭列',exact:true}).click();await s.idle()
-  await s.area.getByRole('button',{name:'在第 1 欄左方插入文字欄',exact:true}).click();await s.idle()
+  await s.area.getByRole('button',{name:'在第 1 欄左方插入空白欄',exact:true}).click();await s.idle()
   await s.area.getByRole('button',{name:'在第 3 列上方插列',exact:true}).click();await s.idle()
   let layout=(await s.state()).layout
   expect(layout.columns[0].kind).toBe('text');expect(layout.rows[0].role).toBe('header')
@@ -433,7 +433,7 @@ test('表格新版：邊界插入、直接標題與合併原位文字、框選',
     await activate(info,s.slot(point(current,0,0)).locator('.grid-empty'));await openSelectedCellMenu(page,info,s)
     await expect(cellMenu(page).getByRole('button',{name:'範圍選取',exact:true})).toBeVisible()
     await expect(s.area.locator('.grid-desktop-hint')).not.toBeVisible()
-    const left=s.area.getByRole('button',{name:'在第 1 欄左方插入文字欄',exact:true})
+    const left=s.area.getByRole('button',{name:'在第 1 欄左方插入空白欄',exact:true})
     await expect(left).toBeVisible();await left.tap();await s.idle()
     await s.area.getByRole('button',{name:'在第 1 列上方插列',exact:true}).tap();await s.idle()
     const after=(await s.state()).layout
@@ -555,13 +555,13 @@ test('表格刪除：保護選手級數、文字確認與合併保留',async({pa
   await s.save('刪除前');await s.idle();const saved=(await s.state()).latest
   await activate(info,s.area.getByLabel('第 1 直欄更多操作',{exact:true}))
   await expect(s.area.locator('.axis-removal-column')).toBeVisible()
-  await activate(info,popup.getByRole('button',{name:'刪除這個文字直欄'}))
+  await activate(info,popup.getByRole('button',{name:'刪除這個空白欄'}))
   const dialog=page.getByRole('dialog',{name:'確認刪除這個範圍'})
   await expect(dialog).toContainText('第 1 直欄');await expect(dialog).toContainText('隊名欄');await expect(dialog).toContainText('確定要刪除的隊名')
   await page.screenshot({path:info.outputPath('axis-delete-confirm.png')})
   await activate(info,dialog.getByRole('button',{name:'保留這個範圍'}));expect((await s.state()).layout).toEqual(saved.layout)
-  await activate(info,s.area.getByLabel('第 1 直欄更多操作',{exact:true}));await activate(info,popup.getByRole('button',{name:'刪除這個文字直欄'}))
-  await activate(info,dialog.getByRole('button',{name:'確認刪除文字直欄'}));await s.idle()
+  await activate(info,s.area.getByLabel('第 1 直欄更多操作',{exact:true}));await activate(info,popup.getByRole('button',{name:'刪除這個空白欄'}))
+  await activate(info,dialog.getByRole('button',{name:'確認刪除空白欄'}));await s.idle()
   const after=await s.state();expect(after.layout.columns).toHaveLength(10);expect(after.rows).toEqual(original.rows)
   expect(after.layout.merges).toEqual(saved.layout.merges) // unaffected header remains intact
   await expect(s.area.locator('.grid-selected')).toHaveCount(0);await expect(page.getByLabel('直接編輯文字')).toHaveCount(0)
@@ -595,12 +595,12 @@ test('表格刪除：確認綁舊token、未知原樣重試與清理失效選格
     await expect(popup).toBeVisible()
   }
   const startDelete=async()=>{
-    const action=popup.getByRole('button',{name:'刪除這個文字直欄'})
+    const action=popup.getByRole('button',{name:'刪除這個空白欄'})
     if(info.project.name==='desktop'&&await editor.isVisible()){await action.focus();await page.keyboard.press('Enter')}
     else await activate(info,action)
   }
   const confirmDelete=async()=>{
-    const action=dialog.getByRole('button',{name:'確認刪除文字直欄'})
+    const action=dialog.getByRole('button',{name:'確認刪除空白欄'})
     if(info.project.name==='desktop'&&await editor.isVisible()){await action.focus();await page.keyboard.press('Enter')}
     else await activate(info,action)
   }
@@ -1499,7 +1499,7 @@ test('色票故障：同色白色與合併範圍不重送',async({page},info)=>{
   // Genuine backend no-op responses after explicit white is already persisted.
   const noops=[{action:'shade_header',column_id:initial.layout.columns[0].id,shade:2},{action:'shade_cells',start:point(initial.layout,0,0),end:point(initial.layout,0,0),shade:0},{action:'shade_cells',start:a,end:b,shade:0}]
   const backend:any[]=[]
-  for(const operation of noops){const current=await s.state(),r=await page.request.post(s.endpoint+'/operations',{headers:s.headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,operation}});expect(r.status()).toBe(422);const body=await r.json();expect(body).toEqual({detail:'安排沒有變更'});expect(await s.state()).toEqual(current);backend.push({operation,status:r.status(),body})}
+  for(const operation of noops){const current=await s.state(),r=await page.request.post(s.endpoint+'/operations',{headers:s.headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,layout_schema_version:2,operation}});expect(r.status()).toBe(422);const body=await r.json();expect(body).toEqual({detail:'安排沒有變更'});expect(await s.state()).toEqual(current);backend.push({operation,status:r.status(),body})}
   await writeFile(info.outputPath('genuine-noop-shapes.json'),JSON.stringify(backend,null,2))
   const writes:any[]=[];page.on('request',r=>{if(r.url().endsWith('/arrangement/operations'))writes.push(r.postDataJSON())})
   await activate(info,s.area.getByLabel('選取第 1 欄表頭',{exact:true}))

@@ -51,7 +51,6 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
   const lastPointer = useRef('')
   const dragToken = useRef(stateToken)
   const layout = knownLayout ?? legacyLayout(rows)
-  const missingLevels = Array.from({length:10},(_,i)=>i+1).filter(level=>!layout.columns.some(c=>c.kind==='level'&&c.level===level))
   const [selected, setSelected] = useState<GridPoint | null>(null)
   const selectionDocument=selectionLayout(layout),headings=headerCells(layout)
   const selectedHeader=selected?.row_id===HEADER_ROW_ID?selected.column_id:null
@@ -261,7 +260,7 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
     onCompositionStart={()=>{composing.current=true}} onCompositionEnd={()=>{composing.current=false}} onChange={e=>{setText(e.target.value);if(editing)onTextDraft(editing.key,e.target.value)}} onClick={e=>e.stopPropagation()}
     onKeyDown={e=>{if(e.nativeEvent.isComposing)return;if(e.key==='Enter'){e.preventDefault();commitText()}if(e.key==='Escape'){e.preventDefault();cancelEdit()}}}/>
   return <>
-    {!readonly&&missingLevels.length>0&&<div className="level-column-controls no-print"><label>加回級數欄<select aria-label="加回級數欄" value="" disabled={blocked||!!drag} onChange={e=>{if(e.target.value)operate({action:'add_level_column',level:Number(e.target.value)})}}><option value="">選擇級數…</option>{missingLevels.map(level=><option key={level} value={level}>{level} 級</option>)}</select></label><small>加回的欄位放在表格右側；新增報名或調級用到未顯示級數時，也會自動補回。</small></div>}
+    {!readonly&&<div className="level-column-controls no-print"><button type="button" className="secondary" disabled={blocked||!!drag} onClick={()=>operate({action:'insert_column',before_id:null})}>＋ 新增空白欄</button><small>空白欄只換位置，保留當次級數；移入級數欄會調整當次級數。</small></div>}
     <div className={`arrangement-table-scroll ${drag ? 'is-dragging' : ''}`} tabIndex={0} role="region" aria-label="級數表格，可水平捲動"
       onPointerDownCapture={event=>{lastPointer.current=event.pointerType}}
       onContextMenuCapture={event=>{
@@ -286,7 +285,7 @@ export function LevelCardBoard({ rows, layout: knownLayout, baselineLayout, chan
           const cell=cells.get(k), row=cell?.kind==='registration' ? rowMap.get(cell.registration_id) : undefined
           const change=row ? changesById.get(row.registration_id) : undefined
           const match=!row || `${row.member_name} ${row.distinguishing_note ?? ''}`.includes(search.trim())
-          const dropEnabled=!blocked && r.role==='body' && c.kind==='level' && !merge && cell?.kind!=='text'
+          const dropEnabled=!blocked && r.role==='body' && !merge && cell?.kind!=='text'
           const shade=cellShade(ri,ci,merge?.rowSpan,merge?.colSpan)
           const isTarget=drag?.target&&pointKey(drag.target)===k
           const textChanged=knownLayout && baselineLayout && ((cell?.kind==='text' ? cell.text : '') !== (oldText.get(k) ?? ''))

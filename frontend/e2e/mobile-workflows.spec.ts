@@ -153,7 +153,7 @@ test('拖曳未知原樣恢復及外來版本409，不重複或自動覆寫',asy
   expect(writes).toHaveLength(2);expect(writes[1]).toEqual(writes[0])
   await page.unroute('**/arrangement/operations')
   const current=await s.state()
-  const external=await page.request.post(s.endpoint+'/operations',{headers:s.headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,operation:{action:'move_bottom',registration_id:s.people[2].id,level:8}}})
+  const external=await page.request.post(s.endpoint+'/operations',{headers:s.headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,layout_schema_version:2,operation:{action:'move_bottom',registration_id:s.people[2].id,level:8}}})
   expect(external.status()).toBe(200)
   const request=page.waitForResponse(r=>r.url().endsWith('/arrangement/operations') && r.status()===409)
   await gridDrag(page,info,s);await request
@@ -185,7 +185,7 @@ test('素食名單依顯示布局列出隊名，不受搜尋裁減；帳號在�
   await page.screenshot({path:info.outputPath('vegetarian-roster.png'),fullPage:true})
   await dialog.getByRole('button',{name:'關閉名單'}).click()
   expect((await s.state()).state_token).toBe(initial.state_token)
-  const op=await page.request.post(s.endpoint+'/operations',{headers:s.headers,data:{request_id:crypto.randomUUID(),state_token:initial.state_token,operation:{action:'move_empty',registration_id:s.people[0].id,target:{row_id:initial.layout.rows[1].id,column_id:initial.layout.columns.find((c:any)=>c.level===1).id}}}})
+  const op=await page.request.post(s.endpoint+'/operations',{headers:s.headers,data:{request_id:crypto.randomUUID(),state_token:initial.state_token,layout_schema_version:2,operation:{action:'move_empty',registration_id:s.people[0].id,target:{row_id:initial.layout.rows[1].id,column_id:initial.layout.columns.find((c:any)=>c.level===1).id}}}})
   expect(op.status()).toBe(200)
   await page.reload();await page.getByLabel('選擇比賽',{exact:true}).selectOption(s.comp.id)
   await s.area.getByRole('button',{name:'查看素食人員名單'}).click()
@@ -227,7 +227,7 @@ test('名單讀取多層欄名與合併隊名，保存後歷史保留原標籤',
   const s=await setup(page,info)
   const op=async(operation:any)=>{
     const current=await s.state()
-    const response=await page.request.post(s.endpoint+'/operations',{headers:s.headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,operation}})
+    const response=await page.request.post(s.endpoint+'/operations',{headers:s.headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,layout_schema_version:2,operation}})
     expect(response.status()).toBe(200)
   }
   await op({action:'insert_header',before_id:null});await op({action:'insert_header',before_id:null})
@@ -306,7 +306,7 @@ test('起拖後外來更新仍以起拖token拒絕，拖曳鍵盤選單不延後
   await gridDrag(page,info,s,0,1,{context:true,beforeRelease:async()=>{
     await page.keyboard.press('Shift+F10')
     await expect(page.getByRole('dialog',{name:'儲存格操作',exact:true})).toHaveCount(0)
-    const external=await page.request.post(s.endpoint+'/operations',{headers:s.headers,data:{request_id:crypto.randomUUID(),state_token:before.state_token,operation:{action:'move_bottom',registration_id:s.people[2].id,level:8}}})
+    const external=await page.request.post(s.endpoint+'/operations',{headers:s.headers,data:{request_id:crypto.randomUUID(),state_token:before.state_token,layout_schema_version:2,operation:{action:'move_bottom',registration_id:s.people[2].id,level:8}}})
     expect(external.status()).toBe(200)
   }})
   await rejected

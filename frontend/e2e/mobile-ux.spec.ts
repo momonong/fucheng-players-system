@@ -33,9 +33,10 @@ test('手機報名、公告圖片與管理入口寬度量測', async ({ browser 
   await expect(page.getByRole('group', { name: '圖片操作' })).toBeVisible()
   await page.getByRole('button', { name: '完成', exact: true }).tap()
   await expect(page.getByRole('group', { name: '圖片操作' })).toHaveCount(0)
-  await page.getByLabel('發布到首頁').check()
   await page.getByRole('button', { name: '儲存公告' }).click()
   await expect(page.getByRole('status')).toHaveText('公告已儲存')
+  await page.getByRole('switch', { name: '公開到首頁', exact: true }).click()
+  await expect(page.getByRole('switch', { name: '公開到首頁', exact: true })).toBeChecked()
 
   const visitor = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true })
   const publicPage = await visitor.newPage()

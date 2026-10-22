@@ -104,7 +104,7 @@ export function useArrangementWorkspace(username:string) {
   function operate(id: string, operation: GridOperation, expectedToken?: string) {
     const current = records.current[id]
     if (!current?.verified || !current.state?.layout || !current.state.editable || current.save || current.operation) return
-    void sendOperation(id, { payload: { request_id: crypto.randomUUID(), state_token: expectedToken ?? current.state.state_token, operation }, status: 'saving', error: '' })
+    void sendOperation(id, { payload: { request_id: crypto.randomUUID(), state_token: expectedToken ?? current.state.state_token, layout_schema_version: 2, operation }, status: 'saving', error: '' })
   }
   function undo(id:string){
     const current=records.current[id],target=current?.undoStack?.at(-1)

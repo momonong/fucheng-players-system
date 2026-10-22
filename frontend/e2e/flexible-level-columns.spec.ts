@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 const prefix=(process.env.FUCHENG_BASE_PATH??'').replace(/\/$/,'')
 const url=(path:string)=>prefix+path
 
-test('每場可刪除空級數欄、加回、保存與列印；有人的欄保持保護',async({page},info)=>{
+test('每場可刪除空級數欄、直接增空白欄、保存與列印；有人的欄保持保護',async({page},info)=>{
   await page.goto(url('/admin/competitions'))
   await page.getByLabel('帳號',{exact:true}).fill('e2e-admin')
   await page.getByLabel('密碼',{exact:true}).fill(process.env.FUCHENG_E2E_ADMIN_PASSWORD!)
@@ -28,15 +28,15 @@ test('每場可刪除空級數欄、加回、保存與列印；有人的欄保�
   await area.getByRole('button',{name:'第 2 直欄更多操作',exact:true}).click()
   await page.getByRole('button',{name:'刪除這個級數欄',exact:true}).click()
   await expect(cols).toHaveCount(9)
-  await expect(area.getByLabel('加回級數欄',{exact:true})).toBeEnabled()
+  await expect(area.getByRole('button',{name:'＋ 新增空白欄',exact:true})).toBeEnabled()
   expect((await state()).rows).toEqual(initial.rows)
   const afterDelete=await state()
-  await area.getByLabel('加回級數欄',{exact:true}).selectOption('2')
+  await area.getByRole('button',{name:'＋ 新增空白欄',exact:true}).click()
   await expect(cols).toHaveCount(10)
   await expect(area.getByLabel('加回級數欄',{exact:true})).toHaveCount(0)
-  expect((await state()).layout.columns.at(-1).level).toBe(2)
+  expect((await state()).layout.columns.at(-1)).toMatchObject({kind:'text',level:null,title:''})
   await area.getByRole('button',{name:'第 10 直欄更多操作',exact:true}).click()
-  await page.getByRole('button',{name:'刪除這個級數欄',exact:true}).click()
+  await page.getByRole('button',{name:'刪除這個空白欄',exact:true}).click()
   await expect(cols).toHaveCount(9)
   await area.getByRole('button',{name:'保存完整安排',exact:true}).click()
   const save=page.getByRole('dialog',{name:'保存完整安排'})
@@ -59,6 +59,6 @@ test('每場可刪除空級數欄、加回、保存與列印；有人的欄保�
   const pending=page.waitForEvent('download');await area.getByRole('button',{name:'匯出 Excel',exact:true}).click();const download=await pending
   expect(await download.failure()).toBeNull();await download.saveAs(info.outputPath('nine-columns.xlsx'))
   await area.getByRole('button',{name:'回目前安排',exact:true}).click()
-  await expect(area.getByLabel('加回級數欄',{exact:true})).toBeVisible()
+  await expect(area.getByRole('button',{name:'＋ 新增空白欄',exact:true})).toBeVisible()
   await page.screenshot({path:info.outputPath('flexible-level-columns.png'),fullPage:true})
 })

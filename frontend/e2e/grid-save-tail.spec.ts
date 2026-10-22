@@ -36,7 +36,7 @@ async function setup(page: Page, info: TestInfo) {
   await expect.poll(async () => !!(await state()).layout).toBe(true)
   const op = async (operation: any) => {
     const current = await state()
-    const response = await page.request.post(`${endpoint}/operations`, { headers, data: { request_id: crypto.randomUUID(), state_token: current.state_token, operation } })
+    const response = await page.request.post(`${endpoint}/operations`, { headers, data: { request_id: crypto.randomUUID(), state_token: current.state_token, layout_schema_version:2,operation } })
     expect(response.status(), await response.text()).toBe(200)
     return response.json()
   }

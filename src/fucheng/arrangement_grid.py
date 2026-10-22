@@ -119,6 +119,7 @@ class GridMutation(StrictInput):
     request_id: str = Field(min_length=8, max_length=64)
     state_token: str = Field(min_length=64, max_length=64)
     operation: Operation
+    layout_schema_version: int = Field(default=1, ge=1, le=2, strict=True)
 
 
 class LayoutRow(BaseModel):
@@ -157,7 +158,7 @@ class HeaderMerge(BaseModel):
     title: str | None = None
 
 class GridLayout(BaseModel):
-    schema_version: Literal[1] = 1
+    schema_version: Literal[1, 2] = 1
     rows: list[LayoutRow]
     columns: list[LayoutColumn]
     cells: list[Annotated[PlayerCell | TextCell, Field(discriminator="kind")]]
@@ -254,7 +255,8 @@ def encode(layout):
 
 def signature(layout):
     # Merge UUIDs are bookkeeping: merge->unmerge->same merge restores the same meaning.
-    return {**layout, "header_merges": sorted(({"start_column_id":m["start_column_id"], "end_column_id":m["end_column_id"], "title":m.get("title")} for m in layout.get("header_merges",[])), key=lambda m:(m["start_column_id"],m["end_column_id"])), "cell_shades": sorted(layout.get("cell_shades", []), key=key), "rows": [{**r, "shade":r.get("shade",0)} for r in layout["rows"]], "columns": [{**c, "shade":c.get("shade",0), "header_shade":c.get("header_shade"), "title": c.get("title") if c.get("title") is not None else (str(c["level"]) + " 級" if c["kind"] == "level" else "文字／備註")} for c in layout["columns"]], "cells": sorted(layout["cells"], key=key),
+    # Capability upgrades alone are not an arrangement change; levels are compared separately.
+    return {**layout, "schema_version": 1, "header_merges": sorted(({"start_column_id":m["start_column_id"], "end_column_id":m["end_column_id"], "title":m.get("title")} for m in layout.get("header_merges",[])), key=lambda m:(m["start_column_id"],m["end_column_id"])), "cell_shades": sorted(layout.get("cell_shades", []), key=key), "rows": [{**r, "shade":r.get("shade",0)} for r in layout["rows"]], "columns": [{**c, "shade":c.get("shade",0), "header_shade":c.get("header_shade"), "title": c.get("title") if c.get("title") is not None else (str(c["level"]) + " 級" if c["kind"] == "level" else "文字／備註")} for c in layout["columns"]], "cells": sorted(layout["cells"], key=key),
         "merges": sorted(({"start": m["start"], "end": m["end"]} for m in layout["merges"]), key=lambda m: (key(m["start"]),key(m["end"])))}
 
 
@@ -300,7 +302,7 @@ def move(layout, registration_id, target):
     if next(r for r in layout["rows"] if r["id"] == target["row_id"])["role"] != "body":
         fail("選手只能放在資料列")
     column = next(c for c in layout["columns"] if c["id"] == target["column_id"])
-    if column["kind"] != "level":
+    if column["kind"] != "level" and layout["schema_version"] < 2:
         fail("選手只能放在級數欄")
     source = next((c for c in layout["cells"] if c.get("registration_id") == registration_id), None)
     if source and key(source) == key(target):
@@ -336,7 +338,7 @@ def player_cell(layout, registration_id):
     cell = next((c for c in layout["cells"] if c.get("registration_id") == registration_id), None)
     if cell is None:
         fail("選手已不在安排中，請重新讀取")
-    if key(cell) in covered(layout) or next(r for r in layout["rows"] if r["id"] == cell["row_id"])["role"] != "body" or next(c for c in layout["columns"] if c["id"] == cell["column_id"])["kind"] != "level":
+    if key(cell) in covered(layout) or next(r for r in layout["rows"] if r["id"] == cell["row_id"])["role"] != "body" or (layout["schema_version"] < 2 and next(c for c in layout["columns"] if c["id"] == cell["column_id"])["kind"] != "level"):
         fail("選手位置不是合法資料格")
     return cell
 
@@ -559,7 +561,10 @@ def apply(layout, operation):
         if action == "insert_header":
             index = next((i for i,r in enumerate(items) if r["role"] == "body"), len(items))
             role = "header"
-        items.insert(index, {"id": new_id(), **({"kind":"text", "level":None} if axis == "columns" else {"role":role})})
+        column = {"kind":"text", "level":None}
+        if layout["schema_version"] >= 2:
+            column["title"] = ""
+        items.insert(index, {"id": new_id(), **(column if axis == "columns" else {"role":role})})
     elif action in {"delete_row", "delete_column"}:
         delete_axis(layout, op)
     elif action == "column_title":
@@ -622,6 +627,8 @@ def validate(layout, rows):
     if not 1 <= len(row_ids) <= MAX_ROWS or not 1 <= len(columns) <= MAX_COLUMNS or not any(r["role"] == "body" for r in layout["rows"]):
         fail("安排大小或資料排不合法")
     for column in layout["columns"]:
+        if column["kind"] == "text" and column["level"] is not None:
+            fail("普通欄不可綁定級數")
         header_shade = column.get("header_shade")
         if header_shade is not None and (type(header_shade) is not int or not 0 <= header_shade <= 3):
             fail("表頭底色色階不合法")
@@ -652,9 +659,11 @@ def validate(layout, rows):
             rid = cell["registration_id"]
             if rid in players or key(cell) in merged: fail("選手重複或位於合併区")
             col = columns[cell["column_id"]]
-            if col["kind"] != "level" or roles[cell["row_id"]] != "body": fail("選手不在級數資料格")
+            if roles[cell["row_id"]] != "body" or (col["kind"] != "level" and layout["schema_version"] < 2): fail("選手不在合法資料格")
             players[rid] = col["level"]
-    if players != {r["registration_id"]:r["competition_level"] for r in rows}:
+    expected = {r["registration_id"]:r["competition_level"] for r in rows}
+    if (any(type(level) is not int or not 1 <= level <= 10 for level in expected.values())
+            or set(players) != set(expected) or any(level is not None and level != expected[rid] for rid, level in players.items())):
         fail("布局與正取名單不一致，請重新讀取")
 
 
@@ -669,7 +678,8 @@ def sync_registration(db, registration):
         if source: layout["cells"].remove(source)
     else:
         col = next((c for c in layout["columns"] if source and c["id"] == source["column_id"]), None)
-        if not source or col["level"] != registration.competition_level:
+        neutral = col is not None and col["kind"] == "text" and layout["schema_version"] >= 2
+        if not source or (not neutral and col["level"] != registration.competition_level):
             if source: layout["cells"].remove(source)
             move(layout, registration.id, bottom_target(layout, registration.competition_level))
     encoded = encode(layout)
