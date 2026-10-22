@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { RefObject } from 'react'
 import type { GridLayout, GridOperation } from './types'
 import { GridAxisMenu, type AxisTarget, type AxisPanel } from './GridAxisMenu'
@@ -8,7 +8,8 @@ export function GridInsertControls({layout,table,disabled,onOperate,stateToken,d
   const [edge,setEdge]=useState<string|null>(null)
   const [targets,setTargets]=useState<AxisTarget[]>([]),[panel,setPanel]=useState<AxisPanel|null>(null)
   useEffect(()=>{if(dragging){setPanel(null);setEdge(null);setActive(null)}},[dragging])
-  useLayoutEffect(()=>{
+  // The following sibling table attaches its ref after this child's layout effects.
+  useEffect(()=>{
     const element=table.current;if(!element)return
     function measure(){
       if(!element)return
