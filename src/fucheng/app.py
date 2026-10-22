@@ -480,6 +480,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from .deployment_report import install_deployment_report_routes
     install_deployment_report_routes(app, get_db, current_auth, require_csrf)
 
+    from .device_reports import install_device_report_routes
+    install_device_report_routes(app, get_db, current_auth, settings)
+
     from .admin_management import install_admin_management_routes
     install_admin_management_routes(app, get_db, current_auth, require_csrf, session_cookie)
 

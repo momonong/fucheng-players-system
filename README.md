@@ -1,5 +1,9 @@
 # 府城球館會員管理系統
 
+0.4.3 整合球館健檢自動回傳：Windows 一鍵工具先留存本機 JSON／Markdown，再以獨立裝置憑證傳送；失敗保留原 UUID／內容重試，報告限管理員讀取。接收功能預設關閉，需顯式升級 schema `0012_device_reports` 並配置秘密檔；既有手動上傳畫面保持原用法。公開報名與管理端連動已補永久回歸；已開管理頁需切換「報名與設定」「排級數」或重新載入讀回，候補由管理員手動遞補。詳見 [0.4.3 發布說明](docs/release-0.4.3.md)、[健檢報告回傳](docs/host-report-upload.md)與[報名連動驗證](docs/registration-linkage-verification-20261022.md)。Git／映像與實際部署身份依發布及[家中部署紀錄](docs/home-deployment.md)分別核對。
+
+[府城公開使用指南](https://momonong.me/slides/fucheng/)已上線，提供手機報名、管理名單與安排操作說明；球館 Windows 實機與人工驗收狀態仍依當次紀錄核對。
+
 0.4.2 修正瀏覽器列印時的會員淺綠表頭與共用格線：關閉背景圖形仍保留表頭色，表格共用邊固定在相同位置，避免疊粗或裁半，維持原字級、格位與 A4 分頁。詳見 [0.4.2 發布說明](docs/release-0.4.2.md)及[表頭列印驗證](docs/print-headers-verification-20261021.md)。2026-10-21 已正式發布並更新既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)；原資料與帳密保留，詳見[家中部署紀錄](docs/home-deployment.md)。
 
 0.4.1 改善會員分級與比賽名單的列印：A4 橫向、清楚字級、統一格線及自然分頁，會員網頁採深綠緊湊卡片。只有會員姓名依筆畫排序，比賽格位不重排；素食以置於姓名右側的圈「素」辨識。詳見 [0.4.1 發布說明](docs/release-0.4.1.md)與[列印驗證](docs/print-layout-verification-20261020.md)。正式發布與現站身份以發布頁及[部署紀錄](docs/home-deployment.md)為準。

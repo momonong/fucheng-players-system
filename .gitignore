@@ -246,6 +246,7 @@ deploy/docker/release.env
 deploy/docker/restore.env
 deploy/docker/local-http.env
 deploy/docker/secrets/
+private/
 deploy/docker/backup/
 deploy/docker/*.tar
 deploy/docker/*.zip

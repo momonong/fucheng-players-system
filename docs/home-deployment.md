@@ -1,26 +1,29 @@
 # 家中 4090 試用部署
 
-2026-10-21 核對：4090 已部署正式 0.4.2，以 SVG 前景保留列印表頭底色，並統一共用格線及整列分頁；原字級、格位與圈素位置保留。使用已合併來源及 Docker Hub 固定 manifest digest，schema 仍為 `0011_admin_management`。原有資料與帳密保留，app／backup 健康，既有登入與管理 API 讀取通過。入口仍為 [momonong.me/fucheng/](https://momonong.me/fucheng/)；原生 Chrome／Edge 系統列印對話框、實體手機、真正 Turnstile 報名及重開機恢復待驗收。詳見文末 0.4.2 紀錄；先前版本段落保留為歷史。
+2026-10-22 核對：4090 已在既有 [momonong.me/fucheng/](https://momonong.me/fucheng/) 啟用球館健檢報告接收，現用 `local/fucheng:snapshot-da298e6231f1f628`，schema 為 `0012_device_reports`；這是尚未 commit／push／Release 或 registry 發布的工作樹 snapshot，產品版本仍標示 0.4.2。app／backup 健康，遷移及驗證登入前原21表全欄全值與帳密／sessions 相同，登入驗證後18表仍相同。外部 HTTPS 只提交一份清楚標記的合成部署驗證報告，35項檢查全為 NOT_TESTED；球館 Windows 電腦仍關機，尚未現場健檢。詳見[本次部署紀錄與回退限制](host-report-home-deployment-20261022.md)。以下舊版本紀錄保留為歷史，不代表現用 image／schema。
 
 ## 主機與入口
 
 使用 4090 的原生 Linux Docker Engine（context `default`）。單一 app image 包含前端與 FastAPI，不使用 GPU。入口沿用 selfhost-servers 的 Cloudflare Tunnel → HP Caddy，透過加密 SSH reverse forward 到本機 loopback；不另建 Tunnel、不占用首頁或 OrderFlow 路由。Caddy 候選與現用狀態由 selfhost-servers 的 `docs/fucheng-ingress-preparation.md` 管理。
 
-`compose.home.yaml` 疊加在 `compose.yaml` 上：
+目前依序疊加 `compose.yaml`、`compose.home.yaml`、`compose.report-upload.yaml`；後續操作須保留第三份 receiver overlay：
 
 - app 僅發布 `127.0.0.1:8064`，HP forward 僅監聽 `127.0.0.1:18084`。
 - app 與備份各使用本 project 的 Linux named volume；不掛 Windows 路徑，也不共用其他 app 資料。
 - app 僅信任指定 Docker bridge gateway。網路允許 Turnstile Siteverify 所需 outbound HTTPS。
 - 不啟用 base Compose 的 cloudflared、ngrok 或 https-test profiles。
-- 固定 image digest，`pull_policy: never`：先明確 pull 並核對 image，再操作。
+- `pull_policy: never`：正式 release 使用固定 registry digest；本次 snapshot 已核對本機 tag、native image ID 與 source manifest，沒有新版 registry digest。先備妥並核對映像，再操作。
 
 ## 設定與操作
 
-從專案根目錄執行。先將 `deploy/docker/home.env.example` 複製至 Git 忽略且受限的 `data/home-deployment/home.env`，依現場確認網段／port。Turnstile sitekey 使用真正的 momonong.me widget，secret 放受限本機檔案，只提供路徑；secret 必須能由容器 UID 10001 讀取。不要把 secret 值放入命令、Git 或聊天。
+從專案根目錄執行。全新部署時，才將 `deploy/docker/home.env.example` 複製至 Git 忽略且受限的 `data/home-deployment/home.env`，依現場確認網段／port；既有站點沿用現用私密設定。Turnstile sitekey 使用真正的 momonong.me widget，secret 放受限本機檔案，只提供路徑；secret 必須能由容器 UID 10001 讀取。不要把 secret 值放入命令、Git 或聊天。
+
+既有站點的 `data/home-deployment/home.env` 已持久更新為本次 snapshot、device ID 與 `FUCHENG_REPORT_UPLOAD_TOKEN_FILE` 私密檔案路徑，不要用範例覆寫。上傳 token 與原 Turnstile secret 分開，receiver overlay 只對 app 掛載 `/run/secrets/report_upload_token`，原 Turnstile secret 保留；一般工具 ZIP 不含秘密，球館端另行私密配置。現用 schema 0012 不可直接換回舊 0.4.2 image，回復方式見[本次紀錄](host-report-home-deployment-20261022.md#回退與未完成驗收)。
 
 ```bash
 dc=(docker --context default compose --env-file data/home-deployment/home.env
-    -f deploy/docker/compose.yaml -f deploy/docker/compose.home.yaml)
+    -f deploy/docker/compose.yaml -f deploy/docker/compose.home.yaml
+    -f deploy/docker/compose.report-upload.yaml)
 ```
 
 真實資料只能以核定來源的成組備份 `ops import-backup` → `ops restore` 還原至全新 project/volume；不要執行 `init` 產生空資料取代既有來源。schema 必須匹配 image。舊式原生 SQLite 先保留原檔，在獨立、無 writer 的副本顯式 migration、逐欄核對既有資料，再製作符合 runtime 契約的成組備份。容器 volume 中所有寫入仍經 runtime 鎖，不直接掛載 SQL 修改。

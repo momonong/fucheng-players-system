@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import re
+import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -23,10 +25,26 @@ class Settings:
     turnstile_hostname: str | None = None
     backup_status_file: Path | None = None
     base_path: str = ""
+    report_upload_enabled: bool = False
+    report_upload_device_id: str | None = None
+    report_upload_token: str | None = field(default=None, repr=False)
+    report_upload_max_reports: int = 500
+    report_upload_max_bytes: int = 64 * 1024 * 1024
+    report_upload_hourly_limit: int = 12
 
     def __post_init__(self):
         from .base_path import normalize_base_path
         object.__setattr__(self, "base_path", normalize_base_path(self.base_path))
+        if self.report_upload_enabled:
+            if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", self.report_upload_device_id or ""):
+                raise ValueError("Report upload requires a server-bound device ID")
+            token = self.report_upload_token or ""
+            if not re.fullmatch(r"(?:[0-9a-f]{2}){32,64}", token):
+                raise ValueError("Report upload requires a random 32-64 byte hexadecimal token")
+        if not (1 <= self.report_upload_max_reports <= 10_000
+                and 256 * 1024 <= self.report_upload_max_bytes <= 1024 * 1024 * 1024
+                and 1 <= self.report_upload_hourly_limit <= 120):
+            raise ValueError("Invalid report upload storage/rate bounds")
         if self.public_origin or self.local_http_preview:
             from .proxy import validate_ingress
             validate_ingress(self)
@@ -49,9 +67,33 @@ class Settings:
             raise ValueError("Choose one Turnstile secret source")
         turnstile_secret = (Path(secret_file).read_text(encoding="utf-8").strip() if secret_file
                             else os.getenv("FUCHENG_TURNSTILE_SECRET"))
+        upload_mode = os.getenv("FUCHENG_REPORT_UPLOAD_ENABLED", "false").lower()
+        if upload_mode not in {"true", "false"}:
+            raise ValueError("Report upload must be explicitly true or false")
+        upload_token = None
+        if upload_mode == "true":
+            upload_file = os.getenv("FUCHENG_REPORT_UPLOAD_TOKEN_FILE")
+            if not upload_file:
+                raise ValueError("Report upload requires TOKEN_FILE")
+            # Do not block startup on a FIFO or accidentally read an unbounded file.
+            try:
+                fd = os.open(upload_file, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+                with os.fdopen(fd, "rb") as stream:
+                    info = os.fstat(stream.fileno())
+                    if not stat.S_ISREG(info.st_mode) or info.st_size > 256:
+                        raise ValueError("invalid secret file")
+                    upload_token = stream.read(257).decode("ascii").strip()
+            except (OSError, UnicodeError, ValueError):
+                raise ValueError("Report upload token file is unavailable or invalid") from None
         return cls(
             database_url=database_url,
             base_path=os.getenv("FUCHENG_BASE_PATH", ""),
+            report_upload_enabled=upload_mode == "true",
+            report_upload_device_id=os.getenv("FUCHENG_REPORT_UPLOAD_DEVICE_ID") or None,
+            report_upload_token=upload_token,
+            report_upload_max_reports=int(os.getenv("FUCHENG_REPORT_UPLOAD_MAX_REPORTS", "500")),
+            report_upload_max_bytes=int(os.getenv("FUCHENG_REPORT_UPLOAD_MAX_BYTES", str(64 * 1024 * 1024))),
+            report_upload_hourly_limit=int(os.getenv("FUCHENG_REPORT_UPLOAD_HOURLY_LIMIT", "12")),
             session_cookie_secure=os.getenv("FUCHENG_COOKIE_SECURE", "true").lower()
             in {"1", "true", "yes"},
             session_hours=int(os.getenv("FUCHENG_SESSION_HOURS", "12")),

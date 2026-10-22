@@ -1,0 +1,14 @@
+# Opt in only on the report receiver. Never include the token in .env or an image.
+services:
+  app:
+    environment:
+      FUCHENG_REPORT_UPLOAD_ENABLED: "true"
+      FUCHENG_REPORT_UPLOAD_DEVICE_ID: ${FUCHENG_REPORT_UPLOAD_DEVICE_ID:?Set the server-bound club device ID}
+      FUCHENG_REPORT_UPLOAD_TOKEN_FILE: /run/secrets/report_upload_token
+      FUCHENG_REPORT_UPLOAD_MAX_REPORTS: ${FUCHENG_REPORT_UPLOAD_MAX_REPORTS:-500}
+      FUCHENG_REPORT_UPLOAD_MAX_BYTES: ${FUCHENG_REPORT_UPLOAD_MAX_BYTES:-67108864}
+      FUCHENG_REPORT_UPLOAD_HOURLY_LIMIT: ${FUCHENG_REPORT_UPLOAD_HOURLY_LIMIT:-12}
+    secrets: [report_upload_token]
+secrets:
+  report_upload_token:
+    file: ${FUCHENG_REPORT_UPLOAD_TOKEN_FILE:?Set a protected local report token file}
