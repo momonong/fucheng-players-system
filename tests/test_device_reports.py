@@ -260,7 +260,7 @@ def test_0012_preserves_all_previous_tables_and_enforces_append_only(tmp_path, m
     command.check(config)
     with sqlite3.connect(path) as db:
         assert {t:db.execute(f'SELECT * FROM "{t}" ORDER BY rowid').fetchall() for t in tables} == before
-        assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0] == '0012_device_reports'
+        assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0] == '0013_announcement_deletion'
         assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
         assert db.execute('PRAGMA foreign_key_check').fetchall() == []
         after_tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != 'alembic_version'")}

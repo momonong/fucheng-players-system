@@ -397,6 +397,9 @@ button.danger { background: #8c3026; }
 .announcement-row { width:100%; text-align:left; display:grid; gap:.3rem; margin:.7rem 0; background:#edf3ed; color:var(--ink); overflow-wrap:anywhere; }
 .announcement-row:hover { background:#d8e7dc; }
 .announcement-row span { font-size:.85rem; font-weight:500; }
+.announcement-row[aria-pressed="true"] { background: #d8e7dc; outline: 2px solid var(--green); outline-offset: 1px; }
+.announcement-lifecycle { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #d8dfd8; }
+.announcement-lifecycle p { margin-top: 0; }
 .history-button { margin-top:1rem; }
 /* The public pages and the three admin workspaces share a fluid outer width. */
 main:not(.arrangement-main):not(.arrangement-print-page) { width: var(--page-width); }
