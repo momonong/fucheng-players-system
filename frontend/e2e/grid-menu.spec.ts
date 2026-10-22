@@ -27,7 +27,7 @@ async function setup(page: Page, info: TestInfo, suffix: string, count=4) {
   await expect.poll(async()=>!!(await state()).layout).toBe(true)
   const cell=(i:number)=>area.locator(`[data-registration-id="${rows[i].id}"]`)
   const slot=(point:any)=>area.locator(`[data-grid-cell="${point.row_id}/${point.column_id}"]`)
-  const op=async(operation:any)=>{const current=await state();const res=await page.request.post(endpoint+'/operations',{headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,operation}});expect(res.status()).toBe(200);return res.json()}
+  const op=async(operation:any)=>{const current=await state();const res=await page.request.post(endpoint+'/operations',{headers,data:{request_id:crypto.randomUUID(),state_token:current.state_token,layout_schema_version:2,operation}});expect(res.status()).toBe(200);return res.json()}
   const reload=async()=>{await choose(true);const loaded=page.waitForResponse(r=>r.url().endsWith(endpoint)&&r.request().method()==='GET');await choose();await loaded;if((await state()).editable)await expect(area.locator('.cell-grip').first()).toBeEnabled()}
   const idle=async()=>{await expect(area.locator('.cell-grip').first()).toBeEnabled();await expect(area.locator('.arrangement-recovery')).toHaveCount(0)}
   const save=async(label='格位版本')=>{await area.getByRole('button',{name:'保存完整安排',exact:true}).click();const dialog=page.getByRole('dialog',{name:'保存完整安排'});await dialog.getByLabel('版本名稱').fill(label);await dialog.getByRole('button',{name:'保存',exact:true}).click()}
@@ -88,7 +88,7 @@ test('F表頭與資料共用選單、真框選、編字合併及stable欄邊界'
   const merged=await s.state();expect(merged.layout.columns[0].title).toBe('甲乙組');expect(merged.rows).toEqual(before.rows)
   await openMenu(page,info,s,headers.first());await page.screenshot({path:info.outputPath('header-context-screen.png'),fullPage:true})
   await page.keyboard.press('Escape');await expect(menu(page)).toHaveCount(0)
-  await activate(info,s.area.getByRole('button',{name:'在第 3 欄左方插入文字欄',exact:true}));await s.idle()
+  await activate(info,s.area.getByRole('button',{name:'在第 3 欄左方插入空白欄',exact:true}));await s.idle()
   const inserted=await s.state();expect(inserted.layout.columns[2].kind).toBe('text');expect(inserted.layout.columns[3].id).toBe(before.layout.columns[2].id)
   await openMenu(page,info,s,headers.first());await activate(info,menu(page).getByRole('group',{name:'整張表格'}).getByRole('button',{name:'復原上一個動作',exact:true}));await s.idle()
   expect((await s.state()).layout.columns.map((c:any)=>c.id)).toEqual(before.layout.columns.map((c:any)=>c.id))

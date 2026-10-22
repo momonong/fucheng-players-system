@@ -28,7 +28,7 @@ test('雙身分報名連動：既開管理端讀回、正候補餐食安排、�
   const state=async()=>await(await page.request.get(endpoint+'/arrangement')).json()
   await expect.poll(async()=>!!(await state()).layout).toBe(true)
   const initial=await state(),column=initial.layout.columns.find((c:any)=>c.level===2)
-  const deleted=await page.request.post(endpoint+'/arrangement/operations',{headers,data:{request_id:crypto.randomUUID(),state_token:initial.state_token,operation:{action:'delete_column',axis_id:column.id,confirmed_text:false}}})
+  const deleted=await page.request.post(endpoint+'/arrangement/operations',{headers,data:{request_id:crypto.randomUUID(),state_token:initial.state_token,layout_schema_version:2,operation:{action:'delete_column',axis_id:column.id,confirmed_text:false}}})
   expect(deleted.status()).toBe(200)
   await page.getByRole('button',{name:'報名與設定',exact:true}).click()
   const summary=(label:string)=>page.locator('.summary-card').filter({hasText:label})

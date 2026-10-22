@@ -197,5 +197,5 @@ export type GridOperation = { action: 'move'; registration_id: string; target: G
   | { action: 'column_title'; column_id: string; text: string }
   | { action: 'merge'; start: GridPoint; end: GridPoint }
   | { action: 'unmerge'; merge_id: string }
-export type GridRequest = { request_id: string; state_token: string; operation: GridOperation }
+export type GridRequest = { request_id: string; state_token: string; layout_schema_version: 2; operation: GridOperation }
 export type GridReceipt = { state_token?: string | null; undo_head?: string | null; redo_head?: string | null; request_id: string; competition_id: string; revision: number; operation: GridOperation; layout: GridLayout }

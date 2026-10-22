@@ -59,3 +59,5 @@ Python 使用 uv、`pyproject.toml`、`uv.lock` 與專案 `.venv`；前端使用
 
 
 場次級數欄可為1–10級的不重複子集合，至少保留一個級數欄；既有十欄資料不改寫。空級數欄可依 stable axis ID／token 刪除，文字確認、合併保留、局部底色 prune 與 Undo／Redo 沿用原契約。`add_level_column` 只加回未存在級數、以新 stable ID 接在最右側，不改既有格位。新增正取／遞補／調級用到缺少級數時，在同一寫入交易補回欄位，GET 不補造。文字欄最多40欄，為十個級數身份保留上限空間；總上限仍50欄。保存／歷史／列印／Excel 依實際 columns 呈現。無新增 migration，但啟用精簡欄位後不可直接回退至仍要求完整十欄的舊 app；需使用相容新版或既有匹配備份回復流程。
+
+2026-10-22 空白欄契約取代上述「文字欄不可放人」限制：layout JSON schema 2 允許新舊 `kind=text` 欄的 body 空格放人，移入只換位置、保留本人 `competition_level`；移入 numeric level 欄仍依各自目的欄調級，交換分別計算。普通欄中的餐食／明確調級保留座標；數字欄的調級與新正取／遞補補欄規則沿用。新增入口直接增空白欄，移除加回級數選單；文字／合併／表頭不可落人及最後級數欄保護維持。新 client 操作帶 `layout_schema_version:2`，成功寫交易才升級 workspace，GET 不回填；schema 2 拒絕 legacy grid write，但舊 receipt 原 key 重送仍先回原結果。Undo／Redo 必須保存及驗證 server 前後級數 map，不從普通欄推導級數；舊 schema 1 receipt 僅在數字欄可確定級數時相容。會員級數／hard snapshot／歷史／原列印外觀不改。詳見 `docs/neutral-table-columns.md`；無資料表 migration，新前後端須一起更新。

@@ -27,8 +27,8 @@ function deletionPreview({layout,target}:AxisPanel) {
   }
   if(target.axis==='column'&&item&&'title' in item&&item.title&&item.title!=='文字／備註')texts.unshift({text:`欄標題：${item.title}`,keep:false})
   const levelColumn=item&&'kind' in item&&item.kind==='level'
-  const columnName=levelColumn?'級數欄':'文字直欄'
-  const title=target.axis==='row'?`第 ${target.index+1} 排（由左到右這一整排）`:`第 ${target.index+1} 直欄（${levelColumn?`${item.level} 級`:'由上到下的文字格'}）`
+  const columnName=levelColumn?'級數欄':'空白欄'
+  const title=target.axis==='row'?`第 ${target.index+1} 排（由左到右這一整排）`:`第 ${target.index+1} 直欄（${levelColumn?`${item.level} 級`:'自由安排選手與文字'}）`
   return {blocked,texts,title,columnName}
 }
 export function GridAxisMenu({panel,disabled,onPanel,onOperate}:{panel:AxisPanel;disabled:boolean;onPanel:(value:AxisPanel|null)=>void;onOperate:(op:GridOperation,token?:string)=>void}) {

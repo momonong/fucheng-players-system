@@ -84,7 +84,7 @@ export function AnnouncementManager({ username, displayName, onLogout }: { usern
   }
   return <><AdminHeader section="announcements" username={username} displayName={displayName} onLogout={signOut} /><main className="announcement-main">
     {error && <div role="alert" className="notice error">{error}<button disabled={locked} onClick={() => void load()}>重新載入</button></div>}{notice && <p role="status" className="notice success">{notice}</p>}
-    <div className="section-title"><p>取消「發布到首頁」並儲存即可下架；刪除的公告可在已刪除清單還原。</p><button disabled={locked} onClick={() => { setCreating(true); setSelected(null); setNotice(''); setMobileEditor(true) }}>新增公告</button></div>
+    <div className="section-title"><p>先儲存公告，再用「公開到首頁」開關公開或下架；刪除的公告可在已刪除清單還原。</p><button disabled={locked} onClick={() => { setCreating(true); setSelected(null); setNotice(''); setMobileEditor(true) }}>新增公告</button></div>
     <div className={`announcement-workspace ${mobileEditor ? 'mobile-editing' : 'mobile-browsing'}`}><section className="panel"><h2>公告清單</h2>
       <div className="competition-view-switch" role="group" aria-label="公告清單範圍"><button type="button" className="secondary" aria-pressed={!deleted} disabled={locked} onClick={() => switchView(false)}>目前公告</button><button type="button" className="secondary" aria-pressed={deleted} disabled={locked} onClick={() => switchView(true)}>已刪除</button></div>
       {(creating || selected) && !mobileEditor && <button className="secondary mobile-pane-back" disabled={locked} onClick={() => setMobileEditor(true)}>繼續查看公告</button>}
@@ -141,16 +141,16 @@ function AnnouncementEditor({ item, onSaved, onConflict, onLocked }: { item: Adm
   const [version, setVersion] = useState(item?.version ?? 0)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [removePhoto, setRemovePhoto] = useState(false)
-  const [published, setPublished] = useState(item?.is_published ?? false)
-  const [pinned, setPinned] = useState(item?.is_pinned ?? false)
+  const published = item?.is_published ?? false
+  const pinned = item?.is_pinned ?? false
   const [busy, setBusy] = useState(false)
-  const [unknown, setUnknown] = useState<'save' | 'inline' | null>(null)
+  const [unknown, setUnknown] = useState<'save' | 'status' | 'inline' | null>(null)
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
   const [history, setHistory] = useState<AuditEntry[] | null>(null)
   const [deletion, setDeletion] = useState<{ restore: boolean; version: number; key: string } | null>(null)
   const [deletionUnknown, setDeletionUnknown] = useState(false)
-  const pending = useRef<{ url: string; method: string; body: string; expectedVersion: number; saved?: AdminAnnouncement; photo: File | null; removePhoto: boolean; photoKey: string } | null>(null)
+  const pending = useRef<{ kind: 'save' | 'status'; message?: string; url: string; method: string; body: string; expectedVersion: number; published: boolean; pinned: boolean; saved?: AdminAnnouncement; photo: File | null; removePhoto: boolean; photoKey: string } | null>(null)
   const inlinePending = useRef<{ key: string; version: number; file: File } | null>(null)
   const legacyPhotoPicker = useRef<HTMLInputElement>(null)
   const dialog = useRef<HTMLDialogElement>(null)
@@ -158,18 +158,20 @@ function AnnouncementEditor({ item, onSaved, onConflict, onLocked }: { item: Adm
   const lock = useRef(false)
   const deleted = !!item?.deleted_at
   const disabled = busy || unknown !== null || deletion !== null
+  const unsavedContent = !item || title !== item.title || body !== initialMarkup(item) || photoFile !== null || removePhoto
+  const statusDisabled = disabled || unsavedContent || conflict
   useEffect(() => { onLocked(disabled); return () => onLocked(false) }, [disabled, onLocked])
   useEffect(() => {
     if (deletion && dialog.current && !dialog.current.open) { dialog.current.showModal(); safeAction.current?.focus() }
     if (!deletion && dialog.current?.open) dialog.current.close()
   }, [deletion])
-  async function failed(error: unknown, kind: 'save' | 'inline') {
+  async function failed(error: unknown, kind: 'save' | 'status' | 'inline') {
     setError((error as Error).message)
     setConflict((error as { status?: number }).status === 409)
     if (uncertain(error)) setUnknown(kind)
     else {
       setUnknown(null)
-      if (kind === 'save') pending.current = null
+      if (kind !== 'inline') pending.current = null
       else inlinePending.current = null
       if ((error as { status?: number }).status === 409) await onConflict()
     }
@@ -191,18 +193,21 @@ function AnnouncementEditor({ item, onSaved, onConflict, onLocked }: { item: Adm
     } catch (e) { await failed(e, 'inline'); throw e }
     finally { setBusy(false); lock.current = false }
   }
-  async function save() {
-    if (lock.current || deleted || deletion || (unknown && unknown !== 'save')) return
+  async function save(status?: { published: boolean; pinned: boolean; message: string }) {
+    const kind = status || unknown === 'status' ? 'status' : 'save'
+    if (lock.current || deleted || deletion || (unknown && unknown !== kind)) return
+    if (!pending.current && kind === 'status' && (!item || unsavedContent || conflict)) return
     lock.current = true; setBusy(true); setError(''); setConflict(false)
     if (!pending.current) {
-      const values = { title, body: bodyFormat === 'plain' ? item?.body ?? body : body, body_format: bodyFormat, is_published: published, is_pinned: pinned, ...(item ? { version } : {}), request_id: crypto.randomUUID() }
-      pending.current = { url: item ? `/api/admin/announcements/${item.id}` : '/api/admin/announcements', method: item ? 'PUT' : 'POST', body: JSON.stringify(values), expectedVersion: item ? version + 1 : 1, photo: photoFile, removePhoto, photoKey: crypto.randomUUID() }
+      // Status changes only replay the saved content; they never submit the editor's draft.
+      const values = { title: status ? item!.title : title, body: status ? item!.body : bodyFormat === 'plain' ? item?.body ?? body : body, body_format: status ? item!.body_format : bodyFormat, is_published: status?.published ?? published, is_pinned: status?.pinned ?? pinned, ...(item ? { version } : {}), request_id: crypto.randomUUID() }
+      pending.current = { kind, message: status?.message, url: item ? `/api/admin/announcements/${item.id}` : '/api/admin/announcements', method: item ? 'PUT' : 'POST', body: JSON.stringify(values), expectedVersion: item ? version + 1 : 1, published: values.is_published, pinned: values.is_pinned, photo: status ? null : photoFile, removePhoto: status ? false : removePhoto, photoKey: crypto.randomUUID() }
     }
     const operation = pending.current
     try {
       if (!operation.saved) {
         const result = await announcementRequest<AdminAnnouncement>(operation.url, { method: operation.method, body: operation.body })
-        if (result.version !== operation.expectedVersion || result.deleted_at !== null) {
+        if (result.version !== operation.expectedVersion || result.deleted_at !== null || result.is_published !== operation.published || result.is_pinned !== operation.pinned) {
           throw Object.assign(new Error('儲存操作已完成，但公告後續又被變更，請重新核對；目前輸入已保留。'), { status: 409 })
         }
         operation.saved = result
@@ -218,8 +223,8 @@ function AnnouncementEditor({ item, onSaved, onConflict, onLocked }: { item: Adm
           throw Object.assign(new Error('照片操作已完成，但公告後續又被變更，請重新核對；目前輸入已保留。'), { status: 409 })
         }
       }
-      pending.current = null; setUnknown(null); onSaved(saved)
-    } catch (e) { if (operation.saved) setVersion(operation.saved.version); await failed(e, 'save') }
+      pending.current = null; setUnknown(null); onSaved(saved, operation.message)
+    } catch (e) { if (operation.saved) setVersion(operation.saved.version); await failed(e, operation.kind) }
     finally { setBusy(false); lock.current = false }
   }
   function submit(event: React.FormEvent) { event.preventDefault(); void save() }
@@ -254,13 +259,22 @@ function AnnouncementEditor({ item, onSaved, onConflict, onLocked }: { item: Adm
       <div className="legacy-photo-controls"><button className="secondary" type="button" disabled={disabled} onClick={() => legacyPhotoPicker.current?.click()}>替換文末照片</button><button className="secondary" type="button" disabled={disabled} onClick={() => { setPhotoFile(null); setRemovePhoto(true); if (legacyPhotoPicker.current) legacyPhotoPicker.current.value = '' }}>移除文末照片</button>{(photoFile || removePhoto) && <button className="secondary" type="button" disabled={disabled} onClick={() => { setPhotoFile(null); setRemovePhoto(false); if (legacyPhotoPicker.current) legacyPhotoPicker.current.value = '' }}>取消文末照片變更</button>}</div>
       <input ref={legacyPhotoPicker} className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" aria-label="選擇文末照片" disabled={disabled} onChange={e => { setPhotoFile(e.target.files?.[0] ?? null); setRemovePhoto(false) }} />
     </details>}
-    <label className="check"><input type="checkbox" checked={published} disabled={disabled} onChange={e => setPublished(e.target.checked)} />發布到首頁</label><p className="editor-hint">取消勾選後儲存，即可從首頁下架。</p>
-    <label className="check"><input type="checkbox" checked={pinned} disabled={disabled} onChange={e => setPinned(e.target.checked)} />置頂公告</label>
-    {!deletion && errors}<button type="submit" disabled={busy || unknown === 'inline' || deletion !== null}>{busy ? '儲存中…' : unknown === 'save' ? '原樣重試儲存' : '儲存公告'}</button>
+    {!deletion && errors}
+    {published && <p className="notice info announcement-live-hint">這則公告已公開到首頁；儲存內容會立即更新首頁。</p>}
+    <div className="announcement-editor-actions">
+      <div className="announcement-save-actions"><button type="submit" disabled={busy || (unknown !== null && unknown !== 'save') || deletion !== null}>{busy && pending.current?.kind === 'save' ? '儲存中…' : unknown === 'save' ? '原樣重試儲存' : '儲存公告'}</button>{item && <button type="button" className="secondary history-button" disabled={disabled} onClick={loadHistory}>公告修改歷史</button>}</div>
+      <div className="announcement-visibility" role="group" aria-label="公告公開與置頂狀態">
+        <div className="announcement-switch-row"><button className="announcement-switch" type="button" role="switch" aria-label="公開到首頁" aria-checked={published} aria-describedby={unsavedContent ? 'announcement-status-hint' : undefined} disabled={statusDisabled} onClick={() => void save({ published: !published, pinned, message: published ? '公告已從首頁下架' : '公告已公開到首頁' })}><span className="announcement-switch-track" aria-hidden="true"><span /></span><span>公開到首頁</span></button><span className="announcement-switch-state">{published ? '已公開' : '未公開'}</span></div>
+        <div className="announcement-switch-row"><button className="announcement-switch" type="button" role="switch" aria-label="置頂公告" aria-checked={pinned} aria-describedby={unsavedContent ? 'announcement-status-hint' : undefined} disabled={statusDisabled} onClick={() => void save({ published, pinned: !pinned, message: pinned ? '公告已取消置頂' : '公告已置頂' })}><span className="announcement-switch-track" aria-hidden="true"><span /></span><span>置頂公告</span></button><span className="announcement-switch-state">{pinned ? '已置頂' : '未置頂'}</span></div>
+        {unsavedContent && <p id="announcement-status-hint" className="editor-hint">先儲存內容，再變更公開或置頂狀態</p>}
+        {!unsavedContent && <p className="editor-hint">{busy && pending.current?.kind === 'status' ? '正在儲存狀態…' : '開關會立即儲存狀態。'}{!published && pinned ? '公開後才會在首頁置頂。' : ''}</p>}
+        {unknown === 'status' && <button type="button" className="secondary" disabled={busy} onClick={() => void save()}>原樣重試狀態變更</button>}
+      </div>
+    </div>
   </form>}
     {deleted && item?.photo_id && <img className="announcement-photo preview" src={appUrl(`/api/admin/announcement-media/${item.photo_id}`)} alt="既有文末照片" />}
     {deleted && !deletion && errors}
-    {item && <><button type="button" className="secondary history-button" disabled={disabled} onClick={loadHistory}>公告修改歷史</button><div className="announcement-lifecycle"><p>{deleted ? '還原後會回到目前公告，維持未發布。' : '刪除後會從首頁移除，內容、圖片與操作紀錄仍可還原。'}</p><button type="button" className={deleted ? 'secondary' : 'danger secondary'} disabled={disabled} onClick={() => { setError(''); setDeletionUnknown(false); setDeletion({ restore: deleted, version, key: crypto.randomUUID() }) }}>{deleted ? '還原公告' : '刪除公告'}</button></div></>}
+    {item && <>{deleted && <button type="button" className="secondary history-button" disabled={disabled} onClick={loadHistory}>公告修改歷史</button>}<div className="announcement-lifecycle"><p>{deleted ? '還原後會回到目前公告，維持未發布。' : '刪除後會從首頁移除，內容、圖片與操作紀錄仍可還原。'}</p><button type="button" className={deleted ? 'secondary' : 'danger secondary'} disabled={disabled} onClick={() => { setError(''); setDeletionUnknown(false); setDeletion({ restore: deleted, version, key: crypto.randomUUID() }) }}>{deleted ? '還原公告' : '刪除公告'}</button></div></>}
     {history && <ul>{history.map(row => <li key={row.id}>{row.admin_username}・{({ create: '新增', update: '修改', photo: '照片', inline_photo: '內文圖片', delete: '刪除', restore: '還原' }[row.action] ?? row.action)}・{dateTime(row.created_at)}<p>{Object.keys(row.changes).map(key => ({ title: '標題', body: '內容', photo_id: '照片', inline_media_id: '內文圖片', is_published: '發布狀態', is_pinned: '置頂狀態', deleted_at: '刪除狀態' }[key] ?? key)).join('、')}</p></li>)}</ul>}
     <dialog ref={dialog} className="competition-confirm-dialog" aria-labelledby="announcement-confirm-title" onCancel={event => { event.preventDefault(); if (!busy && !deletionUnknown) setDeletion(null) }}>
       <h2 id="announcement-confirm-title">{deletion?.restore ? '確認還原公告？' : '確認刪除公告？'}</h2><p className="competition-confirm-name">{item?.title}</p><p>{deletion?.restore ? '內容、圖片與操作紀錄會保留。還原後維持未發布，確認內容後可再發布到首頁。' : '公告將從首頁移除，並移至已刪除清單，可隨時還原。只保留已儲存的版本，尚未儲存的輸入不會保存。'}</p>

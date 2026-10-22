@@ -1,5 +1,7 @@
 # 府城球館會員管理系統
 
+0.4.5 統一新增空白欄的入口，空格可放選手或文字：移入普通欄只換位置，移入既有級數欄維持本場調級。公告改為先儲存內容，再用公開／置頂開關立即保存狀態；修正中文斜體並加寬編輯工具列。資料相容、驗證與發布範圍見 [0.4.5 發布說明](docs/release-0.4.5.md)。本版部署至既有試用站的結果另記於[家中部署紀錄](docs/home-deployment.md)，不代表球館電腦已部署。
+
 0.4.4 新增公告可還原刪除：在「公告管理」的「目前公告」選取公告後按「刪除公告」，可從「已刪除」清單唯讀檢視內容、圖片與歷史，再按「還原公告」回到未發布狀態。一般下架仍是取消「發布到首頁」並儲存。本輪未部署，現站維持 0.4.3／`0012_device_reports`；升級需先停寫、成組備份，再顯式遷移至0013。詳見 [0.4.4 發布說明](docs/release-0.4.4.md)；正式版本與映像身份以 [GitHub Release](https://github.com/momonong/fucheng-players-system/releases/tag/v0.4.4)及 [Docker Hub 0.4.4 標籤](https://hub.docker.com/r/momonong/fucheng-players-system/tags?name=0.4.4)為準。
 
 0.4.4 本輪後端281個案例取得通過證據，另6個PowerShell案例跳過；同份前端成品分spec、獨立合成DB的UI驗證合計27 passed、1個既有skip，涵蓋公告、報名連動及比賽刪除／還原。鎖檔檢查、typecheck、build與npm audit通過；詳細範圍及驗收界線見上述發布說明。

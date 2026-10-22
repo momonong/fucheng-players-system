@@ -224,7 +224,7 @@ def operation_cursor(db, competition_id, admin_id, token, revision):
         return None, []
     try:
         receipt = json.loads(record.receipt_json)
-        if not receipt.get("_undo"):
+        if not isinstance(receipt.get("_undo"), dict):
             return None, []
         redo_stack = receipt.get("_redo_stack", [])
         if (not isinstance(redo_stack, list)
@@ -239,18 +239,38 @@ def operation_cursor(db, competition_id, admin_id, token, revision):
         raise HTTPException(409, "復原紀錄與目前安排不符；請重新讀取") from error
 
 
-def checked_snapshot(layout, current, action):
+_MISSING_LEVELS = object()
+
+
+def roster_levels(rows):
+    return {row.registration_id: row.competition_level for row in rows}
+
+
+def checked_snapshot(layout, current, action, levels=_MISSING_LEVELS):
     try:
         validated = grid.GridLayout.model_validate(layout)
         snapshot = validated.model_dump()
-        levels = {column["id"]: column["level"] for column in snapshot["columns"]}
-        restored = {cell["registration_id"]: levels[cell["column_id"]]
-                    for cell in snapshot["cells"] if cell["kind"] == "registration"}
-        if set(restored) != {row.registration_id for row in current.rows}:
+        if levels is _MISSING_LEVELS:
+            # Historical schema-1 receipts have no independent level snapshot.
+            # Only their numeric-column invariant can prove the original levels.
+            if snapshot["schema_version"] != 1:
+                raise ValueError("缺少級數快照")
+            columns = {column["id"]: column for column in snapshot["columns"]}
+            levels = {}
+            for cell in snapshot["cells"]:
+                if cell["kind"] == "registration":
+                    column = columns[cell["column_id"]]
+                    if column["kind"] != "level":
+                        raise ValueError("舊紀錄無法推回級數")
+                    levels[cell["registration_id"]] = column["level"]
+        if (not isinstance(levels, dict) or set(levels) != {row.registration_id for row in current.rows}
+                or any(type(level) is not int or not 1 <= level <= 10 for level in levels.values())):
             raise ValueError("名單不同")
-        rows = [{**row.model_dump(), "competition_level": restored[row.registration_id]} for row in current.rows]
+        rows = [{**row.model_dump(), "competition_level": levels[row.registration_id]} for row in current.rows]
         grid.validate(snapshot, rows)
-        return snapshot
+        # Undo never downgrades the mutable document's capability contract.
+        snapshot["schema_version"] = max(snapshot["schema_version"], current.layout.schema_version)
+        return snapshot, levels
     except (ValidationError, ValueError, KeyError, TypeError, HTTPException) as error:
         raise HTTPException(409, f"{action}紀錄與目前名單或布局不相容") from error
 
@@ -263,11 +283,14 @@ def undo_layout(db, competition_id, admin_id, current, target_request_id, head):
         raise HTTPException(409, "只能復原自己在這場的最近安排")
     receipt = json.loads(target.receipt_json)
     metadata = receipt.get("_undo")
-    if (not metadata or receipt.get("operation", {}).get("action") in {"undo", "redo"}
+    if (not isinstance(metadata, dict) or receipt.get("operation", {}).get("action") in {"undo", "redo"}
             or metadata.get("base_version_id") != (current.latest.id if current.latest else None)):
         raise HTTPException(409, "保存基準已變更或這筆紀錄不可復原")
-    layout = checked_snapshot(metadata.get("before_layout"), current, "復原")
-    return layout, metadata.get("parent_request_id")
+    after, levels = checked_snapshot(receipt.get("layout"), current, "復原", metadata.get("after_levels", _MISSING_LEVELS))
+    if grid.signature(after) != grid.signature(current.layout.model_dump()) or levels != roster_levels(current.rows):
+        raise HTTPException(409, "目前布局或級數已不同於待復原操作的結果；請重新核對")
+    layout, levels = checked_snapshot(metadata.get("before_layout"), current, "復原", metadata.get("before_levels", _MISSING_LEVELS))
+    return layout, levels, metadata.get("parent_request_id")
 
 
 def redo_layout(db, competition_id, admin_id, current, target_request_id, head, redo_stack):
@@ -278,21 +301,25 @@ def redo_layout(db, competition_id, admin_id, current, target_request_id, head, 
         raise HTTPException(409, "只能重做自己在這場已復原的安排")
     receipt = json.loads(target.receipt_json)
     metadata = receipt.get("_undo")
-    if (not metadata or receipt.get("operation", {}).get("action") in {"undo", "redo"}
+    if (not isinstance(metadata, dict) or receipt.get("operation", {}).get("action") in {"undo", "redo"}
             or metadata.get("base_version_id") != (current.latest.id if current.latest else None)
             or metadata.get("parent_request_id") != head):
         raise HTTPException(409, "保存基準或復原順序已變更；請重新核對")
-    before = checked_snapshot(metadata.get("before_layout"), current, "重做")
-    if grid.signature(before) != grid.signature(current.layout.model_dump()):
+    before, levels = checked_snapshot(metadata.get("before_layout"), current, "重做", metadata.get("before_levels", _MISSING_LEVELS))
+    if grid.signature(before) != grid.signature(current.layout.model_dump()) or levels != roster_levels(current.rows):
         raise HTTPException(409, "目前布局已不同於待重做操作的起點；請重新核對")
-    after = checked_snapshot(receipt.get("layout"), current, "重做")
-    return after, target_request_id
+    after, levels = checked_snapshot(receipt.get("layout"), current, "重做", metadata.get("after_levels", _MISSING_LEVELS))
+    return after, levels, target_request_id
 
 
 def mutate_grid(db, auth, competition_id, payload):
     try:
         admin_id = _begin_immediate(db, auth)
-        fingerprint = digest({"competition_id":competition_id, **payload.model_dump(exclude={"request_id"})})
+        fingerprint_payload = payload.model_dump(exclude={"request_id", "layout_schema_version"})
+        # Preserve exact replay of pre-capability requests and historical receipts.
+        if payload.layout_schema_version != 1:
+            fingerprint_payload["layout_schema_version"] = payload.layout_schema_version
+        fingerprint = digest({"competition_id":competition_id, **fingerprint_payload})
         duplicate = db.get(ArrangementOperation, payload.request_id)
         if duplicate:
             if duplicate.admin_id != admin_id or duplicate.competition_id != competition_id or duplicate.fingerprint != fingerprint:
@@ -302,6 +329,8 @@ def mutate_grid(db, auth, competition_id, payload):
             return receipt
         competition = require_competition(db, competition_id, mutable=True)
         current = state(db, competition)
+        if current.layout and current.layout.schema_version > payload.layout_schema_version:
+            raise HTTPException(409, "此安排已使用新版空白欄，請重新整理頁面後再操作")
         if not current.layout or current.state_token != payload.state_token:
             raise HTTPException(409, "安排或名單已更新，請重新讀取並核對")
         workspace = db.get(ArrangementWorkspace, competition_id)
@@ -309,6 +338,8 @@ def mutate_grid(db, auth, competition_id, payload):
             raise HTTPException(409, "此操作識別碼已用於其他操作")
         before = workspace.layout_json
         layout = json.loads(before)
+        before_levels = roster_levels(current.rows)
+        next_levels = dict(before_levels)
         operation = payload.operation
         parent, redo_stack = operation_cursor(db, competition_id, admin_id, current.state_token, workspace.revision)
         next_head = payload.request_id
@@ -323,20 +354,28 @@ def mutate_grid(db, auth, competition_id, payload):
                     raise HTTPException(409, "選手已不在這場正取名單")
         before_positions = {c["registration_id"]:grid.key(c) for c in layout["cells"] if c["kind"] == "registration"}
         if operation.action == "undo":
-            layout, next_head = undo_layout(db, competition_id, admin_id, current, operation.target_request_id, parent)
+            layout, next_levels, next_head = undo_layout(db, competition_id, admin_id, current, operation.target_request_id, parent)
             next_redo_stack = [*redo_stack, operation.target_request_id]
         elif operation.action == "redo":
-            layout, next_head = redo_layout(db, competition_id, admin_id, current,
+            layout, next_levels, next_head = redo_layout(db, competition_id, admin_id, current,
                 operation.target_request_id, parent, redo_stack)
             next_redo_stack = redo_stack[:-1]
         else:
+            layout["schema_version"] = max(layout["schema_version"], payload.layout_schema_version)
             grid.apply(layout, operation)
+        layout["schema_version"] = max(layout["schema_version"], payload.layout_schema_version)
         columns = {c["id"]:c for c in layout["columns"]}
         for cell in layout["cells"]:
-            if cell["kind"] != "registration" or before_positions.get(cell["registration_id"]) == grid.key(cell):
+            if cell["kind"] != "registration":
+                continue
+            rid = cell["registration_id"]
+            moved = before_positions.get(rid) != grid.key(cell)
+            if operation.action not in {"undo", "redo"} and moved and columns[cell["column_id"]]["kind"] == "level":
+                next_levels[rid] = columns[cell["column_id"]]["level"]
+            if not moved and next_levels[rid] == before_levels[rid]:
                 continue
             affected = db.get(CompetitionRegistration, cell["registration_id"])
-            level = columns[cell["column_id"]]["level"]
+            level = next_levels[rid]
             if affected.competition_level != level:
                 old_level = affected.competition_level
                 affected.competition_level = level
@@ -355,7 +394,7 @@ def mutate_grid(db, auth, competition_id, payload):
         db.flush()
         grid.validate(layout, confirmed_rows(roster(db, competition_id)))
         after = grid.encode(layout)
-        if grid.signature(json.loads(before)) == grid.signature(layout):
+        if grid.signature(json.loads(before)) == grid.signature(layout) and before_levels == next_levels:
             raise HTTPException(422, "安排沒有變更")
         workspace.layout_json = after
         workspace.revision += 1
@@ -367,6 +406,7 @@ def mutate_grid(db, auth, competition_id, payload):
             "redo_head":next_redo_stack[-1] if next_redo_stack else None,
             "_redo_stack":next_redo_stack,
             "_undo":{"before_layout":json.loads(before), "parent_request_id":parent,
+                     "before_levels":before_levels, "after_levels":next_levels,
                      "base_version_id":current.latest.id if current.latest else None}}
         db.add(ArrangementOperation(request_id=payload.request_id,competition_id=competition_id,admin_id=admin_id,
             fingerprint=fingerprint,receipt_json=json.dumps(receipt,ensure_ascii=False)))
