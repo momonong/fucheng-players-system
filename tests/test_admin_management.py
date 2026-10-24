@@ -438,12 +438,16 @@ def test_0011_migration_preserves_accounts_sessions_and_all_existing_rows(tmp_pa
     command.upgrade(config, "0010_deployment_report")
     with sqlite3.connect(path) as db:
         tables = [row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'") if row[0] not in {"alembic_version", "admins"}]
+        columns = {table: [row[1] for row in db.execute(f'PRAGMA table_info("{table}")')] for table in tables}
         before = {table: db.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall() for table in tables}
         old_admin = db.execute("SELECT * FROM admins").fetchone()
     command.upgrade(config, "head")
     with sqlite3.connect(path) as db:
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
-        assert {table: db.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall() for table in tables} == before
+        for table in tables:
+            projection = ",".join(f'"{column}"' for column in columns[table])
+            assert db.execute(f'SELECT {projection} FROM "{table}" ORDER BY rowid').fetchall() == before[table]
+        assert db.execute("SELECT registration_mode,doubles_min_total_level FROM competitions").fetchall() == [("individual", None)]
         assert db.execute("SELECT id,username,password_hash,is_active,created_at FROM admins").fetchone() == old_admin
         assert db.execute("SELECT version,must_change_password,updated_at=created_at FROM admins").fetchone() == (1, 0, 1)
         assert db.execute("SELECT display_name FROM admins").fetchone() == (None,)

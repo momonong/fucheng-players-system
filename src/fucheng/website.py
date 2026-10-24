@@ -144,6 +144,7 @@ def clean_announcement_html(body: str) -> tuple[str, list[str]]:
 
 
 class ScheduleItem(BaseModel):
+    registration_mode: Literal["individual", "doubles"]
     id: str
     name: str
     competition_date: date
@@ -257,6 +258,7 @@ def install_website_routes(app, get_db, current_auth, require_csrf):
             .order_by(Competition.competition_date.desc(), Competition.id))
         now = now_utc()
         return [ScheduleItem(id=row.id, name=row.name, competition_date=row.competition_date,
+            registration_mode=row.registration_mode,
             registration_deadline=row.registration_deadline, notes=row.notes,
             status="closed" if row.status == "open" and row.registration_deadline <= now else row.status)
             for row in rows]

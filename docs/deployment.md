@@ -1,5 +1,17 @@
 # Windows Docker 部署、搬移與維運
 
+## 1.1.0 雙打報名與 schema 0014
+
+1.1.0 新增雙打報名與管理，須同批更新前後端及 app／backup／ops image。版本與功能見 [1.1.0 發布說明](release-1.1.0.md)及[雙打使用說明](doubles-registration.md)。本節是升級契約；實際映像 digest、部署時間與驗證結果以當次[家中部署紀錄](home-deployment.md)為準。
+
+新 head 為 `0014_doubles_registration`，前版為 `0013_announcement_deletion`。migration 新增雙打登記、成員快照、稽核及 receipt，舊場次明確保留 `registration_mode=individual`、`doubles_min_total_level=null`，不將舊個人報名轉為雙打，不改既有會員級數或安排 layout。新增雙打賽事仍須由管理員明確建立，本次發布不在真實資料庫新增測試場次或報名。
+
+更新既有部署前，核對唯一 project、來源 image／schema 與目前資料，停止此 project 的 app／backup 寫入，確認無其他 writer；以原版 runtime 成組備份 DB＋媒體並核對 hash、保留舊 image、設定及 volumes。之後才用已核對的新 image 經 runtime lifecycle／maintenance guard 明確執行 `ops migrate`；`Start`／`serve` 只檢查 schema，不會自動 migration。不得繞過 guard 直接對 volume 執行 Alembic，或以 `init`、reseed、合成 DB 取代原資料。
+
+遷移後同批啟動新版 app／backup，核對 head、integrity／foreign keys、所有既有表欄位及資料指紋、帳號與媒體、備份健康、公開 HTTPS 與原個人賽唯讀結果；舊場次的兩個新欄位只接受上述預設。雙打行為以隔離合成資料驗證，不在正式名單建立測試資料。任何 migration 或核對失敗都停住並保留 maintenance 與故障庫，未完成不能宣稱上線。
+
+`0014` 明確拒絕直接 downgrade；**不可只換回 1.0.0 或其他舊 image 操作已升級資料庫**。回退依下方[更新與回退](#更新與回退)流程，保留目前故障庫／後續寫入，以升級前成組備份在新目標還原，搭配該備份匹配的 image／schema，再核對資料及入口。沒有原地刪除雙打資料或稽核的回退途徑。
+
 ## 球館健檢報告自動回傳（候選）
 
 Windows 一鍵工具、私密設定、固定 UUID 重試、admin-only 取回及接收站 overlay 見[健檢報告回傳](host-report-upload.md)。接收功能預設關閉；啟用前須按維運契約停寫、備份及顯式遷移至 `0012_device_reports`。不改既有手動上傳畫面，不將程式備妥當成球館實機或正式啟用證據。

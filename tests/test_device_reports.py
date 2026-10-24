@@ -255,16 +255,20 @@ def test_0012_preserves_all_previous_tables_and_enforces_append_only(tmp_path, m
         db.execute("INSERT INTO deployment_report_audits VALUES ('da',1,?,'a','2026-01-01')", ('0'*64,))
         db.commit()
         tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != 'alembic_version' ORDER BY name")]
+        columns = {t:[r[1] for r in db.execute(f'PRAGMA table_info("{t}")')] for t in tables}
         before = {t:db.execute(f'SELECT * FROM "{t}" ORDER BY rowid').fetchall() for t in tables}
     command.upgrade(config, 'head')
     command.check(config)
     with sqlite3.connect(path) as db:
-        assert {t:db.execute(f'SELECT * FROM "{t}" ORDER BY rowid').fetchall() for t in tables} == before
-        assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0] == '0013_announcement_deletion'
+        for table in tables:
+            projection = ",".join(f'"{column}"' for column in columns[table])
+            assert db.execute(f'SELECT {projection} FROM "{table}" ORDER BY rowid').fetchall() == before[table]
+        assert db.execute("SELECT registration_mode,doubles_min_total_level FROM competitions").fetchall() == [("individual",None)]
+        assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0] == '0014_doubles_registration'
         assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
         assert db.execute('PRAGMA foreign_key_check').fetchall() == []
         after_tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != 'alembic_version'")}
-        assert after_tables == set(tables) | {'device_deployment_reports'}
+        assert after_tables == set(tables) | {'device_deployment_reports','doubles_entries','doubles_entry_members','doubles_audits','doubles_receipts'}
         db.execute('INSERT INTO device_deployment_reports VALUES (?,?,?,?,?,?)', ('r','synthetic-device','0'*64,'{}',2,'2026-01-01'))
         db.commit()
         for sql in ("UPDATE device_deployment_reports SET digest='changed'", 'DELETE FROM device_deployment_reports'):

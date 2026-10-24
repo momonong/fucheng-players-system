@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
+import { DoublesManager } from './DoublesRegistration'
 import { CompetitionLevels } from './CompetitionLevels'
 import { ResponsivePanel } from './ResponsivePanel'
 import { PrintPreview } from './PrintPreview'
@@ -25,7 +26,7 @@ const registrationText: Record<RegistrationStatus, string> = {
   confirmed: '正取', waitlisted: '候補', cancelled: '已取消',
 }
 const emptyDraft: CompetitionDraft = {
-  name: '', competition_date: '', capacity: 1, registration_deadline: '', notes: '', status: 'draft', reason: '',
+  name: '', competition_date: '', capacity: 1, registration_deadline: '', notes: '', status: 'draft', reason: '', registration_mode: 'individual', doubles_min_total_level: 10,
 }
 
 export function CompetitionManager({ username, displayName, onLogout }: { username: string; displayName?: string | null; onLogout: () => void }) {
@@ -33,8 +34,11 @@ export function CompetitionManager({ username, displayName, onLogout }: { userna
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<CompetitionDetail | null>(null)
   const [creating, setCreating] = useState(false)
+  const [doublesLocked, setDoublesLocked] = useState(false)
+  const isDoubles = detail?.competition.registration_mode === 'doubles'
   const arrangements = useArrangementWorkspace(username)
   const [view, setView] = useState<'arrangement' | 'management'>('arrangement')
+  const managementView = view === 'management' || isDoubles
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
   const [listExpanded, setListExpanded] = useState(() => window.matchMedia('(min-width: 901px)').matches)
 
@@ -47,6 +51,11 @@ export function CompetitionManager({ username, displayName, onLogout }: { userna
   const [deleted, setDeleted] = useState(false)
   const [confirmation, setConfirmation] = useState<Competition | null>(null)
   const requestSequence = useRef(0)
+
+  const syncDoublesCompetition = useCallback((competition: Competition) => {
+    setItems(current => current.map(item => item.id === competition.id ? competition : item))
+    setDetail(current => current?.competition.id === competition.id ? { ...current, competition } : current)
+  }, [])
 
   async function loadList(selectId?: string) {
     const sequence = ++requestSequence.current
@@ -84,25 +93,25 @@ export function CompetitionManager({ username, displayName, onLogout }: { userna
   return <>
     <AdminHeader section="competitions" username={username} displayName={displayName} onLogout={signOut} />
     {notice && <div className={`toast ${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}><span>{notice.text}</span><button className="toast-close" onClick={() => setNotice(null)}>×</button></div>}
-    <nav className="competition-mode no-print" aria-label="比賽工作區"><h2>比賽</h2><select aria-label="選擇比賽" value={selectedId ?? ''} onChange={event => loadDetail(event.target.value)}>{!items.length && <option value="">尚無比賽</option>}{items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="secondary" aria-pressed={view === 'arrangement'} onClick={() => { setView('arrangement'); if (selectedId) void loadDetail(selectedId) }}>排級數</button><button className="secondary" aria-pressed={view === 'management'} onClick={() => { setView('management'); if (selectedId) void loadDetail(selectedId) }}>報名與設定</button>{view === 'management' && detail && <a className="roster-shortcut" href={`${location.pathname}${location.search}#registration-roster`}>前往報名名單</a>}</nav>
-    {view === 'arrangement' && <main className="arrangement-main">{detail ? <CompetitionLevels key={detail.competition.id} competition={detail.competition} controller={arrangements} username={username} /> : <p>請選擇比賽，或到「報名與設定」建立比賽。</p>}</main>}
-    {view === 'management' && <main className="competition-layout">
+    <nav className="competition-mode no-print" aria-label="比賽工作區"><h2>比賽</h2><select aria-label="選擇比賽" disabled={doublesLocked} value={selectedId ?? ''} onChange={event => loadDetail(event.target.value)}>{!items.length && <option value="">尚無比賽</option>}{items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button disabled={doublesLocked || isDoubles} className="secondary" aria-pressed={view === 'arrangement' && !isDoubles} onClick={() => { setView('arrangement'); if (selectedId) void loadDetail(selectedId) }}>排級數</button><button disabled={doublesLocked} className="secondary" aria-pressed={managementView} onClick={() => { setView('management'); if (selectedId && !isDoubles) void loadDetail(selectedId) }}>報名與設定</button>{managementView && detail && <a className="roster-shortcut" href={`${location.pathname}${location.search}#registration-roster`}>前往報名名單</a>}</nav>
+    {view === 'arrangement' && !isDoubles && <main className="arrangement-main">{detail ? <CompetitionLevels key={detail.competition.id} competition={detail.competition} controller={arrangements} username={username} /> : <p>請選擇比賽，或到「報名與設定」建立比賽。</p>}</main>}
+    {managementView && <main className="competition-layout">
       <details className="panel competition-list no-print" open={listExpanded} onToggle={event => setListExpanded(event.currentTarget.open)}>
         <summary className="competition-list-toggle">切換或建立比賽</summary>
         <div className="competition-list-content">
-        <div className="section-title"><div><h2>比賽清單</h2><p>共 {items.length} 場</p></div><button disabled={deleted} onClick={() => { requestSequence.current++; setCreating(true); setSelectedId(null); setDetail(null); setListExpanded(false) }}>建立比賽</button></div>
-        <div className="competition-view-switch" aria-label="比賽清單範圍"><button className="secondary" aria-pressed={!deleted} onClick={() => setDeleted(false)}>目前比賽</button><button className="secondary" aria-pressed={deleted} onClick={() => setDeleted(true)}>已刪除</button></div>
-        <div className="competition-items">{items.map(item => <button key={item.id} className={`competition-item ${selectedId === item.id ? 'selected' : ''}`} onClick={() => loadDetail(item.id)}>
-          <strong>{item.name}</strong><span>{item.competition_date}・{item.deleted_at ? '已刪除' : statusText[item.status]}</span><small>正取 {item.summary.confirmed}/{item.capacity}・候補 {item.summary.waitlisted}</small>
+        <div className="section-title"><div><h2>比賽清單</h2><p>共 {items.length} 場</p></div><button disabled={deleted || doublesLocked} onClick={() => { requestSequence.current++; setCreating(true); setSelectedId(null); setDetail(null); setListExpanded(false) }}>建立比賽</button></div>
+        <div className="competition-view-switch" aria-label="比賽清單範圍"><button className="secondary" disabled={doublesLocked} aria-pressed={!deleted} onClick={() => setDeleted(false)}>目前比賽</button><button className="secondary" disabled={doublesLocked} aria-pressed={deleted} onClick={() => setDeleted(true)}>已刪除</button></div>
+        <div className="competition-items">{items.map(item => <button key={item.id} disabled={doublesLocked} className={`competition-item ${selectedId === item.id ? 'selected' : ''}`} onClick={() => loadDetail(item.id)}>
+          <strong>{item.name}</strong><span>{item.competition_date}・{item.deleted_at ? '已刪除' : statusText[item.status]}</span><small>{item.registration_mode === 'doubles' ? `雙打・正取 ${item.doubles_summary?.confirmed || 0}/${item.capacity} 隊・候補 ${item.doubles_summary?.waitlisted || 0} 隊` : `正取 ${item.summary.confirmed}/${item.capacity}・候補 ${item.summary.waitlisted}`}</small>
         </button>)}</div>
         </div>
       </details>
       <section className="competition-workspace">
         {creating && <CompetitionEditor onSaved={competition => { setNotice({ kind: 'success', text: '比賽已建立' }); setCreating(false); loadList(competition.id) }} />}
         {detail && <>
-          <div className="panel competition-delete-actions no-print"><div>{detail.competition.deleted_at ? <p>已於 {taipei(detail.competition.deleted_at)} 刪除，名單保留且暫停所有操作。</p> : <p>不需要的比賽可移到「已刪除」，日後仍可還原。</p>}</div><button className={detail.competition.deleted_at ? 'secondary' : 'danger'} onClick={() => setConfirmation(detail.competition)}>{detail.competition.deleted_at ? '還原比賽' : '刪除比賽'}</button></div>
-          <CompetitionEditor competition={detail.competition} onSaved={competition => { setNotice({ kind: 'success', text: '比賽設定已儲存' }); loadList(competition.id) }} />
-          <CompetitionRoster detail={detail} reload={() => loadList(detail.competition.id)} notify={setNotice} />
+          <div inert={doublesLocked} className="panel competition-delete-actions no-print"><div>{detail.competition.deleted_at ? <p>已於 {taipei(detail.competition.deleted_at)} 刪除，名單保留且暫停所有操作。</p> : <p>不需要的比賽可移到「已刪除」，日後仍可還原。</p>}</div><button className={detail.competition.deleted_at ? 'secondary' : 'danger'} onClick={() => setConfirmation(detail.competition)}>{detail.competition.deleted_at ? '還原比賽' : '刪除比賽'}</button></div>
+          <div inert={doublesLocked}><CompetitionEditor competition={detail.competition} onSaved={competition => { setNotice({ kind: 'success', text: '比賽設定已儲存' }); loadList(competition.id) }} /></div>
+          {isDoubles ? <DoublesManager key={detail.competition.id} competition={detail.competition} onLock={setDoublesLocked} username={username} onRead={syncDoublesCompetition} /> : <CompetitionRoster detail={detail} reload={() => loadList(detail.competition.id)} notify={setNotice} />}
         </>}
         {!creating && !detail && <div className="panel empty">請選擇比賽，或建立一場比賽。</div>}
       </section>
@@ -129,8 +138,8 @@ function DeletionDialog({ competition, onClose, onDone }: { competition: Competi
   return <dialog ref={dialog} className="competition-confirm-dialog" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description" onCancel={event => { event.preventDefault(); if (!submitting.current) onClose() }}>
     <h2 id="delete-dialog-title">{restore ? '確認還原比賽？' : '確認刪除比賽？'}</h2>
     <p className="competition-confirm-name">{competition.name}</p>
-    <p>{competition.competition_date}・名額 {competition.capacity} 人</p>
-    <p>正取 {competition.summary.confirmed} 人・候補 {competition.summary.waitlisted} 人・已取消 {competition.summary.cancelled} 人</p>
+    <p>{competition.competition_date}・名額 {competition.capacity} {competition.registration_mode === 'doubles' ? '隊' : '人'}</p>
+    {competition.registration_mode === 'doubles' ? <p>正取 {competition.doubles_summary?.confirmed || 0} 隊・候補 {competition.doubles_summary?.waitlisted || 0} 隊・已取消 {competition.doubles_summary?.cancelled || 0} 筆</p> : <p>正取 {competition.summary.confirmed} 人・候補 {competition.summary.waitlisted} 人・已取消 {competition.summary.cancelled} 人</p>}
     <p id="delete-dialog-description">{restore ? `將恢復為「${statusText[competition.status]}」。若原本報名中且尚未截止，還原後會重新開放報名。` : '刪除後會從首頁、報名入口與目前比賽清單移除。所有報名與操作紀錄都會保留，可從「已刪除」還原。'}</p>
     {error && <p className="notice error" role="alert">{error}</p>}
     <div className="competition-confirm-buttons"><button ref={safeButton} className="secondary" disabled={busy} onClick={onClose}>{restore ? '暫不還原' : '保留比賽'}</button><button className={restore ? '' : 'danger'} disabled={busy} onClick={confirm}>{busy ? '處理中…' : restore ? '確認還原' : '確認刪除'}</button></div>
@@ -163,11 +172,13 @@ function CompetitionEditor({ competition, onSaved }: { competition?: Competition
     <summary className="section-title"><div><h2>{competition ? '比賽設定' : '建立比賽'}</h2>{competition && <p>版本 {competition.version}・最後更新 {taipei(competition.updated_at)}</p>}</div>{readonly && <span className="status inactive">唯讀</span>}</summary>
     {error && <div className="notice error" role="alert">{error}（輸入已保留）</div>}
     <form onSubmit={submit}>
+      <label>報名模式<select value={draft.registration_mode || 'individual'} disabled={!!competition || readonly} onChange={event => set('registration_mode', event.target.value as 'individual' | 'doubles')}><option value="individual">個人報名</option><option value="doubles">雙打組隊</option></select></label>{competition && <p>報名模式建立後不能更改。</p>}
       <label>名稱<input required maxLength={120} value={draft.name} disabled={readonly} onChange={event => set('name', event.target.value)} /></label>
       <div className="form-row"><label>比賽日期<input type="date" required value={draft.competition_date} disabled={readonly} onChange={event => set('competition_date', event.target.value)} /></label>
-      <label>名額上限<input type="number" min={1} max={10000} required value={draft.capacity} disabled={readonly} onChange={event => set('capacity', Number(event.target.value))} /></label></div>
+      <label>{draft.registration_mode === 'doubles' ? '隊數上限' : '名額上限'}<input type="number" min={1} max={10000} required value={draft.capacity} disabled={readonly} onChange={event => set('capacity', Number(event.target.value))} /></label></div>
       <div className="form-row"><label>報名截止時間（台北時間）<input type="datetime-local" required value={draft.registration_deadline} disabled={readonly} onChange={event => set('registration_deadline', event.target.value)} /></label>
       <label>狀態<select value={draft.status} disabled={readonly} onChange={event => set('status', event.target.value as CompetitionStatus)}>{allowedStatuses.map(status => <option key={status} value={status}>{statusText[status]}</option>)}</select></label></div>
+      {draft.registration_mode === 'doubles' && <label>兩人級數合計至少（留空表示不設門檻）<input type="number" min={2} max={20} value={draft.doubles_min_total_level ?? ''} disabled={readonly} onChange={event => set('doubles_min_total_level', event.target.value === '' ? null : Number(event.target.value))} /></label>}
       <label>備註<textarea rows={3} maxLength={5000} value={draft.notes} disabled={readonly} onChange={event => set('notes', event.target.value)} /></label>
       {competition && !readonly && <label>設定異動原因（建議填寫）<input maxLength={500} value={draft.reason ?? ''} onChange={event => set('reason', event.target.value)} /></label>}
       {!readonly && <button disabled={saving}>{saving ? '儲存中…' : '儲存比賽'}</button>}
@@ -303,7 +314,7 @@ function RosterSideList({ rows, search, onSelect }: { rows: CompetitionRegistrat
 }
 
 function Summary({ label, value }: { label: string; value: string | number }) { return <div className="summary-card"><span>{label}</span><strong>{value}</strong></div> }
-function fromCompetition(value: Competition): CompetitionDraft { return { name: value.name, competition_date: value.competition_date, capacity: value.capacity, registration_deadline: taipeiInput(value.registration_deadline), notes: value.notes ?? '', status: value.status, version: value.version, reason: '' } }
+function fromCompetition(value: Competition): CompetitionDraft { return { registration_mode: value.registration_mode, doubles_min_total_level: value.doubles_min_total_level, name: value.name, competition_date: value.competition_date, capacity: value.capacity, registration_deadline: taipeiInput(value.registration_deadline), notes: value.notes ?? '', status: value.status, version: value.version, reason: '' } }
 function legalStatuses(status: CompetitionStatus): CompetitionStatus[] { return status === 'draft' ? ['draft', 'open', 'cancelled'] : status === 'open' ? ['open', 'closed', 'cancelled'] : status === 'closed' ? ['closed', 'ended', 'cancelled'] : [status] }
 function taipeiInput(value: string) { return new Date(new Date(value).getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 16) }
 function taipei(value: string) { return new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Taipei' }).format(new Date(value)) }

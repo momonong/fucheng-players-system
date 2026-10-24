@@ -302,3 +302,6 @@ frontend/dist-base-path/
 /output/table-design-samples-20261020/
 
 /frontend/dist-print-headers/
+
+/frontend/dist-doubles-e2e/
+/frontend/dist-release-110/
