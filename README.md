@@ -1,5 +1,7 @@
 # 府城球館會員管理系統
 
+1.2.0 候選新增映像內建部署檢查：管理員在「系統狀態 → 部署檢查報告」按「立即檢查並回傳」，先保存目前 app／Linux 容器的 schema 2 報告，再以私密唯讀 token 檔回傳至固定 HTTPS 接收站；未配置或回傳失敗仍可下載，未知結果保留原 UUID／內容恢復。舊 Windows schema 1 與手動上傳相容。新增 `0015_deployment_diagnostics` 僅加入 run 表；升級須停寫、成組備份及顯式 migrate，serve 不 migration，回退需匹配 image／schema 並還原至新目標。候選二已取得隔離工程與映像 smoke 證據；正式版本／映像發布、現站升級及真實接收站仍待本輪後續執行，球館 Windows、官方外網與完整還原未驗證。詳見 [1.2.0 發布說明](docs/release-1.2.0.md)及[檢查與回傳操作](docs/host-report-upload.md)。
+
 1.1.0 新增雙打組隊報名：可單人等待搭檔或兩人一起報名，由管理員接受、候補遞補、取消與拆隊；原個人賽及安排表保留。已合併、推送並發布 [GitHub Release v1.1.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.1.0)及 Docker Hub `1.1.0`／`latest`，2026-10-24 台北時間 14:30:01 更新既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)。先停寫、成組備份，再經 runtime guard 遷移至 `0014_doubles_registration`；app／backup 健康，22 張舊表原欄與媒體保留，舊場次維持個人賽，4 張雙打新表仍為空。原帳號 HTTPS 登入／讀取／登出、19 張非認證舊表、新版備份及公開資產核對通過；未新增真實測試資料。詳見 [1.1.0 發布說明](docs/release-1.1.0.md)、[雙打使用說明](docs/doubles-registration.md)及[部署紀錄](docs/home-deployment.md#110-雙打報名正式發布與部署2026-10-24)。網站人工試用、真正 Turnstile、球館 Windows 與重開機仍待驗收。
 
 1.0.0 將使用者已確認的目前網頁效果定為第一版正式版本；本次只提升專案版本與發布文件，功能、依賴及資料格式不變。版本與映像識別見 [GitHub Release v1.0.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.0.0)及 [Docker Hub 1.0.0](https://hub.docker.com/r/momonong/fucheng-players-system/tags?name=1.0.0)。2026-10-23 台北時間 00:43:14 已部署至既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)，app／backup 健康；更新前成組備份與 22 表所有欄位、帳號及媒體核對一致，原帳號 HTTPS 登入／讀取／登出後 19 張非認證表仍相同，既有報告與新版備份驗證通過；球館Windows、實體列印及重開機仍待現場驗收。詳見[1.0.0發布說明](docs/release-1.0.0.md)。
@@ -418,3 +420,7 @@ E2E 使用 `FUCHENG_E2E_DATABASE_URL=sqlite:///data/grid-e2e.db`、`FUCHENG_E2E_
 每場可刪除不需要的空級數欄；有選手時先移走，至少保留一個級數欄及一排資料格。欄內文字仍需確認，刪除不影響會員或報名。表格上方「加回級數欄」可將移除的級數加到右側；新報名、遞補或調級用到缺少的級數，也會在同一交易補回。GET 不改排表，既有十欄版不自動縮減。
 
 保存、歷史、列印與 Excel 依每場實際欄位呈現，表格不再強制預留十欄寬度。刪除／加回沿用原復原、重做、衝突核對和請求防重。級數仍是1–10級，不變更長期會員分級或報名快照。無 migration；精簡欄位開始使用後，舊版 app 不再適合作為直接無損回退版本，需依資料保護流程另評估。詳見[本次驗證](docs/flexible-level-columns.md)。
+
+### 映像內建部署檢查
+
+管理員登入後在「系統狀態 → 部署檢查報告」按「立即檢查並回傳」，即可保存目前 app／Linux 容器報告；不需另下載健檢包。回傳憑證與網路未配置仍可查看、下載。Windows 主機、Docker daemon、外部入口與還原仍標示未驗證。可選 server-only secret overlay 與 schema 0015 升級流程見 [操作說明](docs/host-report-upload.md)。

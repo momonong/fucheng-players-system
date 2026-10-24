@@ -126,7 +126,7 @@ def main():
                      "nginx-test.conf", "nginx-host-ngrok.conf", "release.env.example", "ngrok.yml.example",
                      "operate.ps1", "preflight.ps1", "load-images.ps1", "test-tls.ps1",
                      "compose.local-http.yaml", "local-http.ps1", "local-http.env.example",
-                     "compose.bootstrap-admin.yaml", "club.env.example", "compose.report-upload.yaml"]:
+                     "compose.bootstrap-admin.yaml", "club.env.example", "compose.report-upload.yaml", "compose.diagnostics.yaml"]:
             text = (ROOT / "deploy/docker" / name).read_text(encoding="utf-8")
             for support in tagged:
                 text = text.replace(support["reference"], support["tag"])

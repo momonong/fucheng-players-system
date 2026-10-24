@@ -9,7 +9,8 @@ from fastapi import Depends, HTTPException, Query, Request, Response
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr, ValidationError, model_validator
 from sqlalchemy.orm import Session
 
-from .models import DeploymentReport, DeploymentReportAudit, now_utc
+from .models import DeploymentReport, DeploymentReportAudit, DeploymentDiagnosticRun, now_utc
+from sqlalchemy import select
 from .registrations import _begin_immediate
 
 MAX_REPORT_BYTES = 256 * 1024
@@ -117,6 +118,56 @@ class HostReport(StrictModel):
         return self
 
 
+# Schema 2 deliberately has no Windows "host" fields.
+RUNTIME_CHECKS = frozenset("runtime static_assets database_structure data_disk backup_status ingress_configuration".split())
+CONTAINER_CHECKS = REQUIRED_CHECKS | RUNTIME_CHECKS
+HOST_ONLY_CHECKS = REQUIRED_CHECKS - {"cloudflare_https", "registry_https", "cloudflare_tcp_7844"}
+
+
+class ReportRuntime(StrictModel):
+    name: Literal["目前執行中的 app／Linux 容器"]
+    system: Label
+    python: Label
+
+
+class ContainerScope(StrictModel):
+    read_only_probes: Literal[True]
+    container_execution: Literal[True]
+    host_control: Literal[False]
+    business_data_read: Literal[False]
+    external_network_opt_in: StrictBool
+
+
+class ContainerReport(StrictModel):
+    schema_version: Literal[2]
+    report_type: Literal["container_runtime"]
+    checked_at: AwareDatetime
+    runtime: ReportRuntime
+    scope: ContainerScope
+    summary: ReportSummary
+    checks: Annotated[list[ReportCheck], Field(min_length=len(CONTAINER_CHECKS), max_length=len(CONTAINER_CHECKS))]
+    recommendations: Annotated[list[ReportRecommendation], Field(min_length=1, max_length=8)]
+    sources: Annotated[list[Annotated[StrictStr, Field(min_length=8, max_length=300)]], Field(max_length=8)]
+
+    @model_validator(mode="after")
+    def consistent(self):
+        ids = [item.id for item in self.checks]
+        if len(set(ids)) != len(ids) or set(ids) != CONTAINER_CHECKS:
+            raise ValueError("container check set is incomplete or duplicated")
+        if any(item.status != "NOT_TESTED" for item in self.checks if item.id in HOST_ONLY_CHECKS):
+            raise ValueError("a container cannot attest host-only checks")
+        counts = {status: sum(item.status == status for item in self.checks)
+                  for status in ("PASS", "WARN", "FAIL", "NOT_TESTED")}
+        if counts != self.summary.model_dump() or not 2020 <= self.checked_at.year <= 2100:
+            raise ValueError("invalid summary or time")
+        if any(not url.startswith("https://") or any(ord(c) < 32 for c in url) for url in self.sources):
+            raise ValueError("invalid source URL")
+        return self
+
+
+Report = HostReport | ContainerReport
+
+
 def _unique_pairs(pairs):
     result = {}
     for key, value in pairs:
@@ -126,13 +177,14 @@ def _unique_pairs(pairs):
     return result
 
 
-def parse_report(raw: bytes) -> HostReport:
+def parse_report(raw: bytes) -> Report:
     if len(raw) > MAX_REPORT_BYTES:
         raise HTTPException(413, "報告超過 256 KiB 上限；既有報告未變更")
     try:
         value = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs,
                            parse_constant=lambda _: (_ for _ in ()).throw(ValueError("nonfinite number")))
-        return HostReport.model_validate_json(json.dumps(value, ensure_ascii=False))
+        model = ContainerReport if isinstance(value, dict) and value.get("schema_version") == 2 else HostReport
+        return model.model_validate_json(json.dumps(value, ensure_ascii=False))
     except (UnicodeError, ValueError, TypeError, ValidationError):
         raise HTTPException(422, "部署檢查 JSON 格式或內容不正確；既有報告未變更") from None
 
@@ -143,14 +195,24 @@ def _markdown_text(value: object) -> str:
     return re.sub(r"([\\`*_{}\[\]|~])", r"\\\1", text)
 
 
-def render_markdown(report: HostReport) -> str:
-    lines = ["# Windows Docker 主機部署檢查報告", "",
+def render_markdown(report: Report) -> str:
+    lines = []
+    if isinstance(report, HostReport):
+        lines = ["# Windows Docker 主機部署檢查報告", "",
              f"- 檢查時間：{_markdown_text(report.checked_at.isoformat())}",
              f"- 報告宣稱的主機：{_markdown_text(report.host.name)}",
              f"- 系統：{_markdown_text(report.host.windows)}；build {_markdown_text(report.host.build)}",
              f"- 結果：PASS {report.summary.PASS}、WARN {report.summary.WARN}、FAIL {report.summary.FAIL}、NOT_TESTED {report.summary.NOT_TESTED}",
              "", "主機身份與檢查結果由上傳的 JSON 宣稱，伺服器沒有對主機做獨立驗證；請現場核對目標主機。", "",
              "| 檢查 | 狀態 | 理由 | 證據 | 下一步 |", "| --- | --- | --- | --- | --- |"]
+    if isinstance(report, ContainerReport):
+        lines = ["# App／Linux 容器部署檢查報告", "",
+                 f"- 檢查時間：{_markdown_text(report.checked_at.isoformat())}",
+                 f"- 來源：{_markdown_text(report.runtime.name)}",
+                 f"- 系統：{_markdown_text(report.runtime.system)}；Python {_markdown_text(report.runtime.python)}",
+                 f"- 結果：PASS {report.summary.PASS}、WARN {report.summary.WARN}、FAIL {report.summary.FAIL}、NOT_TESTED {report.summary.NOT_TESTED}",
+                 "", "僅檢查正在執行的 app／容器；Windows、Docker daemon、外部入口及完整還原未經驗證。回傳成功不等於部署檢查通過。", "",
+                 "| 檢查 | 狀態 | 理由 | 證據 | 下一步 |", "| --- | --- | --- | --- | --- |"]
     for item in report.checks:
         lines.append("| " + " | ".join(_markdown_text(value) for value in
             (item.id, item.status, item.reason, item.evidence, item.next_action)) + " |")
@@ -160,12 +222,12 @@ def render_markdown(report: HostReport) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _state(row: DeploymentReport | None):
+def _state(row: DeploymentReport | None, run=None):
     if row is None:
-        return {"version": 0, "uploaded_at": None, "report": None, "markdown": None}
-    report = HostReport.model_validate_json(row.report_json)
+        return {"version": 0, "uploaded_at": None, "report": None, "markdown": None, "run": None}
+    report = parse_report(row.report_json.encode("utf-8"))
     return {"version": row.version, "uploaded_at": row.uploaded_at.isoformat(),
-            "report": report.model_dump(mode="json"), "markdown": render_markdown(report)}
+            "report": report.model_dump(mode="json"), "markdown": render_markdown(report), "run": run}
 
 
 def install_deployment_report_routes(app, get_db, current_auth, require_csrf):
@@ -175,7 +237,10 @@ def install_deployment_report_routes(app, get_db, current_auth, require_csrf):
 
     @app.get("/api/admin/deployment-report")
     def read_report(db: Db, _auth: Auth):
-        return _state(db.get(DeploymentReport, 1))
+        row = db.get(DeploymentReport, 1)
+        run = db.scalar(select(DeploymentDiagnosticRun).where(DeploymentDiagnosticRun.report_version == row.version)) if row else None
+        from .deployment_diagnostics import run_state
+        return _state(row, run_state(run) if run else None)
 
     @app.post("/api/admin/deployment-report")
     async def upload_report(request: Request, db: Db, auth: Write,
@@ -188,6 +253,8 @@ def install_deployment_report_routes(app, get_db, current_auth, require_csrf):
             if len(raw) > MAX_REPORT_BYTES:
                 raise HTTPException(413, "報告超過 256 KiB 上限；既有報告未變更")
         report = parse_report(bytes(raw))
+        if not isinstance(report, HostReport):
+            raise HTTPException(422, "手動上傳僅接受 Windows schema 1；容器報告請使用立即檢查")
         canonical = report.model_dump_json()
         digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
         admin_id = _begin_immediate(db, auth)
@@ -219,7 +286,7 @@ def install_deployment_report_routes(app, get_db, current_auth, require_csrf):
         row = db.get(DeploymentReport, 1)
         if row is None:
             raise HTTPException(404, "尚未上傳部署檢查報告")
-        report = HostReport.model_validate_json(row.report_json)
+        report = parse_report(row.report_json.encode("utf-8"))
         if format == "json":
             content = report.model_dump_json(indent=2) + "\n"
             media = "application/json"

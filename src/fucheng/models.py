@@ -143,6 +143,30 @@ class DeploymentReportAudit(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
 
 
+class DeploymentDiagnosticRun(Base):
+    """Immutable report/request identity with a durable, separately mutable delivery state."""
+    __tablename__ = "deployment_diagnostic_runs"
+    __table_args__ = (
+        CheckConstraint("size_bytes > 0 AND size_bytes <= 262144", name="ck_diagnostic_size"),
+        CheckConstraint("send_state IN ('not_configured','unknown','rejected','received')", name="ck_diagnostic_send_state"),
+        UniqueConstraint("report_version", name="uq_diagnostic_report_version"),
+    )
+    request_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"))
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    report_version: Mapped[int] = mapped_column(Integer)
+    report_json: Mapped[str] = mapped_column(Text)
+    digest: Mapped[str] = mapped_column(String(64))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    endpoint: Mapped[str] = mapped_column(String(200))
+    device_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    send_state: Mapped[str] = mapped_column(String(20))
+    detail: Mapped[str] = mapped_column(String(400))
+    receipt_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
 class Member(Base):
     __tablename__ = "members"
     __table_args__ = (

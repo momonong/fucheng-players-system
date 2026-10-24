@@ -305,3 +305,6 @@ frontend/dist-base-path/
 
 /frontend/dist-doubles-e2e/
 /frontend/dist-release-110/
+
+# Dedicated in-image diagnostics E2E build; never source or release context.
+/frontend/dist-diagnostics-e2e/

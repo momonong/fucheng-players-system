@@ -210,6 +210,6 @@ def test_migration_0013_preserves_every_existing_row(tmp_path, monkeypatch):
             projection = ','.join(f'"{c}"' for c in columns[table])
             assert db.execute(f'SELECT {projection} FROM "{table}" ORDER BY 1').fetchall() == before[table]
         assert db.execute('SELECT deleted_at FROM announcements').fetchall() == [(None,)]
-        assert db.execute('SELECT version_num FROM alembic_version').fetchone() == ('0014_doubles_registration',)
+        assert db.execute('SELECT version_num FROM alembic_version').fetchone() == ('0015_deployment_diagnostics',)
         assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
         assert db.execute('PRAGMA foreign_key_check').fetchall() == []
