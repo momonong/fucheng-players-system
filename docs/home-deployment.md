@@ -322,3 +322,20 @@ Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器�
 非秘密結果保留於 ignored `data/release-1.1.0/` 的 `registry.json`、`github-release.json`、`image-smoke.json`、`frontend-static-equality.json`，以及 `home-deployment/` 的 `deployment.json`、`migration.json`、`data-preservation-after-migrate-all.json`、`public-verification.json`、`external-assets-verification.json`。DB、env、exports 與憑證保持受限，不納入文件或 Git。
 
 `0014` 明確拒絕直接 downgrade，不能只換回 1.0.0 或其他舊 image。若需回復，須保留目前資料及後續寫入，以升級前成組備份在新目標還原，使用匹配的 image／schema，再核對資料與入口。部署及工程通過尚非人工接受；網站人工試用、真正 Turnstile 報名、球館 Windows、實體手機／印表機、斷電／重開機仍待驗收，同機備份不等於異地備份。
+
+
+## 1.2.0 映像內建部署檢查正式發布與部署（2026-10-24）
+
+[PR #35](https://github.com/momonong/fucheng-players-system/pull/35)、[GitHub Release v1.2.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.2.0)、tag 與正式映像來源固定為 `ace281a8a25c038a8a442dc332080236b973253f`；後續純文件提交不改映像來源。Docker Hub `1.2.0`／`latest` 發布並拉回核對後，台北時間 **17:17:10**（UTC 09:17:10）同批更新既有 `fucheng-home` app／backup。
+
+- Registry **manifest digest**：`sha256:0e5a297b0d16876fa56e1b9bed0470c3b8632d55ded6b23ffc5c18315f39e6e2`。兩個遠端 tag 相同，linux/amd64、Docker manifest v2，無額外 index；現站使用此固定 digest。拉回的 **config/native image ID** 為 `sha256:2cfa6229bc207b1df68aac4ef94baadb8a5b8bf149f536f1e3f3ee45d0403034`，與已測映像及現站一致；source manifest 為 `9db38da53faea60e32445651aab55d3338079644015346237909d93ee5baf737`。
+- 固定來源經 allowlist staging 建置，89 檔 context 與來源 freeze 相同。正式映像另行通過 root／prefix、容器重啟、原 UUID 讀回、成組備份及私有 TLS receipt／不重複發送 smoke，沒有以舊候選二的 image 身份代替正式版。完整還原未執行；測試服務均已停止，資源保留。
+- 先停止本 project app／backup 寫入，以舊 1.1.0 runtime 成組備份 DB＋媒體，停寫 checkpoint 為 `manual-export-20261024T091612918613Z-fbe4a989.db`。再經新版 runtime lifecycle／maintenance guard 顯式遷移 `0014_doubles_registration` → `0015_deployment_diagnostics`；serve 不 migration，沒有 init、bootstrap、reseed 或新增管理員。
+- 遷移後及登入前，**26 張舊表全部原欄／原值與既有 schema objects 相同**；帳號、密碼及原 sessions 於記憶體核對，不保存認證值或 fingerprint。原媒體檔案與 bytes 相同，新增的 `deployment_diagnostic_runs` 表為空。保留 342 位會員、4 組管理員、2 場比賽、81 筆報名、8 版安排及 1 份既有 device report；4 張雙打表仍空，沒有建立真實測試會員、場次或報名。schema 0015、integrity ok、FK errors 0，app／backup healthy。
+- 外部 HTTPS health、匿名管理拒絕、原帳號登入／唯讀 GET／登出、Secure／HttpOnly／`/fucheng/` Cookie、既有報告下載 digest 及升級後新版備份通過；此時 **23 張非認證舊表仍相同**，沒有提交新報告。公開 JS `index-CA180sJB.js`／CSS `index-C4GIFlsV.css` bytes 與已測映像一致。
+- 隨後另以一份明確標為合成、全部 check 為 **NOT_TESTED** 的 schema 2 固定原 payload，經真 HTTPS 接收端取得 receipt，管理員下載核對內容及 digest。`device_deployment_reports` **僅精確新增此一份**，所有原列、26 張舊表既有欄、其他非認證資料及媒體保留；未覆寫既有報告，沒有在球館執行 app 發送端或實機檢查。台北時間 **17:19:24**（UTC 09:19:24）的最終新版成組備份已驗證，包含這份合成報告，原列與媒體仍保留。
+- 私密 env 僅變更 `FUCHENG_IMAGE`；三份 Compose、原 data／backup volumes、receiver／report token／Turnstile 掛載、`/fucheng/`、loopback8064 及既有 HP forward／Caddy／Tunnel／DNS／網路保留，沒有共用入口或其他服務變更。原設定、舊 images、所有 volumes、升級前 checkpoint 及新版備份均保留，沒有清理。
+
+非秘密收據位於 ignored `data/release-1.2.0/` 的 `registry.json`、`github-release.json`、`build-verification.json`、`image-smoke.json`、`image-diagnostics-smoke.json`、`image-diagnostics-delivery.json`，以及 `home-deployment/` 的 `deployment.json`、`migration.json`、`data-preservation-after-migrate-all.json`、`public-verification.json`、`synthetic-report-verification.json`、`external-assets-verification.json`、`backup-final.json`。DB、env、exports 與憑證保持受限，不納入文件或 Git；版本功能與工程證據見[1.2.0 發布說明](release-1.2.0.md)。
+
+`0015` 明確拒絕直接 downgrade，不能只換回 1.1.0 或其他舊 image；若需回復，須保留故障庫與後續寫入，以匹配的成組備份還原至新目標，搭配匹配 image／schema，再核對資料與入口。本次備份位於同機，尚非異地備份。真 HTTPS 合成接收驗證不代表球館 Windows／Docker Desktop／WSL2、現場 app 發送端、官方外網探測、實體手機、UDP／QUIC、真正 Tunnel、主機防火牆、Turnstile 真人流程、完整還原或冷開機／斷電通過；上述仍未驗證，人工接受亦未完成。
