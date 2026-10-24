@@ -385,17 +385,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=409,
                 detail=f"不可從「{competition.status}」直接轉為「{payload.status}」",
             )
+        from .models import DoublesEntry
+        counter = DoublesEntry if competition.registration_mode == "doubles" else CompetitionRegistration
         confirmed = db.scalar(
-            select(func.count(CompetitionRegistration.id)).where(
-                CompetitionRegistration.competition_id == competition_id,
-                CompetitionRegistration.status == "confirmed",
+            select(func.count(counter.id)).where(
+                counter.competition_id == competition_id,
+                counter.status == "confirmed",
             )
         ) or 0
         if payload.capacity < confirmed:
             db.rollback()
-            raise HTTPException(status_code=409, detail=f"名額不可低於目前 {confirmed} 位正取")
+            unit = "隊" if competition.registration_mode == "doubles" else "位"
+            raise HTTPException(status_code=409, detail=f"名額不可低於目前 {confirmed} {unit}正取")
+        if "registration_mode" in payload.model_fields_set and payload.registration_mode != competition.registration_mode:
+            db.rollback()
+            raise HTTPException(409, "比賽建立後不可更改報名模式")
         before = _competition_values(competition)
         after = payload.model_dump(exclude={"version", "reason"})
+        for field in ("registration_mode", "doubles_min_total_level"):
+            if field not in payload.model_fields_set:
+                after[field] = before[field]
         changes = _changes(before, after)
         if not changes:
             db.rollback()
@@ -464,6 +473,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     from .public_registration import install_public_routes
     install_public_routes(app, get_db, current_auth)
+
+    from .doubles import install_admin_routes
+    install_admin_routes(app, get_db, current_auth, require_csrf)
 
     from .website import install_website_routes
     install_website_routes(app, get_db, current_auth, require_csrf)

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from .models import Admin, ArrangementVersion, Competition, CompetitionAudit, CompetitionRegistration, now_utc
 from .registrations import _begin_immediate
 from .schemas import StrictInput, Diet
-from .models import ArrangementWorkspace, ArrangementOperation, RegistrationAudit, Member
+from .models import ArrangementWorkspace, ArrangementOperation, RegistrationAudit, DoublesReceipt, Member
 from . import arrangement_grid as grid
 
 
@@ -81,6 +81,8 @@ def require_competition(db, competition_id, *, mutable=False):
     competition = db.get(Competition, competition_id)
     if not competition:
         raise HTTPException(404, "找不到比賽")
+    from .registrations import require_individual
+    require_individual(competition)
     if mutable and (competition.deleted_at or competition.status not in {"open", "closed"}):
         raise HTTPException(409, "只有未刪除的開放或截止場次可安排級數")
     return competition
@@ -190,7 +192,7 @@ def save_version(db, auth, competition_id, payload):
             result = saved(duplicate)
             db.rollback()
             return result
-        if db.get(ArrangementOperation, payload.request_id) or db.scalar(select(RegistrationAudit).where(RegistrationAudit.idempotency_key == payload.request_id)):
+        if db.get(DoublesReceipt, payload.request_id) or db.get(ArrangementOperation, payload.request_id) or db.scalar(select(RegistrationAudit).where(RegistrationAudit.idempotency_key == payload.request_id)):
             raise HTTPException(409, "此操作識別碼已用於其他操作")
         competition = require_competition(db, competition_id, mutable=True)
         current = state(db, competition)
@@ -334,7 +336,7 @@ def mutate_grid(db, auth, competition_id, payload):
         if not current.layout or current.state_token != payload.state_token:
             raise HTTPException(409, "安排或名單已更新，請重新讀取並核對")
         workspace = db.get(ArrangementWorkspace, competition_id)
-        if db.scalar(select(RegistrationAudit).where(RegistrationAudit.idempotency_key == payload.request_id)) or db.scalar(select(ArrangementVersion).where(ArrangementVersion.request_id == payload.request_id)):
+        if db.get(DoublesReceipt, payload.request_id) or db.scalar(select(RegistrationAudit).where(RegistrationAudit.idempotency_key == payload.request_id)) or db.scalar(select(ArrangementVersion).where(ArrangementVersion.request_id == payload.request_id)):
             raise HTTPException(409, "此操作識別碼已用於其他操作")
         before = workspace.layout_json
         layout = json.loads(before)

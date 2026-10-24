@@ -208,7 +208,7 @@ def test_public_schedule_hides_drafts_and_closes_at_deadline(app,client,auth):
     client.cookies.clear()
     rows=client.get('/api/public/schedule').json()
     assert {row['name']:row['status'] for row in rows} == {'open':'open','closed':'closed','ended':'ended','cancelled':'cancelled','expired':'closed'}
-    assert all(set(row)=={'id','name','competition_date','registration_deadline','status','notes'} for row in rows)
+    assert all(set(row)=={'id','name','competition_date','registration_deadline','status','notes','registration_mode'} for row in rows)
     assert [row['name'] for row in client.get('/api/public/competitions').json()]==['open']
 
 

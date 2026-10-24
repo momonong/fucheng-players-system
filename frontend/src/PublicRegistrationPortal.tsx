@@ -1,9 +1,10 @@
 import { appUrl, appPathname } from './paths'
 import { useEffect, useRef, useState } from 'react'
-import { request } from './api'
-import type { Diet } from './types'
+import { doublesRequest, request } from './api'
+import { PublicDoublesRegistration } from './DoublesRegistration'
+import type { Diet, PublicCompetition, DoublesRoster } from './types'
 
-type Competition = { id: string; name: string; competition_date: string; registration_deadline: string; notes: string | null; capacity: number; confirmed: number; waitlisted: number; remaining: number }
+type Competition = PublicCompetition
 type Candidate = { id: string; name: string; distinguishing_note: string | null }
 type Result = { status: string; member_name: string; distinguishing_note: string | null; diet: Diet }
 type RegistrationSession = { csrf_token: string; turnstile_sitekey: string | null }
@@ -42,13 +43,16 @@ export function PublicRegistrationPortal() {
     Promise.all([
       publicRequest<RegistrationSession>('/api/public/registration-session'),
       publicRequest<Competition[]>('/api/public/competitions'),
-    ]).then(([session, competitions]) => {
+    ]).then(async ([session, competitions]) => {
       if (!active) return
       setCsrf(session.csrf_token); setTurnstileSitekey(session.turnstile_sitekey); setItems(competitions)
       if (routeId) {
         const match = competitions.find(c => c.id === routeId)
         if (match) setSelected(match)
-        else setError('這場比賽目前未開放報名，請選擇其他比賽或洽管理員。')
+        else {
+          try { const roster = await doublesRequest<DoublesRoster>(`/api/public/competitions/${routeId}/doubles`); if (active) setSelected(roster.competition) }
+          catch { if (active) setError('這場比賽目前未開放報名，請選擇其他比賽或洽管理員。') }
+        }
       }
     }).catch(e => { if (active) { setError(e.message); setLoading(false) } }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -58,7 +62,7 @@ export function PublicRegistrationPortal() {
       <h1 className="visually-hidden">比賽報名</h1>
       <p className="registration-intro">找到自己的名字，就能報名。不用帳號、不用密碼。</p>
       {loading ? <p role="status">載入比賽中…</p> : error ? <div className="notice error" role="alert">{error}<button onClick={() => setRetry(r => r + 1)}>重新載入</button></div> : selected ?
-        <RegistrationForm key={selected.id} competition={selected} csrf={csrf} turnstileSitekey={turnstileSitekey} /> : <>
+        selected.registration_mode === 'doubles' ? <PublicDoublesRegistration key={selected.id} competitionId={selected.id} csrf={csrf} sitekey={turnstileSitekey} /> : <RegistrationForm key={selected.id} competition={selected} csrf={csrf} turnstileSitekey={turnstileSitekey} /> : <>
           <h2>1. 選擇比賽</h2>
           {!items.length && <div className="panel"><p>目前沒有開放報名的比賽。</p><p>如需協助，請洽球館管理員。</p></div>}
           <div className="public-competitions">{items.map(c => <article className="panel" key={c.id}>
@@ -74,7 +78,7 @@ export function PublicRegistrationPortal() {
 function CompetitionInfo({ competition: c }: { competition: Competition }) {
   return <><p>比賽日期：{c.competition_date}</p><p>報名截止：{time(c.registration_deadline)}</p>
     {c.notes && <p className="competition-notes">{c.notes}</p>}
-    <div className="self-counts"><span>正取／名額 <strong>{c.confirmed}／{c.capacity}</strong></span><span>候補 <strong>{c.waitlisted}</strong></span><span>剩餘名額 <strong>{c.remaining}</strong></span></div>
+    {c.registration_mode === 'doubles' ? <p>雙打組隊・正取 {c.doubles_summary?.confirmed || 0}／{c.capacity} 隊・等待搭檔 {c.doubles_summary?.waiting_partner || 0} 人</p> : <div className="self-counts"><span>正取／名額 <strong>{c.confirmed}／{c.capacity}</strong></span><span>候補 <strong>{c.waitlisted}</strong></span><span>剩餘名額 <strong>{c.remaining}</strong></span></div>}
     {c.waitlisted > 0 && c.remaining > 0 && <p>空缺由管理員依序確認候補，新報名會加入候補。</p>}</>
 }
 

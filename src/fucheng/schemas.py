@@ -87,6 +87,8 @@ class CompetitionInput(BaseModel):
     registration_deadline: datetime
     notes: str | None = Field(default=None, max_length=5000)
     status: CompetitionStatus = "draft"
+    registration_mode: Literal["individual", "doubles"] = "individual"
+    doubles_min_total_level: int | None = Field(default=None, ge=2, le=20, strict=True)
 
     @field_validator("name", "notes")
     @classmethod
@@ -118,7 +120,11 @@ class CompetitionInput(BaseModel):
 
 
 class CompetitionCreate(CompetitionInput):
-    pass
+    @model_validator(mode="after")
+    def default_doubles_rule(self):
+        if self.registration_mode == "doubles" and "doubles_min_total_level" not in self.model_fields_set:
+            self.doubles_min_total_level = 10
+        return self
 
 
 class CompetitionUpdate(CompetitionInput):
@@ -137,6 +143,16 @@ class CompetitionSummary(BaseModel):
     competition_level_counts: dict[int, int]
 
 
+class DoublesSummary(BaseModel):
+    waiting_partner: int
+    pending: int
+    confirmed: int
+    waitlisted: int
+    cancelled: int
+    remaining: int
+    pending_promotions: int
+
+
 class AdminCompetition(CompetitionInput):
     deleted_at: datetime | None
     id: str
@@ -145,6 +161,7 @@ class AdminCompetition(CompetitionInput):
     updated_at: datetime
     effective_registration_open: bool
     summary: CompetitionSummary
+    doubles_summary: DoublesSummary | None = None
 
 
 class RegistrationMember(BaseModel):
@@ -231,6 +248,10 @@ class PublicCompetition(BaseModel):
     confirmed: int
     waitlisted: int
     remaining: int
+    registration_mode: Literal["individual", "doubles"] = "individual"
+    doubles_min_total_level: int | None = None
+    doubles_summary: DoublesSummary | None = None
+    effective_registration_open: bool = True
 
 
 class PublicRegistrationResult(BaseModel):
@@ -256,3 +277,85 @@ class ActorAuditEntry(BaseModel):
     queue_sequence: int
     reason: str | None
     changes: dict[str, dict[str, object]]
+
+
+DoublesStatus = Literal["waiting_partner", "pending", "confirmed", "waitlisted", "cancelled"]
+
+
+class DoublesCreate(StrictInput):
+    member_ids: list[str] = Field(min_length=1, max_length=2)
+    request_id: str = Field(min_length=8, max_length=64)
+    reason: str | None = Field(default=None, max_length=500)
+
+    @field_validator("member_ids")
+    @classmethod
+    def distinct_members(cls, value):
+        if len(set(value)) != len(value) or any(not mid or len(mid)>36 for mid in value):
+            raise ValueError("請選擇一或兩位不同會員")
+        return value
+
+
+class PublicDoublesCreate(StrictInput):
+    member_ids: list[str] = Field(min_length=1, max_length=2)
+    request_id: str = Field(min_length=8, max_length=64)
+    turnstile_token: str | None = Field(default=None, max_length=2048)
+    _distinct = field_validator("member_ids")(DoublesCreate.distinct_members.__func__)
+
+
+class DoublesMutation(StrictInput):
+    version: int = Field(ge=1)
+    request_id: str = Field(min_length=8, max_length=64)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class PublicDoublesMember(BaseModel):
+    member_id: str
+    name: str
+    distinguishing_note: str | None
+    level_snapshot: int
+
+
+class PublicDoublesEntry(BaseModel):
+    id: str
+    status: DoublesStatus
+    sequence: int
+    members: list[PublicDoublesMember]
+    total_level: int | None
+    min_total_level: int | None
+    meets_level_rule: bool | None
+
+
+class AdminDoublesEntry(PublicDoublesEntry):
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class PublicDoublesResult(BaseModel):
+    entry: PublicDoublesEntry
+
+
+class AdminDoublesResult(BaseModel):
+    entry: AdminDoublesEntry
+    waiting_entries: list[AdminDoublesEntry] = Field(default_factory=list)
+
+
+class PublicDoublesRoster(BaseModel):
+    competition: PublicCompetition
+    entries: list[PublicDoublesEntry]
+
+
+class AdminDoublesRoster(BaseModel):
+    competition: AdminCompetition
+    entries: list[AdminDoublesEntry]
+
+
+class DoublesHistoryEntry(BaseModel):
+    id: str
+    entry_id: str
+    action: str
+    actor_kind: Literal["admin", "public", "system"]
+    actor_name: str
+    reason: str | None
+    changes: dict[str, object]
+    created_at: datetime

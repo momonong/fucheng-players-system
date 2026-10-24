@@ -46,7 +46,7 @@ def test_search_privacy_csrf_and_no_anonymous_changes(app, client, auth):
     assert len({r['distinguishing_note'] for r in found})==2
     comp=client.post('/api/admin/competitions',headers=auth,json=_competition_payload()).json()
     items=c.get('/api/public/competitions').json()
-    assert set(items[0])=={'id','name','competition_date','registration_deadline','notes','capacity','confirmed','waitlisted','remaining'}
+    assert set(items[0])=={'id','name','competition_date','registration_deadline','notes','capacity','confirmed','waitlisted','remaining','registration_mode','doubles_min_total_level','doubles_summary','effective_registration_open'}
     assert register(c,{},comp,members[0]).status_code==403
     assert register(c,{**h,'Origin':'https://other.example'},comp,members[0]).status_code==403
     for payload in ({'status':'confirmed'},{'queue_sequence':1},{'hard_level_snapshot':1},{'reason':'override'},{'diet':'unset'}):
@@ -259,7 +259,7 @@ def test_upgrade_phase2_preserves_every_original_column_and_backup(tmp_path, mon
                 assert db.execute(f"SELECT {','.join(columns[table])} FROM {table} ORDER BY 1").fetchall()==before[table]
             assert db.execute("SELECT id FROM competition_registrations WHERE status='waitlisted' ORDER BY queue_sequence").fetchall()==[('r2',),('r4',)]
             assert db.execute('SELECT competition_level,hard_level_snapshot FROM competition_registrations').fetchall()==([(8,3)] + [(3,3)]*4 if source_revision == '0006_competition_level' else [(3,3)]*5)
-            assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0013_announcement_deletion'
+            assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0014_doubles_registration'
             assert db.execute('SELECT count(*) FROM arrangement_versions').fetchone()[0] == 0
 
 

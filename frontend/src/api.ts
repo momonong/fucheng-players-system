@@ -195,3 +195,24 @@ export async function refreshArrangementSession(expectedUsername:string){
   if(auth.username!==expectedUsername)throw new Error(`請在另一分頁以原帳號 ${expectedUsername} 登入，再回此頁確認；原操作仍保留。`)
   csrfToken=auth.csrf_token
 }
+
+// Doubles writes retain uncertainty through the full response body, not just headers.
+export async function doublesRequest<T>(url: string, options: RequestInit = {}, publicCsrf?: string): Promise<T> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), 20000)
+  try {
+    if (!url.startsWith('/api/public/')) return await request<T>(url, { ...options, signal: controller.signal })
+    const headers = new Headers(options.headers)
+    if (options.body) headers.set('Content-Type', 'application/json')
+    if (publicCsrf) headers.set('X-CSRF-Token', publicCsrf)
+    const response = await fetch(appUrl(url), { ...options, headers, signal: controller.signal, credentials: 'same-origin' })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      throw Object.assign(new Error(typeof body?.detail === 'string' ? body.detail : '操作失敗，請重新核對名單'), { status: response.status })
+    }
+    return await response.json() as T
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('伺服器未及時回應，操作結果尚未確認。')
+    throw error
+  } finally { window.clearTimeout(timer) }
+}

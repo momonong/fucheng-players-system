@@ -82,7 +82,19 @@ export interface CompetitionSummary {
   competition_level_counts: Record<string, number>
 }
 
+export type DoublesStatus = 'waiting_partner' | 'pending' | 'confirmed' | 'waitlisted' | 'cancelled'
+export interface DoublesSummary { waiting_partner: number; pending: number; confirmed: number; waitlisted: number; cancelled: number; remaining: number; pending_promotions: number }
+export interface DoublesMember { member_id: string; name: string; distinguishing_note: string | null; level_snapshot: number }
+export interface DoublesEntry { id: string; status: DoublesStatus; sequence: number; members: DoublesMember[]; total_level: number | null; min_total_level: number | null; meets_level_rule: boolean | null }
+export interface AdminDoublesEntry extends DoublesEntry { version: number; created_at: string; updated_at: string }
+export interface PublicCompetition { id: string; name: string; competition_date: string; registration_deadline: string; notes: string | null; capacity: number; confirmed: number; waitlisted: number; remaining: number; registration_mode: 'individual' | 'doubles'; doubles_min_total_level: number | null; doubles_summary: DoublesSummary | null; effective_registration_open: boolean }
+export interface DoublesRoster<C = PublicCompetition, E = DoublesEntry> { competition: C; entries: E[] }
+export interface DoublesAudit { id: string; entry_id: string; action: string; actor_kind: string; actor_name: string; reason: string | null; changes: Record<string, unknown>; created_at: string }
+
 export interface Competition {
+  registration_mode: 'individual' | 'doubles'
+  doubles_min_total_level: number | null
+  doubles_summary: DoublesSummary | null
   deleted_at: string | null
   id: string
   name: string
@@ -99,6 +111,8 @@ export interface Competition {
 }
 
 export interface CompetitionDraft {
+  registration_mode?: 'individual' | 'doubles'
+  doubles_min_total_level?: number | null
   name: string
   competition_date: string
   capacity: number

@@ -8,6 +8,7 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -202,6 +203,8 @@ class Competition(Base):
     __tablename__ = "competitions"
     __table_args__ = (
         CheckConstraint("capacity >= 1", name="ck_competitions_capacity"),
+        CheckConstraint("registration_mode IN ('individual', 'doubles')", name="ck_competitions_registration_mode"),
+        CheckConstraint("doubles_min_total_level IS NULL OR doubles_min_total_level BETWEEN 2 AND 20", name="ck_competitions_doubles_min_level"),
         CheckConstraint(
             "status IN ('draft', 'open', 'closed', 'ended', 'cancelled')",
             name="ck_competitions_status",
@@ -212,6 +215,8 @@ class Competition(Base):
     name: Mapped[str] = mapped_column(String(120), index=True)
     competition_date: Mapped[date] = mapped_column(Date, index=True)
     capacity: Mapped[int] = mapped_column(Integer)
+    registration_mode: Mapped[str] = mapped_column(String(12), default="individual", server_default="individual")
+    doubles_min_total_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
     registration_deadline: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
@@ -383,4 +388,73 @@ class ArrangementOperation(Base):
     admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"))
     fingerprint: Mapped[str] = mapped_column(String(64))
     receipt_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+
+
+class DoublesEntry(Base):
+    __tablename__ = "doubles_entries"
+    __table_args__ = (
+        UniqueConstraint("id", "competition_id", name="uq_doubles_entry_competition"),
+        UniqueConstraint("competition_id", "sequence", name="uq_doubles_sequence"),
+        CheckConstraint("status IN ('waiting_partner','pending','confirmed','waitlisted','cancelled')", name="ck_doubles_status"),
+        CheckConstraint("member_count IN (1,2) AND (status='cancelled' OR (status='waiting_partner' AND member_count=1) OR (status IN ('pending','confirmed','waitlisted') AND member_count=2))", name="ck_doubles_member_count"),
+        CheckConstraint("version >= 1 AND sequence >= 1", name="ck_doubles_version_sequence"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    competition_id: Mapped[str] = mapped_column(ForeignKey("competitions.id", ondelete="RESTRICT"), index=True)
+    status: Mapped[str] = mapped_column(String(20), index=True)
+    member_count: Mapped[int] = mapped_column(Integer)
+    sequence: Mapped[int] = mapped_column(Integer)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)
+    members: Mapped[list["DoublesEntryMember"]] = relationship(order_by="DoublesEntryMember.position")
+
+
+class DoublesEntryMember(Base):
+    __tablename__ = "doubles_entry_members"
+    __table_args__ = (
+        ForeignKeyConstraint(["entry_id", "competition_id"], ["doubles_entries.id", "doubles_entries.competition_id"], ondelete="RESTRICT"),
+        UniqueConstraint("entry_id", "position", name="uq_doubles_member_position"),
+        UniqueConstraint("entry_id", "member_id", name="uq_doubles_entry_member"),
+        CheckConstraint("position IN (1,2)", name="ck_doubles_member_position"),
+        CheckConstraint("level_snapshot BETWEEN 1 AND 10", name="ck_doubles_level_snapshot"),
+        Index("uq_doubles_active_member", "competition_id", "member_id", unique=True, sqlite_where=text("is_active=1")),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    entry_id: Mapped[str] = mapped_column(String(36), index=True)
+    competition_id: Mapped[str] = mapped_column(String(36), index=True)
+    member_id: Mapped[str] = mapped_column(ForeignKey("members.id", ondelete="RESTRICT"), index=True)
+    position: Mapped[int] = mapped_column(Integer)
+    level_snapshot: Mapped[int] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    member: Mapped[Member] = relationship()
+
+
+class DoublesAudit(Base):
+    __tablename__ = "doubles_audits"
+    __table_args__ = (actor_constraint("actor", admin_column="admin_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    entry_id: Mapped[str] = mapped_column(ForeignKey("doubles_entries.id", ondelete="RESTRICT"), index=True)
+    competition_id: Mapped[str] = mapped_column(ForeignKey("competitions.id", ondelete="RESTRICT"), index=True)
+    actor_kind: Mapped[str] = mapped_column(String(10))
+    admin_id: Mapped[str | None] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"), nullable=True)
+    actor_visit_id: Mapped[str | None] = mapped_column(ForeignKey("public_visits.id", ondelete="RESTRICT"), nullable=True)
+    action: Mapped[str] = mapped_column(String(30))
+    changes_json: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc, index=True)
+    admin: Mapped[Admin | None] = relationship()
+
+
+class DoublesReceipt(Base):
+    __tablename__ = "doubles_receipts"
+    __table_args__ = (actor_constraint("actor", admin_column="admin_id"),)
+    request_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    competition_id: Mapped[str] = mapped_column(ForeignKey("competitions.id", ondelete="RESTRICT"), index=True)
+    actor_kind: Mapped[str] = mapped_column(String(10))
+    admin_id: Mapped[str | None] = mapped_column(ForeignKey("admins.id", ondelete="RESTRICT"), nullable=True)
+    actor_visit_id: Mapped[str | None] = mapped_column(ForeignKey("public_visits.id", ondelete="RESTRICT"), nullable=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    response_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now_utc)

@@ -7,7 +7,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from .models import (Admin, LoginSession, Member, PublicVisit, Competition,
-                     CompetitionRegistration, RegistrationAudit, now_utc)
+                     CompetitionRegistration, RegistrationAudit, DoublesReceipt, now_utc)
 from .schemas import AdminCompetition, AdminRegistration, RegistrationMutation, RegistrationDietUpdate, RegistrationLevelUpdate
 from .security import token_hash
 
@@ -96,6 +96,8 @@ def _competition_values(competition: Competition) -> dict[str, object]:
         "name": competition.name,
         "competition_date": competition.competition_date,
         "capacity": competition.capacity,
+        "registration_mode": competition.registration_mode,
+        "doubles_min_total_level": competition.doubles_min_total_level,
         "registration_deadline": competition.registration_deadline,
         "notes": competition.notes,
         "status": competition.status,
@@ -129,7 +131,11 @@ def _competition_response(db: Session, competition: Competition) -> AdminCompeti
             diet_counts[diet] += count
             level_counts[level] = level_counts.get(level, 0) + count
             competition_level_counts[competition_level] = competition_level_counts.get(competition_level, 0) + count
-    remaining = max(competition.capacity - status_counts["confirmed"], 0)
+    remaining = max(competition.capacity - status_counts["confirmed"], 0) if competition.registration_mode == "individual" else 0
+    doubles_summary = None
+    if competition.registration_mode == "doubles":
+        from .doubles import summary
+        doubles_summary = summary(db, competition)
     return AdminCompetition(
         **_competition_values(competition),
         deleted_at=competition.deleted_at,
@@ -140,6 +146,7 @@ def _competition_response(db: Session, competition: Competition) -> AdminCompeti
         effective_registration_open=(
             competition.deleted_at is None and competition.status == "open" and now_utc() < _as_utc(competition.registration_deadline)
         ),
+        doubles_summary=doubles_summary,
         summary={
             **status_counts,
             "remaining": remaining,
@@ -195,7 +202,7 @@ def _idempotent_registration(db, request_id, action, competition_id=None, *, act
     audit = db.scalar(select(RegistrationAudit).where(RegistrationAudit.idempotency_key == request_id))
     if not audit:
         from .models import ArrangementOperation, ArrangementVersion
-        if db.get(ArrangementOperation, request_id) or db.scalar(select(ArrangementVersion).where(ArrangementVersion.request_id == request_id)):
+        if db.get(DoublesReceipt, request_id) or db.get(ArrangementOperation, request_id) or db.scalar(select(ArrangementVersion).where(ArrangementVersion.request_id == request_id)):
             raise HTTPException(409, "此操作識別碼已用於其他操作")
         return None
     if (audit.actor_kind != actor.kind or audit.admin_id != actor.admin_id
@@ -250,6 +257,7 @@ def _mutate_registration(
     if actor.kind == "public":
         raise HTTPException(404, "找不到報名紀錄")
     competition = _mutable_competition(db, registration.competition_id)
+    require_individual(competition)
     if actor.kind == "public":
         require_member_open(competition)
     if registration.version != payload.version:
@@ -342,6 +350,7 @@ def create_registration_service(db, auth, competition_id, payload):
         db.rollback()
         return _registration_response(duplicate)
     competition = _mutable_competition(db, competition_id)
+    require_individual(competition)
     if actor.kind == "public":
         require_member_open(competition)
     if competition.status == "draft":
@@ -373,6 +382,7 @@ def public_registration_receipt(db, visit, competition_id, payload):
 
 def _create_registration_in_transaction(db, competition, member, payload, actor, fingerprint):
     """Caller owns BEGIN IMMEDIATE, authorization, competition-state checks and commit."""
+    require_individual(competition)
     competition_id = competition.id
     admin_id = actor.admin_id
     existing = db.scalar(select(CompetitionRegistration).where(
@@ -419,3 +429,8 @@ def _create_registration_in_transaction(db, competition, member, payload, actor,
         payload.reason, payload.request_id, actor, fingerprint,
     ))
     return registration
+
+
+def require_individual(competition):
+    if competition.registration_mode != "individual":
+        raise HTTPException(409, "雙打場次請使用雙打報名與組隊功能")

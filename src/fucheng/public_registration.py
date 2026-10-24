@@ -5,10 +5,10 @@ from datetime import timedelta
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Query, Request, Response
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select, text, union
 from sqlalchemy.orm import Session
 
-from .models import AuthAttempt, Competition, CompetitionRegistration, Member, PublicVisit, RegistrationAudit, now_utc
+from .models import AuthAttempt, Competition, CompetitionRegistration, DoublesAudit, DoublesReceipt, Member, PublicVisit, RegistrationAudit, now_utc
 from .registrations import _competition_response, create_registration_service, public_registration_receipt
 from .schemas import (ActorAuditEntry, PublicCandidate, PublicCompetition,
                       PublicRegistrationCreate, PublicRegistrationResult, RegistrationCreate)
@@ -41,10 +41,13 @@ def rate_limit(db, request, scope, identifier, *, identity_limit=10, ip_limit=40
 
 
 def public_competition(db, row):
-    summary = _competition_response(db, row).summary
+    admin_response = _competition_response(db, row)
+    summary = admin_response.summary
     return PublicCompetition(id=row.id, name=row.name, competition_date=row.competition_date,
         registration_deadline=row.registration_deadline, notes=row.notes, capacity=row.capacity,
-        confirmed=summary.confirmed, waitlisted=summary.waitlisted, remaining=summary.remaining)
+        confirmed=summary.confirmed, waitlisted=summary.waitlisted, remaining=summary.remaining,
+        registration_mode=row.registration_mode,doubles_min_total_level=row.doubles_min_total_level,
+        doubles_summary=admin_response.doubles_summary,effective_registration_open=admin_response.effective_registration_open)
 
 
 def install_public_routes(app, get_db, current_admin):
@@ -84,7 +87,9 @@ def install_public_routes(app, get_db, current_admin):
         row = db.scalar(select(PublicVisit).where(PublicVisit.token_hash == token_hash(request.cookies.get(visit_cookie,''))))
         if not row or row.expires_at <= now_utc():
             # Expired visits referenced by audits are intentionally retained for provenance.
-            referenced = select(RegistrationAudit.actor_visit_id).where(RegistrationAudit.actor_visit_id.is_not(None))
+            referenced = union(select(RegistrationAudit.actor_visit_id).where(RegistrationAudit.actor_visit_id.is_not(None)),
+                select(DoublesAudit.actor_visit_id).where(DoublesAudit.actor_visit_id.is_not(None)),
+                select(DoublesReceipt.actor_visit_id).where(DoublesReceipt.actor_visit_id.is_not(None)))
             db.execute(delete(PublicVisit).where(PublicVisit.expires_at <= now_utc(), PublicVisit.id.not_in(referenced)))
             raw, csrf = new_token(), new_token()
             row = PublicVisit(token_hash=token_hash(raw), csrf_token=csrf, expires_at=now_utc()+timedelta(hours=12))
@@ -135,6 +140,24 @@ def install_public_routes(app, get_db, current_admin):
         # Do not expose another member's status on a duplicate or offer anonymous cancellation/history.
         return PublicRegistrationResult(status=result.status,member_name=result.member_name,
             distinguishing_note=result.distinguishing_note,diet=result.diet)
+
+    from .doubles import create_entry, public_receipt, read_roster
+    from .schemas import DoublesCreate, PublicDoublesCreate, PublicDoublesResult, PublicDoublesRoster
+
+    @app.get('/api/public/competitions/{competition_id}/doubles', response_model=PublicDoublesRoster)
+    def doubles_list(competition_id: str, db: Db):
+        return read_roster(db, competition_id, public=True)
+
+    @app.post('/api/public/competitions/{competition_id}/doubles', response_model=PublicDoublesResult, status_code=201)
+    def doubles_register(competition_id: str, payload: PublicDoublesCreate, request: Request, db: Db, visit: PublicWrite):
+        visit_id=visit.id
+        create_payload=DoublesCreate(member_ids=payload.member_ids,request_id=payload.request_id)
+        previous=public_receipt(db,visit,competition_id,create_payload)
+        if previous is not None:
+            return previous
+        app.state.turnstile_verifier(payload.turnstile_token,settings,request.client.host if request.client else 'unknown')
+        rate_limit(db,request,'public-register',visit_id,identity_limit=20,ip_limit=600,global_limit=1800)
+        return create_entry(db,visit,competition_id,create_payload)
 
     @app.get('/api/admin/competitions/{competition_id}/history', response_model=list[ActorAuditEntry])
     def history(competition_id: str, db: Db, _auth: AdminAuth):
