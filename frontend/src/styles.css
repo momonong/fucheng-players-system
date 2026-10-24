@@ -1183,3 +1183,10 @@ body > .print-output.preview-open { visibility: visible; inset: 0; z-index: 2000
   .doubles-entry { padding: .85rem; }
   .doubles-public .doubles-confirm h3 { font-size: 1.15em; }
 }
+
+/* Keep container diagnostics within the existing status card rhythm. */
+.deployment-diagnostic .diagnostic-network { display:flex; align-items:flex-start; gap:.65rem; margin:1rem 0; }
+.diagnostic-network input { flex:0 0 auto; width:auto; margin-top:.25rem; }
+.diagnostic-delivery { border-top:1px solid var(--line, #d8dfda); margin-top:1.25rem; padding-top:.5rem; overflow-wrap:anywhere; }
+.deployment-manual summary { cursor:pointer; font-weight:700; }
+.deployment-manual[open] summary { margin-bottom:1rem; }

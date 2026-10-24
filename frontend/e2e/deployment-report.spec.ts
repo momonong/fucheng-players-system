@@ -27,6 +27,7 @@ test('管理員在手機與桌面上傳、查看、複製及下載部署報告',
   await page.getByRole('button', { name: '登入', exact: true }).click()
   await page.getByRole('link', { name: '系統狀態' }).click()
   await expect(page.getByRole('heading', { name: '部署檢查報告' })).toBeVisible()
+  await page.getByText('額外 Windows 主機檢查／手動上傳', { exact: true }).click()
   await expect(page.getByRole('button', { name: '上傳並取代最新報告' })).toBeVisible()
   await page.getByLabel('選擇部署檢查 JSON').setInputFiles({ name: 'synthetic-report.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) })
   await page.getByRole('button', { name: '上傳並取代最新報告' }).click()

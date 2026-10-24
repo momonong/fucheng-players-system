@@ -1,10 +1,43 @@
-# 球館主機健檢與報告回傳
+# 網站內建部署檢查與報告回傳
+
+網站映像已包含檢查功能。網站依既有流程 init／migrate 並啟動後，管理員登入「系統狀態 → 部署檢查報告」，按「立即檢查並回傳」。**不需要另下載主機健檢包、Git、Python 或建立 SSH**。檢查與原報告保存在網站資料庫，也納入既有資料庫備份。
+
+## 網站內建檢查
+
+預設只檢查目前 app／Linux 容器的 Python／平台、靜態成品、SQLite 結構與完整性、資料磁碟容量、既有備份狀態與入口設定。勾選官方網路檢查後，只連 Cloudflare HTTPS、Docker Registry HTTPS 與 `region1.v2.argotunnel.com`／`region2.v2.argotunnel.com` 的 TCP 7844。這是目前 app 容器的連線路徑；一端未確認即為 WARN，不代表 UDP／QUIC、真正 Tunnel 或主機防火牆通過。固定探測在 helper 內並行，7 秒預算保留已完成結果，parent 仍以10秒硬上限終止。這不代表 Windows 主機、Docker daemon／Compose、BIOS、防火牆、電源／冷開機、真實外部入口、Turnstile 真人流程或完整還原已通過；這些項目保留 NOT_TESTED 與理由。程式不掛 Docker socket、主機磁碟或特權，也不安裝主機代理。
+
+按鈕先保存同一份 schema 2（`report_type=container_runtime`）報告，再回傳到固定 `https://momonong.me/fucheng/api/deployment-reports`。未配置憑證不影響本機檢查；畫面仍可查看、下載 JSON／中文 Markdown。回傳狀態：
+
+| 狀態 | 意義與操作 |
+| --- | --- |
+| 本機已保存／未配置 | 報告保留；首次掛入合法回傳憑證後，可「重送原報告」 |
+| 結果未確認 unknown | 可能已送達；只讀回／重送原 UUID 與原內容，不重新檢查 |
+| 接收站拒收 rejected | 保留報告，核對設定或接收站版本後以原 UUID 重送 |
+| 已收到收據 received | 已驗 report_id、device_id、digest、接收時間；不表示檢查通過 |
+
+若執行連線中斷，前端保留原請求，先「讀回原執行結果」；伺服器已有收據時只重新 GET。重新整理後保留本頁未確認的請求，並由最新報告恢復保存狀態。不要用重跑代替重送。不同管理員可讀既有報告，只有原執行者可重送。
+
+### 首次配置容器回傳
+
+這是發送端 `REPORT_SEND`，與接收站 `REPORT_UPLOAD` 分開。管理者在首次部署設定專用 token 檔（32–64 bytes 安全亂數的小寫十六進位；不要寫入 env、image、一般日誌或聊天）及接收站綁定的 device ID。token 檔由 app UID 10001 可讀並唯讀掛入，內容不進瀏覽器或報告。
+
+於私密 `club.env` 設定 `FUCHENG_REPORT_SEND_DEVICE_ID` 與 `FUCHENG_REPORT_SEND_TOKEN_FILE`（受保護的主機檔案位置），在既有 Compose 命令最後加 `-f compose.diagnostics.yaml`。overlay 僅對 app 掛入專用 secret，並加入既有 egress network。它設 `FUCHENG_REPORT_SEND_ENABLED=true`；未加 overlay 時預設不送，本機按鈕仍可用。不要把 token 寫成環境值。映像不會自動產生憑證或替接收站配置權限。
+
+`FUCHENG_REPORT_SEND_ENABLED`、`FUCHENG_REPORT_SEND_DEVICE_ID`、`FUCHENG_REPORT_SEND_TOKEN_FILE` 是 app 的發送端設定；缺漏／無法讀取時保存報告並顯示未配置。尚未嘗試發送的報告允許第一次綁定裝置。送出前先持久保存 unknown 與 device，之後換憑證可沿用同 device，不能把同一報告改綁別的 device。禁止 redirect、TLS bypass、任意 URL 與環境 proxy；DNS／TLS／HTTP body 皆由子程序總 deadline 約束（探測 10 秒、回傳 15 秒），逾時終止並保留原報告。
+
+需使用同批新版接收站才能接受 schema 2；舊站回 422 時清楚顯示拒收，不假裝回傳成功。schema 1 Windows 報告、原生腳本與手動上傳仍相容，手動報告不會被標示成容器檢查。
+
+新增 schema `0015_deployment_diagnostics` **只新增** run 表。serve 不 migration；升級依既有停寫、備份、明確 migrate、匹配映像／schema 還原至新目標流程。每站本機檢查最多 500 份／64 MiB，滿時回 507，保留舊報告、不自動刪除。接收站的容量／每小時上限仍獨立適用。
+
+## 額外 Windows 原生深度檢查（選用）
+
+以下工具是主機範圍的額外檢查，**不是使用網站內建檢查的前置步驟**。僅在需要 Windows／Docker 主機資訊時使用，並保留其實機未驗證界線。
 
 工具先在 **Windows 主機原生 PowerShell 5.1 以上**完成既有唯讀健檢，寫下 `report.json`、`report.md`，再以專用憑證回傳。Docker 不可用或檢查有 FAIL 仍可回報；沒有網路時保留原檔。收據只證明伺服器已保存，**不表示檢查通過、主機身份已獨立驗證或准予部署**。不安裝軟體、不啟動容器、不接觸正式 volume、不改防火牆或系統服務。
 
-本功能的程式與工具已備妥；是否已在正式接收站啟用，以當次部署紀錄為準。原生 Windows／球館網路尚須實機驗證。既有管理頁手動上傳報告和畫面保持原用法。
+本功能的程式與工具已備妥；是否已在正式接收站啟用，以當次部署紀錄為準。原生 Windows／球館網路尚須實機驗證。管理頁「額外 Windows 主機檢查／手動上傳」展開後保留原上傳與下載功能。
 
-## 球館使用方式
+### 選用原生工具的使用方式
 
 1. 取得管理者交付的 `fucheng-host-report-kit.zip`，在可信來源核對隨附 SHA-256，解壓到受管理的本機資料夾，例如 `C:\FuchengCheck`。不需要 Git、Python 或額外 runtime；不要直接在 ZIP 預覽視窗執行。
 2. 管理者另外以私密方式提供專用 token 檔。將它放在解壓目錄的 `private\report-upload-token.txt`，只允許執行者與管理者讀取。將 `private\club-report.example.json` 複製為 `private\club-report.json`；確認其中 `device_id` 與伺服器設定相同，`token_file` 指向該私密檔。不要把 token 文字放進 JSON、命令列、聊天、截圖、Git、一般 ZIP 或報告。

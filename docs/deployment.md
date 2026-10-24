@@ -1,10 +1,18 @@
 # Windows Docker 部署、搬移與維運
 
+## 映像內建部署檢查（schema 0015）
+
+同批新版前後端映像啟動後，管理員可在「系統狀態 → 部署檢查報告」按「立即檢查並回傳」，不需另下載健檢包。未配置回傳憑證也可檢查、保存與下載。它只檢查 app／Linux 容器可見資訊；Windows 主機、Docker daemon、外部入口與完整備份還原保留 NOT_TESTED。
+
+可選 `compose.diagnostics.yaml` 僅對 app 掛入專用回傳 secret 並加入 egress network；端點固定，token 不入 image 或前端。首次私密憑證、device 綁定、原 UUID 恢復及狀態說明見 [網站內建檢查與報告回傳](host-report-upload.md)。現用服務更新、公開 Tunnel 與發布仍需另行明確授權。
+
+新增 migration `0015_deployment_diagnostics` 只新增執行記錄表；**serve 不執行 migration**。升級先依原流程停寫與備份，再用相符新映像明確 migrate。新增檢查記錄隨資料庫備份；回退仍需匹配 image/schema 並還原到新目標，保留故障庫與舊備份，不能用舊 image 直接讀寫新版 schema。
+
 ## 1.1.0 雙打報名與 schema 0014
 
 1.1.0 新增雙打報名與管理，須同批更新前後端及 app／backup／ops image。版本與功能見 [1.1.0 發布說明](release-1.1.0.md)及[雙打使用說明](doubles-registration.md)。本節是升級契約；實際映像 digest、部署時間與驗證結果以當次[家中部署紀錄](home-deployment.md)為準。
 
-新 head 為 `0014_doubles_registration`，前版為 `0013_announcement_deletion`。migration 新增雙打登記、成員快照、稽核及 receipt，舊場次明確保留 `registration_mode=individual`、`doubles_min_total_level=null`，不將舊個人報名轉為雙打，不改既有會員級數或安排 layout。新增雙打賽事仍須由管理員明確建立，本次發布不在真實資料庫新增測試場次或報名。
+1.1.0 的 head 為 `0014_doubles_registration`，前版為 `0013_announcement_deletion`。migration 新增雙打登記、成員快照、稽核及 receipt，舊場次明確保留 `registration_mode=individual`、`doubles_min_total_level=null`，不將舊個人報名轉為雙打，不改既有會員級數或安排 layout。新增雙打賽事仍須由管理員明確建立，本次發布不在真實資料庫新增測試場次或報名。
 
 更新既有部署前，核對唯一 project、來源 image／schema 與目前資料，停止此 project 的 app／backup 寫入，確認無其他 writer；以原版 runtime 成組備份 DB＋媒體並核對 hash、保留舊 image、設定及 volumes。之後才用已核對的新 image 經 runtime lifecycle／maintenance guard 明確執行 `ops migrate`；`Start`／`serve` 只檢查 schema，不會自動 migration。不得繞過 guard 直接對 volume 執行 Alembic，或以 `init`、reseed、合成 DB 取代原資料。
 

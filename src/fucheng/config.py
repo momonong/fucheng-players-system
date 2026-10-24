@@ -25,6 +25,9 @@ class Settings:
     turnstile_hostname: str | None = None
     backup_status_file: Path | None = None
     base_path: str = ""
+    report_send_enabled: bool = False
+    report_send_device_id: str | None = None
+    report_send_token_file: Path | None = field(default=None, repr=False)
     report_upload_enabled: bool = False
     report_upload_device_id: str | None = None
     report_upload_token: str | None = field(default=None, repr=False)
@@ -85,7 +88,13 @@ class Settings:
                     upload_token = stream.read(257).decode("ascii").strip()
             except (OSError, UnicodeError, ValueError):
                 raise ValueError("Report upload token file is unavailable or invalid") from None
+        send_mode = os.getenv("FUCHENG_REPORT_SEND_ENABLED", "false").lower()
+        if send_mode not in {"true", "false"}:
+            raise ValueError("Report send must be explicitly true or false")
         return cls(
+            report_send_enabled=send_mode == "true",
+            report_send_device_id=os.getenv("FUCHENG_REPORT_SEND_DEVICE_ID") or None,
+            report_send_token_file=Path(os.environ["FUCHENG_REPORT_SEND_TOKEN_FILE"]) if os.getenv("FUCHENG_REPORT_SEND_TOKEN_FILE") else None,
             database_url=database_url,
             base_path=os.getenv("FUCHENG_BASE_PATH", ""),
             report_upload_enabled=upload_mode == "true",

@@ -1,0 +1,16 @@
+# Optional server-only sender. Include after base and ingress overlays.
+# The app already includes local diagnostics; this adds only egress and a secret.
+services:
+  app:
+    environment:
+      FUCHENG_REPORT_SEND_ENABLED: "true"
+      FUCHENG_REPORT_SEND_DEVICE_ID: ${FUCHENG_REPORT_SEND_DEVICE_ID:?Set the receiver-bound device ID}
+      FUCHENG_REPORT_SEND_TOKEN_FILE: /run/secrets/report_send_token
+    secrets:
+      - source: report_send_token
+        target: report_send_token
+    networks:
+      egress: {}
+secrets:
+  report_send_token:
+    file: ${FUCHENG_REPORT_SEND_TOKEN_FILE:?Set a protected host path to the dedicated report token}

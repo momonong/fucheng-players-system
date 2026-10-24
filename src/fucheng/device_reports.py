@@ -10,13 +10,13 @@ from fastapi import Depends, HTTPException, Query, Request, Response
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.orm import Session
 
-from .deployment_report import MAX_REPORT_BYTES, HostReport, parse_report, render_markdown
+from .deployment_report import MAX_REPORT_BYTES, Report, HostReport, parse_report, render_markdown
 from .models import DeviceDeploymentReport, now_utc
 
 TOKEN_HEADER = "X-Fucheng-Report-Token"
 
 
-def canonical_report(report: HostReport) -> str:
+def canonical_report(report: Report) -> str:
     return json.dumps(report.model_dump(mode="json"), ensure_ascii=False, sort_keys=True,
                       separators=(",", ":"), allow_nan=False)
 
@@ -100,16 +100,16 @@ def install_device_report_routes(app, get_db, current_auth, settings):
                                DeviceDeploymentReport.report_id.desc()).limit(limit + 1)))
         items = []
         for row in rows[:limit]:
-            report = HostReport.model_validate_json(row.report_json)
+            report = parse_report(row.report_json.encode("utf-8"))
             items.append(receipt(row) | {"checked_at": report.checked_at.isoformat(),
-                "claimed_host_name": report.host.name, "summary": report.summary.model_dump()})
+                "claimed_host_name": report.host.name if isinstance(report, HostReport) else report.runtime.name, "summary": report.summary.model_dump()})
         return {"items": items, "next_before": rows[limit - 1].report_id if len(rows) > limit else None}
 
     def download(report_id: UUID, db: Session, markdown: bool):
         row = db.get(DeviceDeploymentReport, str(report_id))
         if not row:
             raise HTTPException(404, "找不到報告")
-        report = HostReport.model_validate_json(row.report_json)
+        report = parse_report(row.report_json.encode("utf-8"))
         content = render_markdown(report) if markdown else report.model_dump_json(indent=2) + "\n"
         suffix, media = ("md", "text/markdown") if markdown else ("json", "application/json")
         return Response(content.encode("utf-8"), media_type=media, headers={

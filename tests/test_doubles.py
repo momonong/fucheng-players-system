@@ -243,7 +243,7 @@ def test_migration_preserves_existing_competition_and_adds_constrained_aggregate
     command.upgrade(config,'head')
     with sqlite3.connect(database) as db:
         assert db.execute('SELECT registration_mode,doubles_min_total_level FROM competitions').fetchall()==[('individual',None)]
-        assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0014_doubles_registration'
+        assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0015_deployment_diagnostics'
         assert db.execute('PRAGMA foreign_key_check').fetchall()==[]
         assert {'doubles_entries','doubles_entry_members','doubles_audits','doubles_receipts'} <= {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         with pytest.raises(sqlite3.IntegrityError):
