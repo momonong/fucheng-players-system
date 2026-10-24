@@ -28,6 +28,14 @@
 
 ## 發布、部署與驗收狀態
 
-截至本文件準備時，Git 合併／推送、版本發布、正式映像建置／推送及網站部署尚待執行；此文件不代表現站已更新。正式映像應由固定 commit 經既有 allowlist staging 與 source manifest 建置，禁止納入 data、帳密、備份或既有 dist。實際版本、digest、schema、資料保留與 HTTPS 核對結果須在執行後記入[家中部署紀錄](home-deployment.md)。
+[PR #33](https://github.com/momonong/fucheng-players-system/pull/33) 已合併及推送，[GitHub Release v1.1.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.1.0)、tag 與正式映像來源固定為 `29a5a18c248b295848f62d105309104fba436702`。映像經既有 allowlist staging 與 source manifest 從固定 commit 建置，沒有 data、帳密、備份或既有 dist；後續純文件更新不改變映像來源。
+
+- Docker Hub `1.1.0`／`latest` 的 registry manifest digest 相同：`sha256:aa3b8b72887dd013102806ed8e8e891d39538ba5c41b6d5f412ad6462a998594`；linux/amd64、Docker manifest v2，無額外 index。
+- 拉回的 config/native image ID 為 `sha256:e1004729610a7874166a917eb18fb8277ca2643883d5310aec13b575b7ae0ebf`，與已測映像一致；source manifest 為 `4525531036e5c2922230676b6a3d3369061093f5d02e7756da9210e084935654`。
+- 根路徑及 `/fucheng` 的隔離合成映像 smoke 通過，涵蓋雙打等待／組隊／接受、級數門檻提醒、不可變 receipt、原個人報名及公告刪除／還原。映像的 HTML／JS／CSS 與最終瀏覽器測試成品逐 byte 相同。
+
+2026-10-24 台北時間 14:30:01 已更新既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)，現站使用上述固定 digest。先停 app／backup 寫入，以舊 runtime 成組備份 DB＋媒體，再經新版 runtime guard 明確遷移 `0013` → `0014`；app／backup 健康、integrity ok、foreign key errors 0。22 張舊表所有原欄位及媒體保留，原帳號核對一致；342 位會員、4 組管理員、2 場比賽、81 筆報名、8 版安排及 1 份既有健檢報告保留，舊場次均為 individual／null，4 張雙打新表為空，沒有新增真實測試會員、場次或報名。
+
+公開 HTTPS、匿名管理拒絕、原帳號登入／唯讀 GET／登出、Cookie、既有報告下載及新版 runtime 備份通過；登入後 19 張非認證舊表仍相同、4 張雙打新表仍空，公開 JS／CSS hash 符合已測映像。瀏覽器已開啟正式首頁並確認新版雙打入口文案；工程與部署核對不代替人工接受。完整紀錄見[家中部署紀錄](home-deployment.md#110-雙打報名正式發布與部署2026-10-24)。
 
 外部真實 Turnstile 尚未連線驗證；受控 widget／HTTP 錯誤測試不等同外部服務驗收。未確認請求僅保留在本頁記憶體，關閉或重新整理前須由管理員核對結果。使用者網站試用、球館 Windows、實體手機／印表機及斷電／重開機仍待人工驗收。

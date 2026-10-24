@@ -1,6 +1,6 @@
 # 府城球館會員管理系統
 
-1.1.0 新增雙打組隊報名：可單人等待搭檔或兩人一起報名，由管理員接受、候補遞補、取消與拆隊；原個人賽及安排表保留。新增 `0014_doubles_registration`，舊場次維持個人賽；前後端須同批更新，升級先停寫、成組備份並經 runtime 顯式 migrate，不可直接換回舊 image。雙打工程驗證及獨立審查已通過；版本、映像發布與網站部署待執行，人工試用尚未驗收。詳見 [1.1.0 發布說明](docs/release-1.1.0.md)、[雙打使用說明](docs/doubles-registration.md)及[升級注意](docs/deployment.md#110-雙打報名與-schema-0014)。
+1.1.0 新增雙打組隊報名：可單人等待搭檔或兩人一起報名，由管理員接受、候補遞補、取消與拆隊；原個人賽及安排表保留。已合併、推送並發布 [GitHub Release v1.1.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.1.0)及 Docker Hub `1.1.0`／`latest`，2026-10-24 台北時間 14:30:01 更新既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)。先停寫、成組備份，再經 runtime guard 遷移至 `0014_doubles_registration`；app／backup 健康，22 張舊表原欄與媒體保留，舊場次維持個人賽，4 張雙打新表仍為空。原帳號 HTTPS 登入／讀取／登出、19 張非認證舊表、新版備份及公開資產核對通過；未新增真實測試資料。詳見 [1.1.0 發布說明](docs/release-1.1.0.md)、[雙打使用說明](docs/doubles-registration.md)及[部署紀錄](docs/home-deployment.md#110-雙打報名正式發布與部署2026-10-24)。網站人工試用、真正 Turnstile、球館 Windows 與重開機仍待驗收。
 
 1.0.0 將使用者已確認的目前網頁效果定為第一版正式版本；本次只提升專案版本與發布文件，功能、依賴及資料格式不變。版本與映像識別見 [GitHub Release v1.0.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.0.0)及 [Docker Hub 1.0.0](https://hub.docker.com/r/momonong/fucheng-players-system/tags?name=1.0.0)。2026-10-23 台北時間 00:43:14 已部署至既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)，app／backup 健康；更新前成組備份與 22 表所有欄位、帳號及媒體核對一致，原帳號 HTTPS 登入／讀取／登出後 19 張非認證表仍相同，既有報告與新版備份驗證通過；球館Windows、實體列印及重開機仍待現場驗收。詳見[1.0.0發布說明](docs/release-1.0.0.md)。
 

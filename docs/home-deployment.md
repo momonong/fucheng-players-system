@@ -1,6 +1,6 @@
 # 家中 4090 試用部署
 
-2026-10-23 台北時間 00:43:14，既有 [momonong.me/fucheng/](https://momonong.me/fucheng/) 已更新至正式 1.0.0 固定 registry digest，schema 維持 `0013_announcement_deletion`、layout JSON 維持 schema 2，沒有 migration。app／backup 健康；更新前成組備份與 22 表所有欄位、帳號及媒體核對一致，原帳號 HTTPS 登入／讀取／登出後 19 張非認證表仍相同，既有報告與新版備份驗證通過。詳見[1.0.0 部署紀錄](#100-第一版正式部署2026-10-23)；下方 0.4.6 及更舊紀錄保留為歷史。球館 Windows、實體列印與重開機仍待現場驗收。
+2026-10-24 台北時間 14:30:01，既有 [momonong.me/fucheng/](https://momonong.me/fucheng/) 已更新至正式 1.1.0 固定 registry digest，經停寫、舊 runtime 成組備份及新版 runtime guard 遷移至 `0014_doubles_registration`，原個人安排 layout JSON 維持 schema 2。app／backup 健康；22 張舊表原欄、帳號及媒體保留，舊場次維持 individual／null，4 張雙打新表仍空；原帳號 HTTPS 登入／讀取／登出後 19 張非認證舊表仍相同，既有報告、新版備份及外部資產核對通過。詳見[1.1.0 部署紀錄](#110-雙打報名正式發布與部署2026-10-24)；1.0.0 及更舊紀錄保留為歷史。網站人工試用、真正 Turnstile、球館 Windows、實體列印與重開機仍待驗收。
 
 ## 主機與入口
 
@@ -12,13 +12,13 @@
 - app 與備份各使用本 project 的 Linux named volume；不掛 Windows 路徑，也不共用其他 app 資料。
 - app 僅信任指定 Docker bridge gateway。網路允許 Turnstile Siteverify 所需 outbound HTTPS。
 - 不啟用 base Compose 的 cloudflared、ngrok 或 https-test profiles。
-- `pull_policy: never`：正式release使用固定registry digest；現用1.0.0已核對registry manifest、拉回的native image ID及source manifest。先備妥並核對映像，再操作。
+- `pull_policy: never`：正式release使用固定registry digest；現用1.1.0已核對registry manifest、拉回的native image ID及source manifest。先備妥並核對映像，再操作。
 
 ## 設定與操作
 
 從專案根目錄執行。全新部署時，才將 `deploy/docker/home.env.example` 複製至 Git 忽略且受限的 `data/home-deployment/home.env`，依現場確認網段／port；既有站點沿用現用私密設定。Turnstile sitekey 使用真正的 momonong.me widget，secret 放受限本機檔案，只提供路徑；secret 必須能由容器 UID 10001 讀取。不要把 secret 值放入命令、Git 或聊天。
 
-既有站點的 `data/home-deployment/home.env` 已持久更新為1.0.0固定registry digest，原device ID及`FUCHENG_REPORT_UPLOAD_TOKEN_FILE`私密檔案路徑保留，不要用範例覆寫。上傳token與原Turnstile secret分開，receiver overlay只對app掛載`/run/secrets/report_upload_token`，原Turnstile secret保留；一般工具ZIP不含秘密，球館端另行私密配置。現用schema0013不能直接換回0012映像；安排寫入升級為layout JSON schema2後，也不能直接使用只理解schema1的舊程式。回復資料須保留故障庫，以匹配映像及備份經runtime還原到新目標，詳見[本次紀錄](#100-第一版正式部署2026-10-23)。
+既有站點的 `data/home-deployment/home.env` 已持久更新為1.1.0固定registry digest，原device ID及`FUCHENG_REPORT_UPLOAD_TOKEN_FILE`私密檔案路徑保留，不要用範例覆寫。上傳token與原Turnstile secret分開，receiver overlay只對app掛載`/run/secrets/report_upload_token`，原Turnstile secret保留；一般工具ZIP不含秘密，球館端另行私密配置。現用schema0014禁止直接downgrade，也不能只換回1.0.0／0013或其他舊映像；安排寫入升級為layout JSON schema2後，也不能直接使用只理解schema1的舊程式。回復資料須保留故障庫，以升級前匹配映像及備份經runtime還原到新目標，詳見[本次紀錄](#110-雙打報名正式發布與部署2026-10-24)。
 
 ```bash
 dc=(docker --context default compose --env-file data/home-deployment/home.env
@@ -306,3 +306,19 @@ Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器�
 - 外部 HTTPS、匿名管理拒絕、原帳號登入／讀取／登出、既有報告下載 digest 與公開 JS／CSS 雜湊皆通過。瀏覽器首頁公告及會員頁完成載入，顯示 342 位會員；未向真實資料新增測試報名或公告。
 
 原 env、資料卷、帳號、憑證、映像、checkpoint 與備份保留，共用入口未改。受限收據存於 ignored `data/release-1.0.0/home-deployment/`。本輪是既有網站更新驗證；球館 Windows、實體手機／印表機、真正 Turnstile 報名與斷電／重開機仍待現場驗收。
+
+
+## 1.1.0 雙打報名正式發布與部署（2026-10-24）
+
+[PR #33](https://github.com/momonong/fucheng-players-system/pull/33)、[GitHub Release v1.1.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.1.0)、tag 與正式映像來源為 `29a5a18c248b295848f62d105309104fba436702`；後續純文件提交不改映像來源。Docker Hub `1.1.0`／`latest` 發布並拉回核對後，台北時間 **14:30:01**（UTC 06:30:01）更新既有 `fucheng-home` app／backup，14:30:26 完成外部資產核對。
+
+- Registry **manifest digest**：`sha256:aa3b8b72887dd013102806ed8e8e891d39538ba5c41b6d5f412ad6462a998594`。兩個遠端 tag 相同，linux/amd64、Docker manifest v2，無額外 index；現站使用固定 digest。拉回的 **config/native image ID** 為 `sha256:e1004729610a7874166a917eb18fb8277ca2643883d5310aec13b575b7ae0ebf`，與已測映像及現站一致。
+- Source manifest：`4525531036e5c2922230676b6a3d3369061093f5d02e7756da9210e084935654`。固定 commit 經既有 allowlist 建置；映像 HTML、`index-BJhLHs06.js`／`index-CN4iCq9T.css` 與最後瀏覽器測試成品逐 byte 相同。獨立 root／prefix 合成映像 smoke 通過雙打等待／組隊／接受、門檻提醒、不可變 receipt、原個人報名與公告刪除／還原；無 host port、network none，測試服務已停止、volumes 保留。
+- 停止本 project app／backup 寫入後，以舊 1.0.0 runtime 成組備份 DB＋媒體，再由新版 runtime 經 lifecycle／maintenance guard 顯式遷移 `0013_announcement_deletion` → `0014_doubles_registration`。沒有 init、bootstrap、reseed 或新增帳號；沒有在真實 DB 建立測試會員、雙打場次或報名。
+- 遷移後及登入驗證前，**22 張舊表所有原欄位及原值相同**，包含 `deleted_at`、原帳號與 sessions；認證資料只於記憶體核對，不保存值或認證 fingerprint。342 位會員、4 組管理員、2 場比賽、81 筆報名、8 版安排及 1 份既有健檢報告保留，原媒體檔案及 bytes 相同。舊比賽新欄位均為 `registration_mode=individual`、`doubles_min_total_level=null`；4 張新雙打表為空。schema 0014、integrity ok、FK errors 0，app／backup healthy。
+- 外部 HTTPS health、匿名管理拒絕、原帳號登入／唯讀 GET／登出、Secure／HttpOnly／前綴 Cookie、既有健檢報告下載及新 runtime 成組備份通過。沒有提交報告；登入後 **19 張非認證舊表仍相同**，4 張新雙打表仍空。公開 JS／CSS hash 符合已測映像；原目標對話亦以瀏覽器開啟正式首頁，確認新版雙打入口文案，未新增或修改真實業務資料。
+- 只更改私密設定的 `FUCHENG_IMAGE`。三份 Compose、原 data／backup volumes、帳號、device report receiver、report token／Turnstile 掛載、`/fucheng/`、loopback8064、HP forward／Caddy／Tunnel／DNS／網路與其他服務保留，沒有共用入口變更或資源清理。原設定、舊 image、checkpoint、備份及 volumes 均保留。
+
+非秘密結果保留於 ignored `data/release-1.1.0/` 的 `registry.json`、`github-release.json`、`image-smoke.json`、`frontend-static-equality.json`，以及 `home-deployment/` 的 `deployment.json`、`migration.json`、`data-preservation-after-migrate-all.json`、`public-verification.json`、`external-assets-verification.json`。DB、env、exports 與憑證保持受限，不納入文件或 Git。
+
+`0014` 明確拒絕直接 downgrade，不能只換回 1.0.0 或其他舊 image。若需回復，須保留目前資料及後續寫入，以升級前成組備份在新目標還原，使用匹配的 image／schema，再核對資料與入口。部署及工程通過尚非人工接受；網站人工試用、真正 Turnstile 報名、球館 Windows、實體手機／印表機、斷電／重開機仍待驗收，同機備份不等於異地備份。
