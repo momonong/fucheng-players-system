@@ -7,7 +7,7 @@ type Operation = { kind: 'create' } | { kind: 'password' } | { kind: 'reset' | '
 type Props = { session: AdminSession; onLogout: () => void; onPasswordChanged: () => void }
 const dateTime = (value: string) => new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Taipei' }).format(new Date(value))
 const actionText: Record<AdminAccountAudit['action'], string> = {
-  create: '新增管理員', change_password: '本人修改密碼', reset_password: '重設密碼', disable: '停用帳號', enable: '啟用帳號', bootstrap: '建立首位管理員',
+  create: '新增管理員', change_password: '本人修改密碼', reset_password: '重設密碼', disable: '停用帳號', enable: '啟用帳號', bootstrap: '建立首位管理員', report_capability: '取得報告短效回傳權限',
 }
 const sourceText: Record<AdminAccountAudit['source'], string> = { web: '管理後台', cli: '維護工具', bootstrap: '首次設定' }
 

@@ -1,5 +1,8 @@
 # Windows Docker 部署、搬移與維運
 
+球館目前已採用固定 Worker＋具名 Tunnel，請先讀[球館部署與維運指南](club-deployment-runbook.md)。
+以下保留通用及歷史部署方式；不要在已 COMPLETE 的正式站重做初始化或首次搬移。
+
 ## 映像內建部署檢查（schema 0015）
 
 同批新版前後端映像啟動後，管理員可在「系統狀態 → 部署檢查報告」按「立即檢查並回傳」，不需另下載健檢包。未配置回傳憑證也可檢查、保存與下載。它只檢查 app／Linux 容器可見資訊；Windows 主機、Docker daemon、外部入口與完整備份還原保留 NOT_TESTED。

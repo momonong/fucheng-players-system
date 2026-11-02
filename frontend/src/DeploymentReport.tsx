@@ -8,8 +8,9 @@ type Check = { id: string; status: Status; reason: string; evidence: string; nex
 type Recommendation = { candidate: string; status: Status; reason: string; next_action: string }
 type HostReport = {
   checked_at: string
-  schema_version: 1 | 2
-  report_type?: "container_runtime"
+  schema_version: 1 | 2 | 3
+  report_type?: "container_runtime" | "deployment_feasibility"
+  scope?: { container_execution: boolean; temporary_public_probe?: boolean }
   host?: { name: string; windows: string; build: string }
   runtime?: { name: string; system: string; python: string }
   summary: Record<Status, number>
@@ -175,7 +176,7 @@ export function DeploymentReportPage({ username, displayName, onLogout }: { user
       <details className="panel deployment-manual"><summary>額外 Windows 主機檢查／手動上傳</summary>
       <section className="deployment-upload" aria-label="上傳部署檢查報告">
         <h3>上傳 JSON 報告</h3>
-        <p>只接受本專案主機健檢產生的 JSON，大小上限 256 KiB；上傳需管理員權限。</p>
+        <p>接受本專案 Windows 主機健檢（schema 1）或部署可行性檢查（schema 3）的 JSON，大小上限 256 KiB；上傳需管理員權限。</p>
         <input ref={fileInput} type="file" accept=".json,application/json" aria-label="選擇部署檢查 JSON" disabled={busy || !!pending} onChange={event => setFile(event.target.files?.[0] ?? null)} />
         <button type="button" disabled={!file || !state || busy || !!pending} onClick={upload}>{busy ? '上傳中…' : '上傳並取代最新報告'}</button>
         {file && <p>已選：{file.name}</p>}
@@ -189,6 +190,7 @@ export function DeploymentReportPage({ username, displayName, onLogout }: { user
         <section className="panel deployment-summary">
           <h3>最新報告 <small>版本 {state.version}</small></h3>
           {report.runtime ? <p>來源：<strong>{report.runtime.name}</strong>・{report.runtime.system}・Python {report.runtime.python}</p> : report.host && <p>報告宣稱的主機：<strong>{report.host.name}</strong>・{report.host.windows} build {report.host.build}</p>}
+          {report.schema_version === 3 && <p>此為臨時主動測試：容器執行{report.scope?.container_execution ? '已啟用' : '未執行'}，臨時公開測試{report.scope?.temporary_public_probe ? '已啟用' : '未執行'}；只使用隔離 nonce-only 容器，不存取真實資料 volume。主機回讀 HTTPS 不等於獨立手機外網驗收，固定 IP 合約與 ISP 入站政策仍未驗證。</p>}
           <p>檢查時間：{dateTime(report.checked_at)}；保存時間：{state.uploaded_at ? dateTime(state.uploaded_at) : '未知'}</p>
           {timeWarning && <p role="alert" className="notice error">{timeWarning}</p>}
           <p className="deployment-counts">{(['PASS', 'WARN', 'FAIL', 'NOT_TESTED'] as const).map(status => <span key={status} className={`report-${status.toLowerCase()}`}>{status} {report.summary[status]}</span>)}</p>

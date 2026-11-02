@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -36,6 +37,12 @@ def source_files():
                     "frontend/vite.config.ts", "frontend/src/**/*.ts", "frontend/src/**/*.tsx",
                     "frontend/src/**/*.css", "deploy/docker/runtime.py"]:
         files.extend(ROOT.glob(pattern))
+    # Resolve relative to this reviewed script, including when loaded by importlib.
+    helper_path = Path(__file__).with_name("club_host_one_shot_package.py")
+    spec = importlib.util.spec_from_file_location("fucheng_host_tool_package", helper_path)
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    files.extend(ROOT / name for name in set(helper.FILES) | helper.DOWNLOAD_SOURCES | {"scripts/club_host_one_shot_package.py"})
     return sorted(set(files))
 
 

@@ -1,5 +1,40 @@
 # 家中 4090 試用部署
 
+> **2026-11-03 已停站保留資料。** 球館已改用
+> `https://fucheng.momonong.workers.dev/`，公開健康及原帳號登入成功。
+> 本文以下為歷史部署；後續操作以[球館維運指南](club-deployment-runbook.md)為準。
+> 不要直接執行舊 Compose up 或還原舊卷作為球館現況。
+
+## 4090 停站紀錄（2026-11-03）
+
+使用者確認球館原帳號登入成功後，明確授權停止 4090 府城服務。本機確認為
+`Ubuntu-RTX4090`／原生 Docker `default`，僅操作 `fucheng-home` 的 app／backup：
+
+- `fucheng-home-app-1`、`fucheng-home-backup-1` 均 exited，restart policy 改為 `no`。
+  保留容器及 `fucheng-home_data`、`fucheng-home_home_backups`，沒有 prune／down／刪卷。
+- 停寫後使用原實際 image ID
+  `sha256:3b006c21e144369db53f7e6b3ab074c57896051af000e72da866e0f866fd2a99`
+  （`snapshot-def5349d3ac76ec8`）執行 runtime export，未 init、migration 或還原。
+  受限 backup volume 中最後成組 checkpoint 為
+  `manual-export-20261102T175437668557Z-d7c52b5d.db`，匯出為
+  `exports/export-20261102T175437700203Z.tar`（檔名使用 UTC）。
+  archive SHA-256：`ef10f3311142a66876095a09a09238ee4ddfaf156733ffb79920bdda2e666bed`。
+- 非秘密操作收據在 ignored `data/club-cutover-20261103/`；原 image、資料、帳號、
+  歷史報告與所有備份保留。這份舊站資料不是球館後續寫入的同步備援，不得直接啟動取代球館。
+- 停站後瀏覽器確認球館 `/api/health` 為 `{"status":"ok"}`；momonong.me 首頁正常渲染，
+  原其他服務入口保留。直接 Python HTTP 請求遭 Cloudflare 1010 拒絕，未將該 403 當站點故障。
+  未重新登入其他應用或驗收其全部業務。
+- HP Caddy／共用 cloudflared／DNS／其他應用未更改。4090 專用 SSH forward 仍 active／enabled；
+  查核既有 sudo 權限需互動密碼，因此本次未停用該 root-owned unit，也沒有改權限。
+  它僅保留空轉的舊傳輸通道，app 已停止；舊 `/fucheng` 路由、首頁卡片均保留，未改成自動轉址。
+- 4090 接收站與固定 SHA 工具下載同時離線。既有球館 JSON／UUID／收據保留；
+  球館正式 app 沒有啟用 report send／upload，不依賴舊接收站。
+
+本次共用文件版本以可信遠端 main 核對為
+`momonong/selfhost-servers@602f1995b501a46ca68254a5de3344643c1226d7`；未修改該 repo
+既有工作樹草稿、共用設定或發布服務目錄。本次 Git 交付與球館固定 1.2.0 image 分別記錄，
+沒有覆寫 release／registry tag。
+
 2026-10-24 台北時間 14:30:01，既有 [momonong.me/fucheng/](https://momonong.me/fucheng/) 已更新至正式 1.1.0 固定 registry digest，經停寫、舊 runtime 成組備份及新版 runtime guard 遷移至 `0014_doubles_registration`，原個人安排 layout JSON 維持 schema 2。app／backup 健康；22 張舊表原欄、帳號及媒體保留，舊場次維持 individual／null，4 張雙打新表仍空；原帳號 HTTPS 登入／讀取／登出後 19 張非認證舊表仍相同，既有報告、新版備份及外部資產核對通過。詳見[1.1.0 部署紀錄](#110-雙打報名正式發布與部署2026-10-24)；1.0.0 及更舊紀錄保留為歷史。網站人工試用、真正 Turnstile、球館 Windows、實體列印與重開機仍待驗收。
 
 ## 主機與入口
@@ -339,3 +374,32 @@ Python urllib 的外部探測被 Cloudflare 拒絕（403 / 1010）；瀏覽器�
 非秘密收據位於 ignored `data/release-1.2.0/` 的 `registry.json`、`github-release.json`、`build-verification.json`、`image-smoke.json`、`image-diagnostics-smoke.json`、`image-diagnostics-delivery.json`，以及 `home-deployment/` 的 `deployment.json`、`migration.json`、`data-preservation-after-migrate-all.json`、`public-verification.json`、`synthetic-report-verification.json`、`external-assets-verification.json`、`backup-final.json`。DB、env、exports 與憑證保持受限，不納入文件或 Git；版本功能與工程證據見[1.2.0 發布說明](release-1.2.0.md)。
 
 `0015` 明確拒絕直接 downgrade，不能只換回 1.1.0 或其他舊 image；若需回復，須保留故障庫與後續寫入，以匹配的成組備份還原至新目標，搭配匹配 image／schema，再核對資料與入口。本次備份位於同機，尚非異地備份。真 HTTPS 合成接收驗證不代表球館 Windows／Docker Desktop／WSL2、現場 app 發送端、官方外網探測、實體手機、UDP／QUIC、真正 Tunnel、主機防火牆、Turnstile 真人流程、完整還原或冷開機／斷電通過；上述仍未驗證，人工接受亦未完成。
+
+## 一段 PowerShell 自動下載與短效回傳（2026-10-25，公開驗收待入口恢復）
+
+使用者要求取消 AnyDesk 手動傳資料夾，改成貼上一段 PowerShell 自動下載、執行 Windows 檢查並取得安全回傳權限。球館正式網域仍由球館自備；`momonong.me` 僅供既有暫時接收站與工具／指南。
+
+- 既有 `fucheng-home` app／backup 已同批切換至未提交來源快照 `local/fucheng:snapshot-d0fdd83e2ffe6ae7`；native image ID `sha256:f00d55f7e449ccbd786b9627b987473c4b4c70fa15d9313864dcdbc7901e54aa`，source manifest `d0fdd83e2ffe6ae71f7b30e8e968a2462943eae22925e1bf388999d8a5369a8e`。這不是新的 registry release，未變更 Docker Hub `1.2.0`／`latest`，未 commit／push。
+- 新功能包含固定 SHA-256 的無秘密工具下載、既有管理員重新登入後簽發一小時單報告 HMAC capability、同 UUID／內容續傳與收據復用。密碼/session 不寫工具檔，長效接收 token 不發給使用者。沒有 migration，schema 仍為 `0015_deployment_diagnostics`。
+- 先用舊映像正常停寫並成組 backup/export，驗證 archive／DB／metadata／媒體；切換及後續核對均確認 **27 張 app 表、全部欄位與原值、帳號與媒體完全相同**。app／backup healthy，integrity ok、FK errors 0。新版 runtime 成組備份也已完成。原 env、舊映像、volumes、前後備份均保留。
+- 只有私密 `home.env` 的 `FUCHENG_IMAGE` 改變；三份 Compose、秘密掛載、資料卷、loopback8064、base path、HP forward／Caddy／Tunnel／DNS 及其他服務均未修改。球館電腦未重開機或重啟 Docker。
+- 103 個來源檔及 source-manifest 經 allowlist context/audit 核對；獨立合成 volume、無外網／無主機 port 的候選啟動、健康、匿名 capability 拒絕和映像實際下載 bytes 均通過。bootstrap SHA `f54a5e9d21e6ef7affdb172823ebd3ff9d6f6783223227f184b99c39c3b1764f`，ZIP SHA `3db404e85a53492a0eea347cc3f5409f5f238395d88eca12feb2aba0c5005956`。
+- 全套工程測試 421 passed／1 failed；唯一封裝 helper 動態匯入問題修正後，受影響案例重新驗證通過。此修正不在映像輸入內，未改上述映像／工具 bytes。完整合成 TLS 下載→登入→簽發→登出→送出→回應遺失→原報告續傳→收據復用，以及錯 hash／redirect 拒絕、前端 typecheck 已通過。
+- **公開驗證尚未完成**：HTTPS 第一個 health GET 回傳 Cloudflare 530 Tunnel error，尚未執行管理員登入或簽發 capability。唯讀核對發現 HP:22 與 ASUS:2222 均 `No route to host`；另一個「每日資安巡檢與修補追蹤」對話正在承接使用者的伺服器重開後斷線。此次未介入該維護、重開主機、變更入口或繞過 TLS。未新增正式報告或 capability audit。
+
+證據位於 ignored `data/club-host-download-20261025/`：`image/release.json`、`image-smoke.json`、`implementation-handoff.md`、`frozen-source-hashes.json`、`frozen-download/` 與 `deployment/` 的 checkpoint／deployment／comparison／post-deploy-backup。HTML 原稿已產生，但尚未上傳私人預覽，不能把本機測試當成跨裝置交付完成。
+
+入口恢復後接續：保留原 `public-verify-attempt.json` 及失敗收據，核對失敗只發生在 health GET 後，明確記錄一次續驗；完成真 HTTPS 靜態下載 hash、原管理員登入／讀取／登出及資料比較，再以原合成報告 UUID 做短效 capability 的真 PowerShell 續傳。只允許一筆精確 capability audit 追加，既有報告和其餘資料不變。最後上傳無秘密 HTML、用瀏覽器核對「複製」所得文字及新私人連結。Windows PowerShell 5.1／ACL／認證視窗／現場網路／冷開機仍需球館實機驗收。
+
+
+## 部署可行性報告接收快照（2026-10-30）
+
+本次獲得「允許更新接收端，保留資料與帳號」授權後，已完成 checkpoint、switch、verify 及外部 HTTPS 唯讀核對。現用 app／backup 為 `local/fucheng:snapshot-def5349d3ac76ec8`；native image ID `sha256:3b006c21e144369db53f7e6b3ab074c57896051af000e72da866e0f866fd2a99`，source manifest `def5349d3ac76ec88230e103a3dbe7f2f93e6831c7c4529eb38fc86e69dd125c`。這是未提交來源快照，沒有新的 Git／registry 發布。
+
+schema 仍為 0015，沒有 migration／init／新增帳號。升級前舊 runtime 成組備份與匯出已核對；升級後 27 張 app 表、既有帳號、schema objects 及媒體 bytes 全部相等，integrity ok、FK errors 0，app／backup healthy。新版支援 schema 3 的 44 項部署可行性報告；實際 app 內的合成格式解析已通過，沒有寫入測試報告。
+
+私密 env 只改 `FUCHENG_IMAGE`。另新增 ignored overlay `data/club-deployment-feasibility-20261030/deployment/compose.host-tools.yaml`，只將既有公開凍結工具目錄 readonly bind 至 app 的 `/app/host-tools`，維持原 bootstrap／ZIP 的固定 SHA 下載網址。**後續對現用接收站執行 Compose 時，須在原三份 Compose 後加入此 overlay；否則重建 app 會遺失舊工具下載掛載。** 原 data／backup named volumes、secret mounts、loopback8064、`/fucheng`、origin、共用入口及其他服務保持不變。
+
+外部 HTTPS health／首頁 200、四個匿名管理 API 401、JS／CSS 與 app 內成品 hash、兩個舊工具 URL 與固定 SHA 均通過。此輪沒有登入現站或提交 schema 3 報告；球館 Windows 實跑、原生 ACL／中斷清理、球館實際網路與正式網域驗收仍待現場結果，不能以本機合成 Quick Tunnel smoke 取代。
+
+收據及受限備份在 ignored `data/club-deployment-feasibility-20261030/deployment/`；`public-verification.json`、`verification.json`、`schema3-runtime-verification.json` 各自記錄驗證範圍。一次貼上腳本見 `deploy/docker/club-deployment-feasibility.ps1`，操作與限制見 `docs/club-deployment-feasibility.md`。保留舊 image、volumes、checkpoint、原報告及其 UUID／收據。

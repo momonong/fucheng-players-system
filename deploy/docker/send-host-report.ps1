@@ -6,6 +6,7 @@ after a lost response. No token, exception body or raw HTTP response is printed.
 param(
     [Parameter(Mandatory=$true)][string]$ReportDirectory,
     [Parameter(Mandatory=$true)][string]$ConfigFile,
+    [switch]$PrepareOnly,
     [ValidateRange(3,60)][int]$TimeoutSeconds = 20
 )
 $ErrorActionPreference = 'Stop'
@@ -81,12 +82,16 @@ try {
         Write-Output "報告先前已接收，沿用原收據。report_id=$($operation.report_id)"
         exit 0
     }
+    if ($PrepareOnly) {
+        Write-Output "原始報告與 operation 已就緒。report_id=$($operation.report_id)"
+        exit 0
+    }
     $tokenPath = [string]$config.token_file
     if (![IO.Path]::IsPathRooted($tokenPath)) { $tokenPath = Join-Path ([IO.Path]::GetDirectoryName($configPath)) $tokenPath }
     $tokenInfo = Get-Item -LiteralPath $tokenPath
-    if ($tokenInfo.Length -gt 256 -or $tokenInfo.PSIsContainer) { throw 'token file' }
+    if ($tokenInfo.Length -gt 1024 -or $tokenInfo.PSIsContainer) { throw 'token file' }
     $token = [IO.File]::ReadAllText($tokenPath, $utf8).Trim()
-    if ($token -cnotmatch '^(?:[0-9a-f]{2}){32,64}$') { throw 'invalid token' }
+    if ($token -cnotmatch '^(?:(?:[0-9a-f]{2}){32,64}|fcr1\.[A-Za-z0-9_-]+\.[0-9a-f]{64})$') { throw 'invalid token' }
 } catch {
     Write-Output '未開始上傳：請核對私密設定、原始報告及 operation；沒有覆寫原檔。'
     exit 2

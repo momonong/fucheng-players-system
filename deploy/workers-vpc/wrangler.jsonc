@@ -1,0 +1,12 @@
+{
+  "name": "fucheng",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "vpc_services": [
+    {
+      "binding": "fucheng",
+      "service_id": "01a192c8-1155-7dc2-9c51-acec10809396"
+    }
+  ]
+}

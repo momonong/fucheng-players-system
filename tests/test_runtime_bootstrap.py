@@ -252,6 +252,11 @@ def test_source_allowlist_and_manifest_exclude_runtime_password_files(tmp_path, 
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("synthetic source\n")
+    # New required public-tool inputs also belong to the explicit source fixture.
+    for path in package.source_files():
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("synthetic public tool source\n")
     private_password = secrets.token_urlsafe(24)
     secret_file = tmp_path / "deploy/docker/secrets/bootstrap-admin-password"
     secret_file.parent.mkdir()

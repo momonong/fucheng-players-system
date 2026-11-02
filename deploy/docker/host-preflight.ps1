@@ -10,6 +10,7 @@ param(
     [ValidateRange(1,65535)][int]$TestPort = 8052,
     [string]$DockerSubnet = '172.30.98.0/24',
     [string]$ComposeProject,
+    [string]$ContainerName,
     [string]$Domain,
     [string]$PreviewOrigin,
     [string]$BasePath = '',
@@ -32,6 +33,8 @@ if (!$out.StartsWith($data + [IO.Path]::DirectorySeparatorChar, [StringCompariso
     throw 'OutputDir must be a new directory under the repository ignored data/ directory'
 }
 if (Test-Path -LiteralPath $out) { throw 'OutputDir already exists; report files are never overwritten' }
+if ($ComposeProject -and $ContainerName) { throw 'ComposeProject and ContainerName are mutually exclusive' }
+if ($ContainerName -and $ContainerName -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$') { throw 'Invalid ContainerName' }
 if ($ComposeProject -and $ComposeProject -notmatch '^[a-z0-9][a-z0-9_-]{0,62}$') { throw 'Invalid ComposeProject' }
 if ($Domain -and $Domain -notmatch '^(?=.{1,253}$)[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$') { throw 'Invalid domain' }
 if ($ImageRef -notmatch '^[a-zA-Z0-9][a-zA-Z0-9./:_@-]{1,255}$') { throw 'Invalid ImageRef' }
@@ -53,6 +56,37 @@ function Command-Path([string]$Name) {
     if ($item) { return $item.Source }
     return $null
 }
+function Stop-OwnedProcessTree([Diagnostics.Process]$Process) {
+    # Only the process object started by this tool is eligible; never use names.
+    $killer = $null
+    try {
+        if ($Process.HasExited) { return $false }
+        if ($env:OS -eq 'Windows_NT') {
+            $info = New-Object Diagnostics.ProcessStartInfo
+            $info.FileName = Join-Path ([Environment]::SystemDirectory) 'taskkill.exe'
+            $info.Arguments = '/PID ' + $Process.Id + ' /T /F'
+            $info.UseShellExecute = $false
+            $info.CreateNoWindow = $true
+            $info.RedirectStandardOutput = $true
+            $info.RedirectStandardError = $true
+            $killer = New-Object Diagnostics.Process
+            $killer.StartInfo = $info
+            [void]$killer.Start()
+            $null = $killer.StandardOutput.ReadToEndAsync()
+            $null = $killer.StandardError.ReadToEndAsync()
+            if (!$killer.WaitForExit(1000)) {
+                try { $killer.Kill() } catch {}
+                return $false
+            }
+            if ($killer.ExitCode -ne 0) { return $false }
+        } else {
+            # Portable PowerShell 7 test runtime supports this process-tree API.
+            $Process.Kill($true)
+        }
+        return $Process.WaitForExit(1000)
+    } catch { return $false }
+    finally { if ($killer) { $killer.Dispose() } }
+}
 function Invoke-Bounded([string]$File, [string]$Arguments, [int]$Limit, [string]$Encoding='utf8') {
     if (!$File -or !(Test-Path -LiteralPath $File -PathType Leaf)) { return @{missing=$true; timed_out=$false; exit_code=$null; stdout=''} }
     $psi = New-Object Diagnostics.ProcessStartInfo
@@ -71,12 +105,14 @@ function Invoke-Bounded([string]$File, [string]$Arguments, [int]$Limit, [string]
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
         if (!$process.WaitForExit($Limit * 1000)) {
-            try { $process.Kill() } catch {}
-            [void]$process.WaitForExit(1000)
+            $cleanup = Stop-OwnedProcessTree $process
+            return @{missing=$false; timed_out=$true; exit_code=$null; stdout=''; cleanup_confirmed=$cleanup}
+        }
+        # Exited parent processes can leave a descendant holding a pipe open.
+        # Never access Result unless both asynchronous drains have completed.
+        if (!$stdout.Wait(1000) -or !$stderr.Wait(1000)) {
             return @{missing=$false; timed_out=$true; exit_code=$null; stdout=''}
         }
-        [void]$stdout.Wait(1000)
-        [void]$stderr.Wait(1000)
         return @{missing=$false; timed_out=$false; exit_code=$process.ExitCode; stdout=$stdout.Result.Trim()}
     } catch {
         return @{missing=$false; timed_out=$false; exit_code=$null; stdout=''}
@@ -148,6 +184,11 @@ try {
     $memoryGiB = [math]::Round($system.TotalPhysicalMemory/1GB, 1)
     if ($memoryGiB -ge 8) { Add-Check 'memory' 'PASS' 'Memory meets the 8 GiB Docker Desktop baseline.' "memory_gib=$memoryGiB" 'Check concurrent workload capacity before deployment.' }
     else { Add-Check 'memory' 'WARN' 'Memory is below the 8 GiB baseline.' "memory_gib=$memoryGiB" 'Review Docker Desktop requirements and host capacity.' }
+} catch {
+    Add-Check 'memory' 'NOT_TESTED' 'Hardware query unavailable.' 'CIM query failed or timed out.' 'Check installed RAM on the club host.'
+}
+try {
+    if (!$system) { throw 'System query unavailable' }
     if ($system.HypervisorPresent) { Add-Check 'virtualization' 'PASS' 'A hypervisor is present.' 'Win32_ComputerSystem.HypervisorPresent=true' 'Confirm WSL 2 backend in Docker Desktop settings.' }
     else {
         $cpu = Get-CimInstance Win32_Processor -OperationTimeoutSec $TimeoutSeconds | Select-Object -First 1
@@ -156,7 +197,6 @@ try {
         } else { Add-Check 'virtualization' 'WARN' 'Virtualization/SLAT could not both be confirmed.' 'No hypervisor; one or more CPU flags not true.' 'Check BIOS/UEFI virtualization and WSL requirements.' }
     }
 } catch {
-    Add-Check 'memory' 'NOT_TESTED' 'Hardware query unavailable.' 'CIM query failed or timed out.' 'Check installed RAM on the club host.'
     Add-Check 'virtualization' 'NOT_TESTED' 'Virtualization query unavailable.' 'CIM query failed or timed out.' 'Check BIOS/UEFI virtualization and WSL 2 support.'
 }
 try {
@@ -216,14 +256,21 @@ try {
     if ($occupied.Count) { Add-Check 'direct_ports' 'WARN' 'One or both local direct TLS ports are occupied.' "occupied_80_443_count=$($occupied.Count)" 'Identify the owner before evaluating Caddy/nginx; do not stop it automatically.' }
     else { Add-Check 'direct_ports' 'PASS' 'No local listeners found on 80/443.' 'Local port availability only.' 'External 80/443 reachability remains untested.' }
 } catch { Add-Check 'direct_ports' 'NOT_TESTED' 'Local 80/443 listener query was unavailable.' 'Bounded Get-NetTCPConnection failed.' 'Check local port ownership manually.' }
+$desktopStartup = 'not_tested'
+try {
+    # Read only the named Windows sign-in entry; never output its command/path.
+    $startupEntry = Get-ItemPropertyValue -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'Docker Desktop' -ErrorAction Stop
+    $desktopStartup = ([bool]$startupEntry).ToString().ToLowerInvariant()
+    $startupEntry = $null
+} catch {}
 try {
     $service = Get-CimInstance Win32_Service -Filter "Name='com.docker.service'" -OperationTimeoutSec $TimeoutSeconds
     if ($service) {
         $serviceStatus = if ($service.State -eq 'Running' -and $service.StartMode -eq 'Auto') { 'PASS' } else { 'WARN' }
-        Add-Check 'docker_service' $serviceStatus 'Docker Desktop service record was found; this alone does not prove unattended startup.' "state=$($service.State); start_mode=$($service.StartMode)" 'Verify actual recovery after a Windows reboot and designated user sign-in.'
+        Add-Check 'docker_service' $serviceStatus 'Docker Desktop service record was found; this alone does not prove unattended startup.' "state=$($service.State); start_mode=$($service.StartMode); docker_desktop_sign_in_entry=$desktopStartup" 'Verify actual recovery after a Windows reboot and designated user sign-in.'
     }
-    else { Add-Check 'docker_service' 'NOT_TESTED' 'Docker Desktop service not found; per-user WSL installation may differ.' 'No service record.' 'Inspect the Docker Desktop installation and startup policy.' }
-} catch { Add-Check 'docker_service' 'NOT_TESTED' 'Docker service query unavailable.' 'CIM query failed or timed out.' 'Inspect Docker Desktop startup policy manually.' }
+    else { Add-Check 'docker_service' 'NOT_TESTED' 'Docker Desktop service not found; per-user WSL installation may differ.' "service_record=false; docker_desktop_sign_in_entry=$desktopStartup" 'Inspect the Docker Desktop installation and startup policy.' }
+} catch { Add-Check 'docker_service' 'NOT_TESTED' 'Docker service query unavailable.' "CIM query failed or timed out; docker_desktop_sign_in_entry=$desktopStartup" 'Inspect Docker Desktop startup policy manually.' }
 $powercfg = Command-Path 'powercfg.exe'
 $sleep = Invoke-Bounded $powercfg '/query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE' $TimeoutSeconds
 if ($sleep.missing -or $sleep.timed_out -or $sleep.exit_code -ne 0) {
@@ -237,7 +284,15 @@ if ($sleep.missing -or $sleep.timed_out -or $sleep.exit_code -ne 0) {
     } else { Add-Check 'ac_sleep' 'NOT_TESTED' 'Power settings output could not be parsed.' 'Raw powercfg output intentionally omitted.' 'Review AC sleep in Windows Settings.' }
 }
 Add-Check 'cold_boot_recovery' 'NOT_TESTED' 'Running processes and restart policies do not prove unattended cold-boot recovery.' 'No reboot or sign-in performed.' 'Test power recovery, Windows sign-in, Docker Desktop start, app/backup and public URL at the club.'
-Add-Check 'hibernate_policy' 'NOT_TESTED' 'AC sleep timeout does not establish hibernate, lid, update or power-loss behavior.' 'No power state was changed.' 'Review hibernate/Windows Update policy and perform a controlled recovery drill.'
+$hibernate = Invoke-Bounded $powercfg '/query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE' $TimeoutSeconds
+$hibernateValues = @([regex]::Matches($hibernate.stdout, '0x[0-9a-fA-F]{8}') | ForEach-Object Value)
+if (!$hibernate.missing -and !$hibernate.timed_out -and $hibernate.exit_code -eq 0 -and $hibernateValues.Count -ge 2) {
+    $hibernateAc = [convert]::ToInt64($hibernateValues[$hibernateValues.Count-2].Substring(2),16)
+    $hibernateStatus = if ($hibernateAc -eq 0) { 'PASS' } else { 'WARN' }
+    Add-Check 'hibernate_policy' $hibernateStatus 'Current AC automatic hibernate timeout was read; this does not establish lid, update or power-loss policy.' "powercfg_ac_hibernate_seconds=$hibernateAc; settings_changed=false" 'Review lid/Windows Update policy and perform a controlled recovery drill separately.'
+} else {
+    Add-Check 'hibernate_policy' 'NOT_TESTED' 'AC hibernate timeout could not be read.' 'Read-only powercfg missing, failed, timed out or unrecognized.' 'Review AC hibernate, lid/Windows Update policy and controlled recovery separately.'
+}
 try {
     $firewallProbe = Invoke-LocalBounded { Get-NetFirewallProfile -ErrorAction Stop } @() $TimeoutSeconds
     if ($firewallProbe.failed -or $firewallProbe.timed_out) { throw 'Firewall probe unavailable' }
@@ -295,7 +350,22 @@ if ($dockerReady) {
             }
         }
     }
-    if ($ComposeProject) {
+    if ($ContainerName) {
+        # Narrow format only: no full inspect, environment, mounts or credentials.
+        $container = Invoke-Bounded $docker "inspect --type container --format `"{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}|{{.HostConfig.RestartPolicy.Name}}|{{.RestartCount}}`" $ContainerName" $TimeoutSeconds
+        if ($container.timed_out -or $container.exit_code -ne 0) {
+            Add-Check 'project_health' 'NOT_TESTED' 'Specified container state could not be read.' 'Narrow container inspect failed or timed out.' 'Check the specified trial container with its owner; no container was started.'
+        } elseif ($container.stdout -match '^(created|running|paused|restarting|removing|exited|dead)\|(healthy|unhealthy|starting|none)\|(no|always|unless-stopped|on-failure|)\|([0-9]+)$') {
+            $containerState=$Matches[1]; $containerHealth=$Matches[2]; $restartPolicy=$Matches[3]; $restartCount=$Matches[4]
+            $curl = Command-Path 'curl.exe'
+            $localHealth = Invoke-Bounded $curl "--silent --show-error --noproxy `"*`" --max-time $TimeoutSeconds --output NUL --write-out `"%{http_code}`" `"http://127.0.0.1:$TestPort$BasePath/api/health`"" ($TimeoutSeconds+1)
+            $httpStatus = if (!$localHealth.missing -and !$localHealth.timed_out -and $localHealth.exit_code -eq 0 -and $localHealth.stdout -match '^[0-9]{3}$') { $localHealth.stdout } else { 'not_tested' }
+            $containerCheck = if ($containerState -eq 'running' -and $containerHealth -eq 'healthy' -and $restartPolicy -in @('always','unless-stopped') -and $httpStatus -eq '200') { 'PASS' } else { 'WARN' }
+            Add-Check 'project_health' $containerCheck 'Only the specified container and local loopback app health were inspected.' "container=$ContainerName; state=$containerState; health=$containerHealth; restart_policy=$restartPolicy; restart_count=$restartCount; local_http=$httpStatus" 'Local health and restart policy do not prove reboot recovery or a public URL; preserve the synthetic trial volume.'
+        } else {
+            Add-Check 'project_health' 'NOT_TESTED' 'Specified container returned an unrecognized narrow state format.' 'Raw inspect output intentionally omitted.' 'Inspect the named container locally; no full inspect was recorded.'
+        }
+    } elseif ($ComposeProject) {
         $project = Invoke-Bounded $docker "ps -a --filter `"label=com.docker.compose.project=$ComposeProject`" --format `"{{.Names}}|{{.Status}}`"" $TimeoutSeconds
         if ($project.timed_out -or $project.exit_code -ne 0) { Add-Check 'project_health' 'NOT_TESTED' 'Compose project status could not be read.' 'Docker ps failed or timed out.' 'Inspect only the named project manually.' }
         else {
@@ -311,11 +381,11 @@ if ($dockerReady) {
                     $restart = Invoke-Bounded $docker "inspect --format `"{{.HostConfig.RestartPolicy.Name}}`" $name" $TimeoutSeconds
                     if ($restart.timed_out -or $restart.exit_code -ne 0 -or $restart.stdout -notin @('unless-stopped','always')) { $restartIssues++ }
                 }
-                $state = if ($running -eq $rows.Count -and $restartIssues -eq 0) { 'PASS' } else { 'WARN' }
+                $state = if ($running -eq $rows.Count -and $healthy -eq $rows.Count -and $restartIssues -eq 0) { 'PASS' } else { 'WARN' }
                 Add-Check 'project_health' $state 'Only the named Compose project was inspected.' "containers=$($rows.Count); running=$running; healthy_reported=$healthy; restart_policy_issues=$restartIssues" 'Check app/backup health and the public URL; restart policy is not cold-boot proof.'
             }
         }
-    } else { Add-Check 'project_health' 'NOT_TESTED' 'No ComposeProject was supplied.' 'No container names or volumes inspected.' 'After an isolated trial, rerun with -ComposeProject.' }
+    } else { Add-Check 'project_health' 'NOT_TESTED' 'No ComposeProject or ContainerName was supplied.' 'No container names or volumes inspected.' 'After an isolated trial, rerun with -ComposeProject or -ContainerName.' }
 } else {
     foreach ($id in @('compose_plugin','app_image','docker_subnet','project_health')) {
         Add-Check $id 'NOT_TESTED' 'Docker-dependent probe skipped because the engine is unavailable.' 'No containers or volumes touched.' 'Restore Docker access, then rerun with a new report directory.'
@@ -371,6 +441,7 @@ $recommendations = @(
     [ordered]@{candidate='Caddy 直連 TLS'; status='NOT_TESTED'; reason='Reverse proxy，可與 Tunnel 組合。HTTP-01/TLS-ALPN-01 分別需要外部 80/443 可達；DNS-01 只解決簽證。'; next_action='有網域、DNS、外部入站證據與持久憑證目錄後再比較。'},
     [ordered]@{candidate='nginx 直連 TLS'; status='NOT_TESTED'; reason='Reverse proxy，可與 Tunnel 組合；需另設憑證申請與續期。原生 Windows nginx 的限制不可套用到 Docker Linux nginx。'; next_action='直連前置條件成立後再比較憑證流程。'}
 )
+if ($checks.Count -ne 35 -or @($checks | ForEach-Object { $_.id } | Sort-Object -Unique).Count -ne 35) { throw 'Host report must contain exactly 35 unique checks' }
 $counts = [ordered]@{PASS=0; WARN=0; FAIL=0; NOT_TESTED=0}
 foreach ($check in $checks) { $counts[$check.status]++ }
 $report = [ordered]@{
@@ -411,7 +482,7 @@ $zh = @{
     docker_service=@('Docker 服務','服務存在或啟動模式不證明無人登入冷開機可恢復。','到球館主機實測重開機、登入及 Docker Desktop 恢復。')
     ac_sleep=@('AC 休眠','核對目前 AC 電源睡眠逾時。','依場地政策核對休眠與斷電後恢復。')
     cold_boot_recovery=@('冷開機恢復','本次沒有執行重啟或登入流程。','在球館主機驗 Docker、app、backup 與公開網址恢復。')
-    hibernate_policy=@('休眠與更新政策','AC 睡眠逾時不涵蓋 hibernate、更新或斷電。','核對政策並做受控恢復演練。')
+    hibernate_policy=@('休眠與更新政策','核對 AC 自動 hibernate 逾時；更新與斷電另驗。','核對政策並做受控恢復演練。')
     windows_firewall_baseline=@('Windows 防火牆概況','只讀取防火牆 profile 預設狀態。','另核對有效規則及場地出口防火牆。')
     proxy_configuration=@('Proxy 線索','只記錄程序 proxy 環境變數是否存在，不讀取值。','由場地管理者核對 Docker、registry 與 Tunnel 所用 proxy。')
     firewall_egress_policy=@('出口政策','本機預設規則不證明場地防火牆可出站。','核對 7844 TCP／UDP、HTTPS 與 registry 政策。')
@@ -419,7 +490,7 @@ $zh = @{
     compose_plugin=@('Compose plugin','核對 Docker Compose plugin 可用性。','使用與 image 相容且固定版本的 Compose 設定。')
     app_image=@('本機 app image','只讀檢查已下載 image 的平台，不拉取。','部署時拉取並核對已審核的固定 digest。')
     docker_subnet=@('Docker 網段','只比對指定 subnet 與已存在 Docker networks。','再核對球館 LAN／VPN 路由後選唯一 subnet。')
-    project_health=@('指定 project 健康','只查指定 Compose project 的容器狀態與 restart policy。','再驗 app／backup 與手機公開入口；restart policy 不保證冷開機。')
+    project_health=@('指定容器／project 健康','核對指定容器或 Compose project 的健康與 restart policy。','再驗 app／backup 與手機公開入口；restart policy 不保證冷開機。')
     lan_vpn_subnet=@('LAN／VPN 網段','Docker networks 不足以推論 LAN／VPN 是否衝突。','由場地管理者核對實際路由。')
     domain_dns=@('網域 DNS','只檢查從本主機解析指定網域。','另核對網域控制權與外部網路 DNS。')
     cloudflare_tcp_7844=@('Cloudflare TCP 7844','只測兩個官方 region 的直接 TCP 連線。','再核對實際 cloudflared HTTP/2 與場地政策。')

@@ -28,6 +28,7 @@ class Settings:
     report_send_enabled: bool = False
     report_send_device_id: str | None = None
     report_send_token_file: Path | None = field(default=None, repr=False)
+    host_tools_dir: Path = Path("/app/host-tools")
     report_upload_enabled: bool = False
     report_upload_device_id: str | None = None
     report_upload_token: str | None = field(default=None, repr=False)
@@ -97,6 +98,7 @@ class Settings:
             report_send_token_file=Path(os.environ["FUCHENG_REPORT_SEND_TOKEN_FILE"]) if os.getenv("FUCHENG_REPORT_SEND_TOKEN_FILE") else None,
             database_url=database_url,
             base_path=os.getenv("FUCHENG_BASE_PATH", ""),
+            host_tools_dir=Path(os.getenv("FUCHENG_HOST_TOOLS_DIR", "/app/host-tools")),
             report_upload_enabled=upload_mode == "true",
             report_upload_device_id=os.getenv("FUCHENG_REPORT_UPLOAD_DEVICE_ID") or None,
             report_upload_token=upload_token,
