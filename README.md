@@ -1,5 +1,13 @@
 # 府城球館會員管理系統
 
+**目前使用入口（2026-11-03）：[球館系統](https://fucheng.momonong.workers.dev/)。**
+球館 Windows 的固定 1.2.0 映像已完成部署／公開健康檢查，使用者確認原帳號登入成功。
+4090 的 `fucheng-home` app／backup 已停止並取消自動重啟，舊資料、帳號及備份保留；
+下列 `momonong.me/fucheng/` 發布段落均為歷史，不是目前入口。
+請從[球館部署與維運指南](docs/club-deployment-runbook.md)開始；Cloudflare 設定及
+故障接續見 [Workers VPC 文件](docs/club-workers-vpc.md)。本次交付部署工具與文件，
+沒有覆寫既有 1.2.0 tag／registry image，也沒有修改 `momonong.me` 的其他功能。
+
 1.2.0 已合併、推送並發布 [GitHub Release v1.2.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.2.0)及 Docker Hub `1.2.0`／`latest`，2026-10-24 台北時間 17:17:10 更新既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)。新增管理員一鍵檢查目前 app／Linux 容器、保存 schema 2 報告與固定 HTTPS 回傳；未配置或回傳失敗仍可下載，未知結果保留原 UUID／內容，舊 Windows schema 1／手動上傳相容。先停寫、成組備份，再顯式遷移至 `0015_deployment_diagnostics`；app／backup 健康，26 張舊表原欄、原帳號與媒體保留，原帳號 HTTPS 登入／讀取／登出通過。另以真 HTTPS 接收端新增一份明確標為合成、全部 NOT_TESTED 的 schema 2 報告，收據／管理下載及包含它的最終備份通過，其餘原資料保留。球館 Windows、現場發送端、官方網路探測、實體手機、完整還原及冷開機仍未驗證。詳見 [1.2.0 發布說明](docs/release-1.2.0.md)、[部署紀錄](docs/home-deployment.md#120-映像內建部署檢查正式發布與部署2026-10-24)及[檢查與回傳操作](docs/host-report-upload.md)。
 
 1.1.0 新增雙打組隊報名：可單人等待搭檔或兩人一起報名，由管理員接受、候補遞補、取消與拆隊；原個人賽及安排表保留。已合併、推送並發布 [GitHub Release v1.1.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.1.0)及 Docker Hub `1.1.0`／`latest`，2026-10-24 台北時間 14:30:01 更新既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)。先停寫、成組備份，再經 runtime guard 遷移至 `0014_doubles_registration`；app／backup 健康，22 張舊表原欄與媒體保留，舊場次維持個人賽，4 張雙打新表仍為空。原帳號 HTTPS 登入／讀取／登出、19 張非認證舊表、新版備份及公開資產核對通過；未新增真實測試資料。詳見 [1.1.0 發布說明](docs/release-1.1.0.md)、[雙打使用說明](docs/doubles-registration.md)及[部署紀錄](docs/home-deployment.md#110-雙打報名正式發布與部署2026-10-24)。網站人工試用、真正 Turnstile、球館 Windows 與重開機仍待驗收。

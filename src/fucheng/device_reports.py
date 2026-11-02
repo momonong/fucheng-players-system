@@ -1,8 +1,7 @@
 """A narrowly scoped device credential may append bounded reports, never read data."""
 import hashlib
-import hmac
 import json
-from datetime import timedelta
+from datetime import timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -10,8 +9,10 @@ from fastapi import Depends, HTTPException, Query, Request, Response
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.orm import Session
 
-from .deployment_report import MAX_REPORT_BYTES, Report, HostReport, parse_report, render_markdown
-from .models import DeviceDeploymentReport, now_utc
+from .deployment_report import MAX_REPORT_BYTES, Report, HostReport, DeploymentFeasibilityReport, parse_report, render_markdown
+from .models import Admin, AdminAudit, DeviceDeploymentReport, now_utc
+from .registrations import _begin_immediate
+from .report_capability import CapabilityRequest, TTL_SECONDS, issue_token, require_report_token
 
 TOKEN_HEADER = "X-Fucheng-Report-Token"
 
@@ -26,23 +27,42 @@ def receipt(row: DeviceDeploymentReport) -> dict:
             "received_at": row.received_at.isoformat()}
 
 
-def install_device_report_routes(app, get_db, current_auth, settings):
+def install_device_report_routes(app, get_db, current_auth, settings, require_csrf):
     Db = Annotated[Session, Depends(get_db)]
     Auth = Annotated[tuple, Depends(current_auth)]
 
-    def require_device(request: Request):
+    CsrfAuth = Annotated[tuple, Depends(require_csrf)]
+
+    @app.post("/api/admin/deployment-report-capability")
+    def capability(payload: CapabilityRequest, db: Db, auth: CsrfAuth):
+        if not settings.report_upload_enabled:
+            raise HTTPException(404, "報告回傳尚未啟用")
+        _begin_immediate(db, auth)
+        admin, session = auth
+        timestamp = now_utc()
+        created = session.created_at.replace(tzinfo=timezone.utc) if session.created_at.tzinfo is None else session.created_at
+        if not timedelta(0) <= timestamp - created <= timedelta(minutes=5):
+            raise HTTPException(403, "請重新登入後取得短效回傳憑證")
+        token = issue_token(settings, admin, payload.report_id, int(timestamp.timestamp()))
+        expires = timestamp.replace(microsecond=0) + timedelta(seconds=TTL_SECONDS)
+        db.add(AdminAudit(actor_admin_id=admin.id, target_admin_id=admin.id, action="report_capability",
+            source="web", changes_json=json.dumps({key: {"before": None, "after": value} for key, value in {
+                "report_id": str(payload.report_id), "device_id": settings.report_upload_device_id,
+                "expires_at": expires.isoformat()}.items()})))
+        db.commit()
+        return {"token": token, "report_id": str(payload.report_id),
+            "device_id": settings.report_upload_device_id, "expires_at": expires.isoformat()}
+
+    def require_device(report_id: UUID, request: Request, db: Db):
         if not settings.report_upload_enabled:
             raise HTTPException(404, "報告回傳尚未啟用")
         values = request.headers.getlist(TOKEN_HEADER)
         supplied = values[0] if len(values) == 1 else ""
-        # Hash to a fixed length before constant-time comparison, including invalid input.
-        expected = hashlib.sha256(settings.report_upload_token.encode("ascii")).digest()
-        actual = hashlib.sha256(supplied.encode("utf-8")).digest()
-        if not hmac.compare_digest(expected, actual):
-            raise HTTPException(401, "報告回傳憑證無效")
+        require_report_token(settings, supplied, report_id, db)
+        return supplied
 
-    @app.post("/api/deployment-reports/{report_id}", dependencies=[Depends(require_device)])
-    async def upload(report_id: UUID, request: Request, db: Db):
+    @app.post("/api/deployment-reports/{report_id}")
+    async def upload(report_id: UUID, request: Request, db: Db, supplied: str = Depends(require_device)):
         if request.headers.get("content-type", "").split(";", 1)[0].lower() != "application/json":
             raise HTTPException(415, "請傳送 JSON 報告")
         raw = bytearray()
@@ -59,6 +79,7 @@ def install_device_report_routes(app, get_db, current_auth, settings):
         db.rollback()
         db.execute(text("BEGIN IMMEDIATE"))
         try:
+            require_report_token(settings, supplied, report_id, db)
             existing = db.get(DeviceDeploymentReport, str(report_id))
             if existing:
                 if existing.device_id != settings.report_upload_device_id or existing.digest != digest:
@@ -102,7 +123,7 @@ def install_device_report_routes(app, get_db, current_auth, settings):
         for row in rows[:limit]:
             report = parse_report(row.report_json.encode("utf-8"))
             items.append(receipt(row) | {"checked_at": report.checked_at.isoformat(),
-                "claimed_host_name": report.host.name if isinstance(report, HostReport) else report.runtime.name, "summary": report.summary.model_dump()})
+                "claimed_host_name": report.host.name if isinstance(report, (HostReport, DeploymentFeasibilityReport)) else report.runtime.name, "summary": report.summary.model_dump()})
         return {"items": items, "next_before": rows[limit - 1].report_id if len(rows) > limit else None}
 
     def download(report_id: UUID, db: Session, markdown: bool):

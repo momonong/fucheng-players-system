@@ -495,7 +495,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_diagnostic_routes(app, get_db, current_auth, require_csrf, settings)
 
     from .device_reports import install_device_report_routes
-    install_device_report_routes(app, get_db, current_auth, settings)
+    install_device_report_routes(app, get_db, current_auth, settings, require_csrf)
+
+    from .host_tools import install_host_tool_routes
+    install_host_tool_routes(app, settings)
 
     from .admin_management import install_admin_management_routes
     install_admin_management_routes(app, get_db, current_auth, require_csrf, session_cookie)

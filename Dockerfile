@@ -13,6 +13,13 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project --no-editable --python /usr/local/bin/python
 
+FROM python:3.14.6-slim-bookworm@sha256:4c92ffcde4dd6f1ff72a24518f49fd4990b27134987dfa31a733badde66df9f8 AS host-tools
+WORKDIR /build
+COPY scripts/club_host_one_shot_package.py /build/scripts/club_host_one_shot_package.py
+COPY deploy/docker/host-preflight.ps1 deploy/docker/send-host-report.ps1 deploy/docker/club-host-one-shot.ps1 deploy/docker/club-host-network.ps1 deploy/docker/club-host-credential.ps1 deploy/docker/club-host-bootstrap.ps1 deploy/docker/club-host-download-launcher.ps1 deploy/docker/club-host-run.cmd deploy/docker/club-host-new-check.cmd deploy/docker/club-host-one-shot.example.json deploy/docker/launch-club-host-check.ps1 /build/deploy/docker/
+COPY docs/club-host-one-shot.md /build/docs/club-host-one-shot.md
+RUN python /build/scripts/club_host_one_shot_package.py --download /build/data/download
+
 FROM scratch AS context-audit
 COPY . /
 
@@ -21,6 +28,7 @@ ENV PATH=/app/.venv/bin:$PATH PYTHONPATH=/app/src PYTHONUNBUFFERED=1 PYTHONDONTW
 WORKDIR /app
 COPY --from=python-deps /app/.venv /app/.venv
 COPY --from=frontend /built-static /app/static
+COPY --from=host-tools /build/data/download/bootstrap.ps1 /build/data/download/tools.zip /app/host-tools/
 COPY src/fucheng/*.py /app/src/fucheng/
 COPY migrations /app/migrations
 COPY alembic.ini /app/alembic.ini

@@ -28,7 +28,7 @@ export interface AdminAccountAudit {
   target_admin_id: string
   target_username: string
   target_display_name: string | null
-  action: 'create' | 'change_password' | 'reset_password' | 'disable' | 'enable' | 'bootstrap'
+  action: 'create' | 'change_password' | 'reset_password' | 'disable' | 'enable' | 'bootstrap' | 'report_capability'
   source: 'web' | 'cli' | 'bootstrap'
   changes: Record<string, { before: unknown; after: unknown }>
   created_at: string

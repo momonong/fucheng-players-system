@@ -1,0 +1,5 @@
+{
+  "endpoint": "https://momonong.me/fucheng/api/deployment-reports",
+  "device_id": "club-windows-01",
+  "token_file": "report-upload-token.txt"
+}

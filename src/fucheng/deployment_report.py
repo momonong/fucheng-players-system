@@ -165,7 +165,69 @@ class ContainerReport(StrictModel):
         return self
 
 
-Report = HostReport | ContainerReport
+FEASIBILITY_CHECKS = REQUIRED_CHECKS | frozenset((
+    "probe_image isolated_probe quick_tunnel public_https_nonce https_samples "
+    "temporary_cleanup public_ip_observation static_ip_contract isp_inbound_policy"
+).split())
+
+
+class FeasibilityScope(StrictModel):
+    read_only_probes: StrictBool
+    container_execution: StrictBool
+    host_control: StrictBool
+    live_volume_access: StrictBool
+    temporary_public_probe: StrictBool
+    external_network_opt_in: StrictBool
+
+    @model_validator(mode="after")
+    def isolated_active_probes(self):
+        if (self.read_only_probes or self.host_control or self.live_volume_access
+                or not self.external_network_opt_in):
+            raise ValueError("invalid feasibility scope")
+        if self.temporary_public_probe and not self.container_execution:
+            raise ValueError("a temporary public probe requires container execution")
+        return self
+
+
+class DeploymentFeasibilityReport(StrictModel):
+    schema_version: Literal[3]
+    report_type: Literal["deployment_feasibility"]
+    checked_at: AwareDatetime
+    host: ReportHost
+    scope: FeasibilityScope
+    summary: ReportSummary
+    checks: Annotated[list[ReportCheck], Field(min_length=len(FEASIBILITY_CHECKS), max_length=len(FEASIBILITY_CHECKS))]
+    recommendations: Annotated[list[ReportRecommendation], Field(min_length=1, max_length=8)]
+    sources: Annotated[list[Annotated[StrictStr, Field(min_length=8, max_length=300)]], Field(max_length=8)]
+
+    @model_validator(mode="after")
+    def consistent(self):
+        statuses = {item.id: item.status for item in self.checks}
+        if len(statuses) != len(self.checks) or statuses.keys() != FEASIBILITY_CHECKS:
+            raise ValueError("feasibility check set is incomplete or duplicated")
+        counts = {status: sum(item.status == status for item in self.checks)
+                  for status in ("PASS", "WARN", "FAIL", "NOT_TESTED")}
+        if counts != self.summary.model_dump() or not 2020 <= self.checked_at.year <= 2100:
+            raise ValueError("invalid summary or time")
+        if any(not url.startswith("https://") or any(ord(c) < 32 for c in url) for url in self.sources):
+            raise ValueError("invalid source URL")
+        if any(statuses[key] != "NOT_TESTED" for key in
+               ("static_ip_contract", "isp_inbound_policy", "public_ingress")):
+            raise ValueError("host probes cannot attest provider contracts or independent public ingress")
+        if not self.scope.container_execution and any(statuses[key] == "PASS" for key in
+                ("isolated_probe", "quick_tunnel", "public_https_nonce", "https_samples")):
+            raise ValueError("a container probe cannot pass without container execution")
+        if not self.scope.temporary_public_probe and any(statuses[key] == "PASS" for key in
+                ("quick_tunnel", "public_https_nonce")):
+            raise ValueError("a public probe cannot pass outside its scope")
+        if any(statuses[key] == "PASS" for key in ("public_https_nonce", "https_samples")) and statuses["quick_tunnel"] != "PASS":
+            raise ValueError("HTTPS probes require a passing temporary tunnel")
+        if statuses["https_samples"] == "PASS" and statuses["public_https_nonce"] != "PASS":
+            raise ValueError("HTTPS samples require a passing nonce probe")
+        return self
+
+
+Report = HostReport | ContainerReport | DeploymentFeasibilityReport
 
 
 def _unique_pairs(pairs):
@@ -183,7 +245,8 @@ def parse_report(raw: bytes) -> Report:
     try:
         value = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs,
                            parse_constant=lambda _: (_ for _ in ()).throw(ValueError("nonfinite number")))
-        model = ContainerReport if isinstance(value, dict) and value.get("schema_version") == 2 else HostReport
+        schema_version = value.get("schema_version") if isinstance(value, dict) else None
+        model = {2: ContainerReport, 3: DeploymentFeasibilityReport}.get(schema_version, HostReport)
         return model.model_validate_json(json.dumps(value, ensure_ascii=False))
     except (UnicodeError, ValueError, TypeError, ValidationError):
         raise HTTPException(422, "部署檢查 JSON 格式或內容不正確；既有報告未變更") from None
@@ -212,6 +275,16 @@ def render_markdown(report: Report) -> str:
                  f"- 系統：{_markdown_text(report.runtime.system)}；Python {_markdown_text(report.runtime.python)}",
                  f"- 結果：PASS {report.summary.PASS}、WARN {report.summary.WARN}、FAIL {report.summary.FAIL}、NOT_TESTED {report.summary.NOT_TESTED}",
                  "", "僅檢查正在執行的 app／容器；Windows、Docker daemon、外部入口及完整還原未經驗證。回傳成功不等於部署檢查通過。", "",
+                 "| 檢查 | 狀態 | 理由 | 證據 | 下一步 |", "| --- | --- | --- | --- | --- |"]
+    if isinstance(report, DeploymentFeasibilityReport):
+        lines = ["# Windows Docker 部署可行性報告", "",
+                 f"- 檢查時間：{_markdown_text(report.checked_at.isoformat())}",
+                 f"- 報告宣稱的主機：{_markdown_text(report.host.name)}",
+                 f"- 系統：{_markdown_text(report.host.windows)}；build {_markdown_text(report.host.build)}",
+                 f"- 容器已執行：{'是' if report.scope.container_execution else '否'}；臨時公開測試：{'是' if report.scope.temporary_public_probe else '否'}",
+                 f"- 結果：PASS {report.summary.PASS}、WARN {report.summary.WARN}、FAIL {report.summary.FAIL}、NOT_TESTED {report.summary.NOT_TESTED}",
+                 "", "本報告含臨時主動測試，只使用隔離 nonce-only 容器，不存取真實資料 volume、不控制主機設定。主機身份及結果由上傳 JSON 宣稱，伺服器未獨立驗證。", "",
+                 "主機回讀臨時 HTTPS 入口不等於獨立手機外網驗收；固定 IP 合約、ISP 入站政策及正式公開入口仍未驗證。", "",
                  "| 檢查 | 狀態 | 理由 | 證據 | 下一步 |", "| --- | --- | --- | --- | --- |"]
     for item in report.checks:
         lines.append("| " + " | ".join(_markdown_text(value) for value in
@@ -253,8 +326,8 @@ def install_deployment_report_routes(app, get_db, current_auth, require_csrf):
             if len(raw) > MAX_REPORT_BYTES:
                 raise HTTPException(413, "報告超過 256 KiB 上限；既有報告未變更")
         report = parse_report(bytes(raw))
-        if not isinstance(report, HostReport):
-            raise HTTPException(422, "手動上傳僅接受 Windows schema 1；容器報告請使用立即檢查")
+        if not isinstance(report, (HostReport, DeploymentFeasibilityReport)):
+            raise HTTPException(422, "手動上傳僅接受 Windows schema 1 或部署可行性 schema 3；容器報告請使用立即檢查")
         canonical = report.model_dump_json()
         digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
         admin_id = _begin_immediate(db, auth)
