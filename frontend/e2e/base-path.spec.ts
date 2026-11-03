@@ -37,7 +37,7 @@ test('same build: deep links, public registration, arrangement and export stay w
     await visitor.reload()
     await expect(visitor.getByText('合成會員一', { exact: true })).toBeVisible()
     await visitor.getByRole('link', { name: '比賽報名', exact: true }).click()
-    await visitor.getByRole('link', { name: `我要報名：${name}`, exact: true }).click()
+    await visitor.getByRole('link', { name: `報名／查看名單：${name}`, exact: true }).click()
     await visitor.reload()
     await visitor.getByLabel('搜尋姓名', { exact: true }).fill('合成會員一')
     await visitor.getByRole('button', { name: '合成會員一 東區', exact: true }).click()

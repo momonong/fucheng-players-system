@@ -100,7 +100,7 @@ test('雙打公開單人承接、直接雙人審核、取消拆隊候補及截�
     await expect(b.getByRole('button', { name: '我們兩人一起報名', exact: true })).toHaveCount(0)
     await b.screenshot({ path: info.outputPath('public-doubles.png'), fullPage: true })
     await b.goto(url('/'))
-    await expect(b.getByRole('link', { name: `查看雙打名單：${data.competition.name}`, exact: true })).toBeVisible()
+    await expect(b.getByRole('link', { name: `查看報名名單：${data.competition.name}`, exact: true })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     expect(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     expect(errors).toEqual([])

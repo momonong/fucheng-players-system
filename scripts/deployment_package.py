@@ -35,7 +35,7 @@ def source_files():
     for pattern in ["src/fucheng/*.py", "migrations/env.py", "migrations/versions/*.py",
                     "frontend/package*.json", "frontend/index.html", "frontend/tsconfig*.json",
                     "frontend/vite.config.ts", "frontend/src/**/*.ts", "frontend/src/**/*.tsx",
-                    "frontend/src/**/*.css", "deploy/docker/runtime.py"]:
+                    "frontend/src/**/*.css", "frontend/public/help/*.png", "deploy/docker/runtime.py"]:
         files.extend(ROOT.glob(pattern))
     # Resolve relative to this reviewed script, including when loaded by importlib.
     helper_path = Path(__file__).with_name("club_host_one_shot_package.py")

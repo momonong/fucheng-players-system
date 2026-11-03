@@ -6,7 +6,8 @@
 下列 `momonong.me/fucheng/` 發布段落均為歷史，不是目前入口。
 請從[球館部署與維運指南](docs/club-deployment-runbook.md)開始；Cloudflare 設定及
 故障接續見 [Workers VPC 文件](docs/club-workers-vpc.md)。本次交付部署工具與文件，
-沒有覆寫既有 1.2.0 tag／registry image，也沒有修改 `momonong.me` 的其他功能。
+1.3.0 新增[站內使用說明與公開報名名單](docs/release-1.3.0.md)，更新方式見[球館更新指南](docs/club-vpc-upgrade.md)。
+保留 1.2.0 tag，`momonong.me` 的其他功能不變；球館更新結果待現場執行確認。
 
 1.2.0 已合併、推送並發布 [GitHub Release v1.2.0](https://github.com/momonong/fucheng-players-system/releases/tag/v1.2.0)及 Docker Hub `1.2.0`／`latest`，2026-10-24 台北時間 17:17:10 更新既有 [momonong.me/fucheng/](https://momonong.me/fucheng/)。新增管理員一鍵檢查目前 app／Linux 容器、保存 schema 2 報告與固定 HTTPS 回傳；未配置或回傳失敗仍可下載，未知結果保留原 UUID／內容，舊 Windows schema 1／手動上傳相容。先停寫、成組備份，再顯式遷移至 `0015_deployment_diagnostics`；app／backup 健康，26 張舊表原欄、原帳號與媒體保留，原帳號 HTTPS 登入／讀取／登出通過。另以真 HTTPS 接收端新增一份明確標為合成、全部 NOT_TESTED 的 schema 2 報告，收據／管理下載及包含它的最終備份通過，其餘原資料保留。球館 Windows、現場發送端、官方網路探測、實體手機、完整還原及冷開機仍未驗證。詳見 [1.2.0 發布說明](docs/release-1.2.0.md)、[部署紀錄](docs/home-deployment.md#120-映像內建部署檢查正式發布與部署2026-10-24)及[檢查與回傳操作](docs/host-report-upload.md)。
 

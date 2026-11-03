@@ -4,6 +4,7 @@ import * as api from './api'
 import type { AdminMember, AdminSession, AuditEntry, Diet, MemberDraft, PublicMember } from './types'
 import { CompetitionManager } from './CompetitionManager'
 import { PublicRegistrationPortal } from './PublicRegistrationPortal'
+import { HelpPage } from './HelpPage'
 import { SiteNav, ClubHome, AnnouncementManager } from './ClubWebsite'
 import { DeploymentReportPage } from './DeploymentReport'
 import { AdminHeader } from './AdminHeader'
@@ -27,7 +28,7 @@ const emptyDraft: MemberDraft = {
 
 export function App() {
   const adminPage = appPathname().startsWith('/admin')
-  return <><SiteNav />{adminPage ? <AdminPage /> : appPathname() === '/members' ? <PublicPage /> : appPathname() === '/' ? <ClubHome /> : <PublicRegistrationPortal />}</>
+  return <><SiteNav />{adminPage ? <AdminPage /> : appPathname() === '/help' ? <HelpPage /> : appPathname() === '/members' ? <PublicPage /> : appPathname() === '/' ? <ClubHome /> : <PublicRegistrationPortal />}</>
 }
 
 function PublicPage({ managed = false }: { managed?: boolean }) {

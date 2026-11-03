@@ -254,6 +254,18 @@ class PublicCompetition(BaseModel):
     effective_registration_open: bool = True
 
 
+class PublicRosterEntry(BaseModel):
+    name: str
+    distinguishing_note: str | None
+    status: Literal["confirmed", "waitlisted"]
+    queue_sequence: int
+
+
+class PublicIndividualRoster(BaseModel):
+    competition: PublicCompetition
+    entries: list[PublicRosterEntry]
+
+
 class PublicRegistrationResult(BaseModel):
     status: RegistrationStatus
     member_name: str
