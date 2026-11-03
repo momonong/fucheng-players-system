@@ -243,6 +243,15 @@ function Assert-UpgradeNoWriter([string[]]$Allowed=@()) {
  }
 }
 
+function Test-UpgradeImageIdentity([string]$Actual,[string]$Reference,[string]$ConfigId) {
+ # Classic Docker reports config ID; containerd-backed Docker may report the
+ # pinned manifest digest. Only these two exact, reviewed identities are valid.
+ if($ConfigId -cnotmatch '^sha256:[a-f0-9]{64}$'){return $false}
+ if($Reference -cnotmatch '^.+@(sha256:[a-f0-9]{64})$'){return $false}
+ $manifestId=$Matches[1]
+ return ($Actual -ceq $ConfigId -or $Actual -ceq $manifestId)
+}
+
 function Get-UpgradeContainer([string]$Name) {
  $format='{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"ref":{{json .Config.Image}},"state":{{json .State.Status}},"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}},"labels":{{json .Config.Labels}},"mounts":{{json .Mounts}},"networks":{{json .NetworkSettings.Networks}},"ports":{{json .HostConfig.PortBindings}},"command":{{json .Config.Cmd}},"user":{{json .Config.User}},"readonly":{{json .HostConfig.ReadonlyRootfs}},"network_mode":{{json .HostConfig.NetworkMode}}}'
  return (Invoke-VpcChecked @('inspect','--type','container','--format',$format,$Name))|ConvertFrom-Json
@@ -257,7 +266,7 @@ function Assert-UpgradeIdentity([string]$Ref,[string]$ImageId,[bool]$RequireHeal
   # Only failure cleanup accepts a partially recreated stack. Each writer still
   # has to match one of the two independently verified immutable image pins.
   if($AllowMixed -and $service -cne 'cloudflared' -and $v.ref -ceq $oldImage){$expectedRef=$oldImage;$expectedId=$oldImageId}
-  if($v.id -cnotmatch '^[0-9a-f]{64}$' -or $v.name -cne ('/'+$name) -or $v.image -cne $expectedId -or $v.ref -cne $expectedRef -or !$v.readonly -or $v.state -cnotin @('running','exited','created','restarting','paused','dead')){throw 'STACK_IDENTITY_MISMATCH'}
+  if($v.id -cnotmatch '^[0-9a-f]{64}$' -or $v.name -cne ('/'+$name) -or !(Test-UpgradeImageIdentity $v.image $expectedRef $expectedId) -or $v.ref -cne $expectedRef -or !$v.readonly -or $v.state -cnotin @('running','exited','created','restarting','paused','dead')){throw 'STACK_IDENTITY_MISMATCH'}
   $labels=$v.labels
   if($labels.'com.docker.compose.project' -cne 'fucheng' -or $labels.'com.docker.compose.service' -cne $service -or $labels.'io.fucheng.vpc.managed' -cne 'full-v1' -or $labels.'io.fucheng.vpc.deployment' -cne $deployment.id -or !$labels.'com.docker.compose.project.config_files' -or [IO.Path]::GetFullPath($labels.'com.docker.compose.project.config_files') -ine $composePath){throw 'STACK_IDENTITY_MISMATCH'}
   if(@($v.ports.PSObject.Properties).Count -ne 0){throw 'STACK_IDENTITY_MISMATCH'}
@@ -421,7 +430,7 @@ function Invoke-ClubUpgrade([string]$TargetImage,[string]$ExpectedImageId) {
   $lock=[IO.File]::Open((Join-Path $root 'setup.lock'),[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
   if(Test-Path -LiteralPath ($deployJournalPath+'.next')){throw 'JOURNAL_UPDATE_PENDING'}
   $deployment=[IO.File]::ReadAllText($deployJournalPath)|ConvertFrom-Json
-  if($deployment.version -ne 1 -or $deployment.phase -cne 'COMPLETE' -or $deployment.id -cnotmatch '^[a-f0-9]{32}$' -or $deployment.source_id -cnotmatch '^[a-f0-9]{64}$' -or $deployment.image_id -cne $oldImageId -or $deployment.target_volume -cne 'fucheng_data' -or $deployment.old_default -isnot [bool]){throw 'JOURNAL_INVALID'}
+  if($deployment.version -ne 1 -or $deployment.phase -cne 'COMPLETE' -or $deployment.id -cnotmatch '^[a-f0-9]{32}$' -or $deployment.source_id -cnotmatch '^[a-f0-9]{64}$' -or !(Test-UpgradeImageIdentity $deployment.image_id $oldImage $oldImageId) -or $deployment.target_volume -cne 'fucheng_data' -or $deployment.old_default -isnot [bool]){throw 'JOURNAL_INVALID'}
   foreach($f in @('business_match','admin_match','media_match')){if($deployment.verification.$f -isnot [bool] -or !$deployment.verification.$f){throw 'PRESERVATION_NOT_CONFIRMED'}}
   $upgrades=@(Get-ChildItem -LiteralPath $backupRoot -Directory -Filter 'upgrade-*')
   if($upgrades.Count -gt 1){throw 'UPGRADE_RECONCILIATION_REQUIRED'}
@@ -447,16 +456,16 @@ function Invoke-ClubUpgrade([string]$TargetImage,[string]$ExpectedImageId) {
   $tunnelImageId=Invoke-VpcChecked @('image','inspect','--format','{{.Id}}',$tunnelImage)
   if($tunnelImageId -cnotmatch '^sha256:[a-f0-9]{64}$'){throw 'STACK_IDENTITY_MISMATCH'}
   if($journal){
-   if((Invoke-VpcChecked @('image','inspect','--format','{{.Id}}',$TargetImage)) -cne $ExpectedImageId){throw 'TARGET_IMAGE_MISMATCH'}
+   if(!(Test-UpgradeImageIdentity (Invoke-VpcChecked @('image','inspect','--format','{{.Id}}',$TargetImage)) $TargetImage $ExpectedImageId)){throw 'TARGET_IMAGE_MISMATCH'}
    $stack=Assert-UpgradeIdentity $TargetImage $ExpectedImageId $true;Assert-UpgradeNoWriter @($stack|Where-Object {$_.service -cin @('app','backup')}|ForEach-Object {$_.id})
    if(!(Test-DeployPublic)){throw 'PUBLIC_HEALTH_UNCONFIRMED'}
    Write-Host 'COMPLETE：既有 1.3.0 身份與公開健康通過；未重新備份或重建。';return
   }
-  if((Invoke-VpcChecked @('image','inspect','--format','{{.Id}}',$oldImage)) -cne $oldImageId){throw 'JOURNAL_IMAGE_MISMATCH'}
+  if(!(Test-UpgradeImageIdentity (Invoke-VpcChecked @('image','inspect','--format','{{.Id}}',$oldImage)) $oldImage $oldImageId)){throw 'JOURNAL_IMAGE_MISMATCH'}
   $stack=Assert-UpgradeIdentity $oldImage $oldImageId $true
   Assert-UpgradeNoWriter @($stack|Where-Object {$_.service -cin @('app','backup')}|ForEach-Object {$_.id})
   $stage='download_target';$null=Invoke-VpcChecked @('pull','--platform','linux/amd64',$TargetImage) 300
-  if((Invoke-VpcChecked @('image','inspect','--format','{{.Id}}',$TargetImage)) -cne $ExpectedImageId){throw 'TARGET_IMAGE_MISMATCH'}
+  if(!(Test-UpgradeImageIdentity (Invoke-VpcChecked @('image','inspect','--format','{{.Id}}',$TargetImage)) $TargetImage $ExpectedImageId)){throw 'TARGET_IMAGE_MISMATCH'}
   # Recheck after a potentially long download, before changing the running stack.
   $stack=Assert-UpgradeIdentity $oldImage $oldImageId $true
   Assert-UpgradeNoWriter @($stack|Where-Object {$_.service -cin @('app','backup')}|ForEach-Object {$_.id})

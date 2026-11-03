@@ -46,3 +46,9 @@ FUCHENG_TEST_PWSH=<pwsh-path> uv run --locked pytest -q -p no:cacheprovider test
 測試涵蓋 ACL／remote context／recipe／image／volume／writer／mount／ports／labels／IP 漂移、partial journal、backup create UNKNOWN、hash 不符、stop timeout／仍 running、部分 Compose old/new stack 清理、before/after 變更、公開 health 失敗、COMPLETE read-only 重跑與正常更新順序。
 
 **未驗證：原生 Windows PowerShell 5.1 實際執行、Docker Desktop bind mount 實機形式、球館真實資料及實際 1.3.0 發布 pin。** portable parser／mock／SQLite 合成證據不等於球館部署或人工驗收。若 Docker Desktop mount source 形式不在 guard 允許範圍，會在停止之前拒絕，不自行放寬。
+
+## Docker Desktop 映像識別相容性修正
+
+球館實測 `docker inspect .Image` 及原部署 journal 的 `image_id` 回報1.2.0固定manifest digest，而傳統Docker回報config ID。更新器現僅接受同一固定映像的這兩個精確識別；本機image、目前容器及原journal均核對，仍要求精確image Ref、labels、mounts、network與writer守門。新升級journal繼續保存canonical config ID，原部署紀錄不修改。
+
+舊更新器的 `preflight/JOURNAL_INVALID` 未進入停寫或變更資料。使用修正後固定來源與新SHA launcher即可；不要改journal、重建管理員或重跑首次部署。網站Docker映像仍為已發布的1.3.0，此修正只更新維護腳本。
