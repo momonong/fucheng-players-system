@@ -160,7 +160,7 @@ def test_summary_covers_admin_credentials_sessions_and_media_without_disclosure(
     (data/'announcement-media'/'private.jpg').write_bytes(b'changed');fourth=summary();assert fourth['media_digest']!=third['media_digest']
     db.close()
 
-@pytest.mark.parametrize('mode',['ok','windows_bind','wrong_image','wrong_volume','public_port','wrong_secret_mount','extra_network','wrong_ip','wrong_labels','foreign_network_member','foreign_project_container','mixed_images','mixed_wrong_image','manifest_images'])
+@pytest.mark.parametrize('mode',['ok','windows_bind','wrong_image','wrong_volume','public_port','wrong_secret_mount','extra_network','wrong_ip','wrong_labels','foreign_network_member','foreign_project_container','mixed_images','mixed_wrong_image','manifest_images','missing_app_health'])
 def test_real_identity_guard_has_bounded_scope(tmp_path,mode):
     # Exercise actual identity guard; only Docker transport and selected JSON are mocked.
     out=tmp_path/'identity.json'
@@ -179,10 +179,12 @@ function Get-UpgradeContainer([string]$Name){
  if($mode -eq 'windows_bind'){$mounts[-1].Source='/run/desktop/mnt/host/c/Users/club/AppData/Local/Fucheng/'+$extra[1]}
  $networks=if($service -eq 'backup'){@{none=@{}}}else{@{fucheng_origin=@{IPAddress=$(if($service -eq 'app'){'172.30.98.2'}else{'172.30.98.3'})};fucheng_default=@{}}}
  $v=@{id=$id;name=('/'+$Name);image=$(if($service -eq 'cloudflared'){$tunnelImageId}else{$oldImageId});ref=$(if($service -eq 'cloudflared'){$tunnelImage}else{$oldImage});state='running';health='healthy';readonly=$true;user='10001:10001';ports=[pscustomobject]@{};network_mode=$(if($service -eq 'backup'){'none'}else{'fucheng_default'});command=$(if($service -eq 'app'){@('serve')}elseif($service -eq 'backup'){@('backup-loop')}else{@('tunnel','--no-autoupdate','--protocol','quic','run','--token-file','/run/secrets/tunnel_token')});mounts=$mounts;networks=[pscustomobject]$networks;labels=@{'com.docker.compose.project'='fucheng';'com.docker.compose.service'=$service;'com.docker.compose.project.config_files'=$composePath;'io.fucheng.vpc.managed'='full-v1';'io.fucheng.vpc.deployment'=$deployment.id}}
+ if($service -eq 'cloudflared'){$v.health=$null}
  if($mode -eq 'manifest_images'){$v.image=($v.ref -split '@')[1]}
  if($service -eq 'app'){
   if($mode -cin @('mixed_images','mixed_wrong_image')){$v.ref=NEWREF;$v.image=NEWID;if($mode -eq 'mixed_wrong_image'){$v.image='sha256:'+('0'*64)}}
   switch($mode){
+   'missing_app_health' {$v.health=$null}
    'wrong_image' {$v.image='sha256:'+('0'*64)}
    'wrong_volume' {$v.mounts[0].Name='other_data'}
    'public_port' {$v.ports=[pscustomobject]@{'8000/tcp'=@(@{HostIp='0.0.0.0';HostPort='8000'})}}
@@ -209,6 +211,7 @@ try{if($mode -cin @('mixed_images','mixed_wrong_image')){$v=Assert-UpgradeIdenti
     assert out.exists(),r.stdout+r.stderr
     result=out.read_text()
     if mode in ('ok','windows_bind','mixed_images','manifest_images'):assert result=='ok:3',result
+    elif mode=='missing_app_health':assert result=='STACK_UNHEALTHY',result
     elif mode in ('foreign_network_member','foreign_project_container'):assert result=='UNKNOWN_FUCHENG_RESOURCE',result
     else:assert result=='STACK_IDENTITY_MISMATCH',result
 
@@ -234,3 +237,26 @@ def test_digest_identity_accepts_only_fixed_config_or_manifest(tmp_path,actual,a
     v={'config':OLD_ID,'manifest':OLD.split('@')[1],'other':'sha256:'+'0'*64}[actual]
     r=ps(tmp_path,'Write-Output (Test-UpgradeImageIdentity '+q(v)+' '+q(OLD)+' '+q(OLD_ID)+')')
     assert r.returncode==0 and r.stdout.strip()==str(allowed),r.stdout+r.stderr
+
+
+def test_real_docker_optional_health_template():
+    import re,shutil
+    name=os.environ.get('FUCHENG_TEST_HEALTHLESS_CONTAINER')
+    if not name:
+        pytest.skip('Set isolated healthless container for real Docker template regression')
+    source=SCRIPT.read_text(encoding='utf-8-sig')
+    function=source.split('function Get-UpgradeContainer',1)[1].split('function Assert-UpgradeIdentity',1)[0]
+    template=re.search(r"\$format='([^']+)'",function).group(1)
+    command=['docker','--context',os.environ.get('FUCHENG_TEST_DOCKER_CONTEXT','default'),'inspect','--type','container','--format',template,name]
+    result=subprocess.run(command,capture_output=True,text=True,timeout=15)
+    assert result.returncode==0,result.stderr
+    value=json.loads(result.stdout)
+    assert value['health'] is None and value['state']=='created'
+
+
+@pytest.mark.parametrize('command,visible',[("@('inspect','--type')",True),("@('compose','up')",False)])
+def test_docker_failure_reports_command_but_only_read_metadata_stderr(tmp_path,command,visible):
+    body="function Invoke-ProbeDocker {return @{exit_code=1;timed_out=$false;stdout='';stderr='SYNTHETIC_ERROR_DETAIL'}}\ntry {Invoke-VpcChecked "+command+"} catch {}"
+    r=ps(tmp_path,body)
+    assert 'DOCKER_FAILED:' in r.stdout
+    assert ('SYNTHETIC_ERROR_DETAIL' in r.stdout)==visible

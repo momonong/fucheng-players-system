@@ -52,3 +52,9 @@ FUCHENG_TEST_PWSH=<pwsh-path> uv run --locked pytest -q -p no:cacheprovider test
 球館實測 `docker inspect .Image` 及原部署 journal 的 `image_id` 回報1.2.0固定manifest digest，而傳統Docker回報config ID。更新器現僅接受同一固定映像的這兩個精確識別；本機image、目前容器及原journal均核對，仍要求精確image Ref、labels、mounts、network與writer守門。新升級journal繼續保存canonical config ID，原部署紀錄不修改。
 
 舊更新器的 `preflight/JOURNAL_INVALID` 未進入停寫或變更資料。使用修正後固定來源與新SHA launcher即可；不要改journal、重建管理員或重跑首次部署。網站Docker映像仍為已發布的1.3.0，此修正只更新維護腳本。
+
+## 未配置 healthcheck 的 Tunnel 容器
+
+Docker的State可能完全沒有Health欄位；Tunnel未配置healthcheck是正常狀態。更新器用安全的map索引讀取可選Health，對Tunnel仍核對running及固定身份，對app／backup仍強制要求healthy。已以真實Docker的無Health合成容器重現舊模板失敗，並驗證修正後PowerShell程序傳參與JSON讀回。
+
+Docker命令失敗會顯示命令種類、exit code與timeout；僅唯讀metadata命令顯示最多1500字元stderr。寫入／Compose／log內容及完整命令參數不回顯。
