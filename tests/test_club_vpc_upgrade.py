@@ -34,6 +34,7 @@ function Get-Command {return [pscustomobject]@{Source='fixture-docker.exe'}}
 function Start-Sleep {}
 $jid='e'*32
 $old=[pscustomobject]@{version=1;phase='COMPLETE';id=$jid;source_id=('f'*64);image_id=$oldImageId;target_volume='fucheng_data';old_default=$false;verification=@{business_match=$true;admin_match=$true;media_match=$true};operations=@()}
+if($mode -eq 'manifest_store'){$old.image_id=($oldImage -split '@')[1]}
 $text=Get-DeployCompose $jid $false
 foreach($name in @('setup.lock','protected.env','turnstile.secret','tunnel.token')){[IO.File]::WriteAllText((Join-Path $r $name),'DO_NOT_READ_SECRET')}
 [IO.File]::WriteAllText((Join-Path $r 'compose.yml'),$text)
@@ -53,7 +54,7 @@ function Invoke-VpcChecked([string[]]$Arguments,[int]$Limit=15) {
  $script:calls.Add(@($Arguments));$a=$Arguments
  if($a[0] -eq 'context'){if($mode -eq 'remote'){return 'tcp://evil:2376'};return 'npipe:////./pipe/dockerDesktopLinuxEngine'}
  if($a[0] -eq 'info'){return 'linux|x86_64'}
- if($a[0] -eq 'image'){if($a[-1] -ceq $TargetImage){if($mode -eq 'image'){return 'sha256:'+('0'*64)};return $ExpectedImageId};return $oldImageId}
+ if($a[0] -eq 'image'){if($mode -eq 'manifest_store'){return ($a[-1] -split '@')[1]};if($a[-1] -ceq $TargetImage){if($mode -eq 'image'){return 'sha256:'+('0'*64)};return $ExpectedImageId};return $oldImageId}
  if($a[0] -eq 'pull'){return ''}
  if($a[0] -eq 'container'){if($mode -eq 'writer'){return '9'*64};$items=@();foreach($s in @('app','backup')){if($states[$s] -eq 'running'){$items+=(@{app='1';backup='2'}[$s]*64)}};return $items -join "`n"}
  if($a[0] -eq 'stop'){$s=@{'1'='app';'2'='backup';'3'='cloudflared'}[$a[-1].Substring(0,1)];if($mode -eq 'stop_unknown' -and $s -eq 'cloudflared'){throw 'DOCKER_COMMAND_UNCONFIRMED'};if($mode -ne 'still_running'){$states[$s]='exited'};return ''}
@@ -159,7 +160,7 @@ def test_summary_covers_admin_credentials_sessions_and_media_without_disclosure(
     (data/'announcement-media'/'private.jpg').write_bytes(b'changed');fourth=summary();assert fourth['media_digest']!=third['media_digest']
     db.close()
 
-@pytest.mark.parametrize('mode',['ok','windows_bind','wrong_image','wrong_volume','public_port','wrong_secret_mount','extra_network','wrong_ip','wrong_labels','foreign_network_member','foreign_project_container','mixed_images','mixed_wrong_image'])
+@pytest.mark.parametrize('mode',['ok','windows_bind','wrong_image','wrong_volume','public_port','wrong_secret_mount','extra_network','wrong_ip','wrong_labels','foreign_network_member','foreign_project_container','mixed_images','mixed_wrong_image','manifest_images'])
 def test_real_identity_guard_has_bounded_scope(tmp_path,mode):
     # Exercise actual identity guard; only Docker transport and selected JSON are mocked.
     out=tmp_path/'identity.json'
@@ -178,6 +179,7 @@ function Get-UpgradeContainer([string]$Name){
  if($mode -eq 'windows_bind'){$mounts[-1].Source='/run/desktop/mnt/host/c/Users/club/AppData/Local/Fucheng/'+$extra[1]}
  $networks=if($service -eq 'backup'){@{none=@{}}}else{@{fucheng_origin=@{IPAddress=$(if($service -eq 'app'){'172.30.98.2'}else{'172.30.98.3'})};fucheng_default=@{}}}
  $v=@{id=$id;name=('/'+$Name);image=$(if($service -eq 'cloudflared'){$tunnelImageId}else{$oldImageId});ref=$(if($service -eq 'cloudflared'){$tunnelImage}else{$oldImage});state='running';health='healthy';readonly=$true;user='10001:10001';ports=[pscustomobject]@{};network_mode=$(if($service -eq 'backup'){'none'}else{'fucheng_default'});command=$(if($service -eq 'app'){@('serve')}elseif($service -eq 'backup'){@('backup-loop')}else{@('tunnel','--no-autoupdate','--protocol','quic','run','--token-file','/run/secrets/tunnel_token')});mounts=$mounts;networks=[pscustomobject]$networks;labels=@{'com.docker.compose.project'='fucheng';'com.docker.compose.service'=$service;'com.docker.compose.project.config_files'=$composePath;'io.fucheng.vpc.managed'='full-v1';'io.fucheng.vpc.deployment'=$deployment.id}}
+ if($mode -eq 'manifest_images'){$v.image=($v.ref -split '@')[1]}
  if($service -eq 'app'){
   if($mode -cin @('mixed_images','mixed_wrong_image')){$v.ref=NEWREF;$v.image=NEWID;if($mode -eq 'mixed_wrong_image'){$v.image='sha256:'+('0'*64)}}
   switch($mode){
@@ -206,7 +208,7 @@ try{if($mode -cin @('mixed_images','mixed_wrong_image')){$v=Assert-UpgradeIdenti
     r=ps(tmp_path,body)
     assert out.exists(),r.stdout+r.stderr
     result=out.read_text()
-    if mode in ('ok','windows_bind','mixed_images'):assert result=='ok:3',result
+    if mode in ('ok','windows_bind','mixed_images','manifest_images'):assert result=='ok:3',result
     elif mode in ('foreign_network_member','foreign_project_container'):assert result=='UNKNOWN_FUCHENG_RESOURCE',result
     else:assert result=='STACK_IDENTITY_MISMATCH',result
 
@@ -218,3 +220,17 @@ def test_partial_compose_timeout_stops_verified_mixed_old_new_stack(tmp_path):
     assert not any(a[0]=='start' and a[-1] in ('1'*64,'2'*64,'3'*64) for a in s['calls'])
     j=json.loads(next(root.glob('backup/upgrade-*/upgrade-journal.json')).read_text())
     assert j['stop_confirmed'] is True
+
+
+def test_manifest_store_journal_and_images_complete_without_rewriting_history(tmp_path):
+    r,s,root=invoke(tmp_path,'manifest_store')
+    assert 'COMPLETE' in r.stdout,r.stdout+r.stderr
+    assert s['historical_unchanged']
+    j=json.loads(next(root.glob('backup/upgrade-*/upgrade-journal.json')).read_text())
+    assert j['phase']=='COMPLETE' and j['target_image_id']==NEW_ID
+
+@pytest.mark.parametrize('actual,allowed',[('config',True),('manifest',True),('other',False)])
+def test_digest_identity_accepts_only_fixed_config_or_manifest(tmp_path,actual,allowed):
+    v={'config':OLD_ID,'manifest':OLD.split('@')[1],'other':'sha256:'+'0'*64}[actual]
+    r=ps(tmp_path,'Write-Output (Test-UpgradeImageIdentity '+q(v)+' '+q(OLD)+' '+q(OLD_ID)+')')
+    assert r.returncode==0 and r.stdout.strip()==str(allowed),r.stdout+r.stderr
