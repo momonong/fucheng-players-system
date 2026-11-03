@@ -68,7 +68,9 @@ def test_search_privacy_csrf_and_no_anonymous_changes(app, client, auth):
     for action in ('cancel','promote'):
         assert c.post(f'/api/public/registrations/{reg.id}/{action}',headers=h,json={}).status_code in (404,405)
         assert c.post(f'/api/admin/registrations/{reg.id}/{action}',headers=h,json={'version':1,'request_id':str(uuid4())}).status_code==401
-    assert c.get(f"/api/public/competitions/{comp['id']}/registrations").status_code in (404,405)
+    roster = c.get(f"/api/public/competitions/{comp['id']}/registrations")
+    assert roster.status_code == 200
+    assert all(set(row) == {'name', 'distinguishing_note', 'status', 'queue_sequence'} for row in roster.json()['entries'])
     history=client.get(f"/api/admin/competitions/{comp['id']}/history").json()
     assert history[0]['actor_kind']=='public' and '未驗證' in history[0]['actor_name']
     with app.state.session_factory.begin() as db: db.get(Member,members[1]['id']).is_active=False

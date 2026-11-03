@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from .models import AuthAttempt, Competition, CompetitionRegistration, DoublesAudit, DoublesReceipt, Member, PublicVisit, RegistrationAudit, now_utc
 from .registrations import _competition_response, create_registration_service, public_registration_receipt
 from .schemas import (ActorAuditEntry, PublicCandidate, PublicCompetition,
-                      PublicRegistrationCreate, PublicRegistrationResult, RegistrationCreate)
+                      PublicRegistrationCreate, PublicRegistrationResult, RegistrationCreate, PublicIndividualRoster, PublicRosterEntry)
 from .security import hash_password, new_token, token_hash
 from .turnstile import verify_turnstile
 
@@ -116,6 +116,33 @@ def install_public_routes(app, get_db, current_admin):
         rows = db.scalars(select(Competition).where(Competition.deleted_at.is_(None), Competition.status=='open', Competition.registration_deadline > now_utc())
             .order_by(Competition.competition_date, Competition.id))
         return [public_competition(db,row) for row in rows]
+
+    @app.get('/api/public/registration-rosters', response_model=list[PublicCompetition])
+    def available_rosters(db: Db):
+        db.rollback()
+        db.execute(text('BEGIN'))
+        rows = db.scalars(select(Competition).where(Competition.deleted_at.is_(None),
+            Competition.status.in_(('open', 'closed')))
+            .order_by(Competition.competition_date, Competition.id))
+        return [public_competition(db, row) for row in rows]
+
+    @app.get('/api/public/competitions/{competition_id}/registrations', response_model=PublicIndividualRoster)
+    def individual_roster(competition_id: str, db: Db):
+        db.rollback()
+        db.execute(text('BEGIN'))
+        row = db.get(Competition, competition_id)
+        if (not row or row.deleted_at or row.status not in ('open', 'closed')
+                or row.registration_mode != 'individual'):
+            raise HTTPException(404, '找不到公開報名名單')
+        entries = db.execute(select(CompetitionRegistration, Member)
+            .join(Member, CompetitionRegistration.member_id == Member.id)
+            .where(CompetitionRegistration.competition_id == competition_id,
+                CompetitionRegistration.status.in_(('confirmed', 'waitlisted')))
+            .order_by(CompetitionRegistration.queue_sequence, CompetitionRegistration.id))
+        return PublicIndividualRoster(competition=public_competition(db, row), entries=[
+            PublicRosterEntry(name=member.name, distinguishing_note=member.distinguishing_note,
+                status=entry.status, queue_sequence=entry.queue_sequence)
+            for entry, member in entries])
 
     @app.get('/api/public/competitions/{competition_id}', response_model=PublicCompetition)
     def competition(competition_id: str, db: Db):

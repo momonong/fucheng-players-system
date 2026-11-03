@@ -4,6 +4,7 @@ import { doublesRequest, request } from './api'
 import { PublicDoublesRegistration } from './DoublesRegistration'
 import type { Diet, PublicCompetition, DoublesRoster } from './types'
 
+type IndividualRoster = { competition: PublicCompetition; entries: { name: string; distinguishing_note: string | null; status: 'confirmed' | 'waitlisted'; queue_sequence: number }[] }
 type Competition = PublicCompetition
 type Candidate = { id: string; name: string; distinguishing_note: string | null }
 type Result = { status: string; member_name: string; distinguishing_note: string | null; diet: Diet }
@@ -36,13 +37,14 @@ export function PublicRegistrationPortal() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
+  const [rosterRevision, setRosterRevision] = useState(0)
   const routeId = appPathname().match(/^\/register\/([^/]+)$/)?.[1]
   useEffect(() => {
     let active = true
     setLoading(true); setError('')
     Promise.all([
       publicRequest<RegistrationSession>('/api/public/registration-session'),
-      publicRequest<Competition[]>('/api/public/competitions'),
+      publicRequest<Competition[]>('/api/public/registration-rosters'),
     ]).then(async ([session, competitions]) => {
       if (!active) return
       setCsrf(session.csrf_token); setTurnstileSitekey(session.turnstile_sitekey); setItems(competitions)
@@ -51,7 +53,7 @@ export function PublicRegistrationPortal() {
         if (match) setSelected(match)
         else {
           try { const roster = await doublesRequest<DoublesRoster>(`/api/public/competitions/${routeId}/doubles`); if (active) setSelected(roster.competition) }
-          catch { if (active) setError('這場比賽目前未開放報名，請選擇其他比賽或洽管理員。') }
+          catch { if (active) setError('找不到這場比賽的公開名單，請選擇其他比賽或洽管理員。') }
         }
       }
     }).catch(e => { if (active) { setError(e.message); setLoading(false) } }).finally(() => { if (active) setLoading(false) })
@@ -62,17 +64,45 @@ export function PublicRegistrationPortal() {
       <h1 className="visually-hidden">比賽報名</h1>
       <p className="registration-intro">找到自己的名字，就能報名。不用帳號、不用密碼。</p>
       {loading ? <p role="status">載入比賽中…</p> : error ? <div className="notice error" role="alert">{error}<button onClick={() => setRetry(r => r + 1)}>重新載入</button></div> : selected ?
-        selected.registration_mode === 'doubles' ? <PublicDoublesRegistration key={selected.id} competitionId={selected.id} csrf={csrf} sitekey={turnstileSitekey} /> : <RegistrationForm key={selected.id} competition={selected} csrf={csrf} turnstileSitekey={turnstileSitekey} /> : <>
+        selected.registration_mode === 'doubles' ? <PublicDoublesRegistration key={selected.id} competitionId={selected.id} csrf={csrf} sitekey={turnstileSitekey} /> : <><RegistrationForm key={selected.id} competition={selected} csrf={csrf} turnstileSitekey={turnstileSitekey} onRegistered={() => setRosterRevision(n => n + 1)} /><PublicIndividualRoster competitionId={selected.id} revision={rosterRevision} onUpdate={setSelected} /></> : <>
           <h2>1. 選擇比賽</h2>
-          {!items.length && <div className="panel"><p>目前沒有開放報名的比賽。</p><p>如需協助，請洽球館管理員。</p></div>}
+          {!items.length && <div className="panel"><p>目前沒有可查看的比賽。</p><p>如需協助，請洽球館管理員。</p></div>}
           <div className="public-competitions">{items.map(c => <article className="panel" key={c.id}>
             <h3>{c.name}</h3><CompetitionInfo competition={c} />
-            <a className="registration-button" href={appUrl(`/register/${c.id}`)}>我要報名：{c.name}</a>
+            <a className="registration-button" href={appUrl(`/register/${c.id}`)}>{c.effective_registration_open ? '報名／查看名單' : '查看名單'}：{c.name}</a>
           </article>)}</div>
         </>}
       <p className="registration-help">如需取消、更正或找不到名字，請洽管理員協助。</p>
     </main>
   </>
+}
+
+function PublicIndividualRoster({ competitionId, revision, onUpdate }: { competitionId: string; revision: number; onUpdate: (competition: Competition) => void }) {
+  const [roster, setRoster] = useState<IndividualRoster | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [refresh, setRefresh] = useState(0)
+  useEffect(() => {
+    let active = true
+    setLoading(true); setError('')
+    publicRequest<IndividualRoster>(`/api/public/competitions/${competitionId}/registrations`)
+      .then(value => { if (active) { setRoster(value); onUpdate(value.competition) } })
+      .catch(e => { if (active) setError(e.message) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [competitionId, revision, refresh, onUpdate])
+  return <section className="public-roster" aria-label="比賽報名名單">
+    <div className="section-title"><h2>報名名單</h2><button type="button" className="secondary" disabled={loading} onClick={() => setRefresh(n => n + 1)}>{loading ? '更新中…' : '更新名單'}</button></div>
+    <p>依報名順序顯示；同名時請核對註記。候補需由管理員確認遞補。</p>
+    {error && <p className="notice error" role="alert">名單更新失敗：{error}。請按「更新名單」重試。</p>}
+    {loading && !roster && <p role="status">載入名單中…</p>}
+    {roster && <div className="public-roster-groups">{(['confirmed', 'waitlisted'] as const).map(status => {
+      const entries = roster.entries.filter(entry => entry.status === status)
+      return <section className="panel" key={status} aria-label={`${states[status]}名單`}><h3>{states[status]}（{entries.length} 人）</h3>
+        {entries.length ? <ol className="public-roster-names">{entries.map(entry => <li key={entry.queue_sequence}><strong>{entry.name}</strong>{entry.distinguishing_note && <span>{entry.distinguishing_note}</span>}</li>)}</ol> : <p>目前沒有{states[status]}會員。</p>}
+      </section>
+    })}</div>}
+  </section>
 }
 
 function CompetitionInfo({ competition: c }: { competition: Competition }) {
@@ -82,7 +112,7 @@ function CompetitionInfo({ competition: c }: { competition: Competition }) {
     {c.waitlisted > 0 && c.remaining > 0 && <p>空缺由管理員依序確認候補，新報名會加入候補。</p>}</>
 }
 
-function RegistrationForm({ competition: c, csrf, turnstileSitekey }: { competition: Competition; csrf: string; turnstileSitekey: string | null }) {
+function RegistrationForm({ competition: c, csrf, turnstileSitekey, onRegistered }: { competition: Competition; csrf: string; turnstileSitekey: string | null; onRegistered: () => void }) {
   const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [member, setMember] = useState<Candidate | null>(null)
@@ -150,7 +180,7 @@ function RegistrationForm({ competition: c, csrf, turnstileSitekey }: { competit
         body: JSON.stringify({ member_id: member.id, diet, request_id: pending.current.key,
           ...(turnstileSitekey ? { turnstile_token: turnstileToken } : {}) }),
       })
-      setResult(receipt)
+      setResult(receipt); onRegistered()
     } catch (e) {
       const failure = e as Error & { status?: number }
       setSubmitError(failure.message)
@@ -170,7 +200,7 @@ function RegistrationForm({ competition: c, csrf, turnstileSitekey }: { competit
   return <>
     <a href={appUrl("/competitions")}>← 回比賽清單</a>
     <section className="panel public-competition-info"><h2>{c.name}</h2><CompetitionInfo competition={c} /></section>
-    <form className="panel registration-form" onSubmit={submit}>
+    {!c.effective_registration_open ? <p className="notice">報名已截止，仍可查看下方名單。</p> : <form className="panel registration-form" onSubmit={submit}>
       <h2>2. 找到自己的名字</h2>
       <label>搜尋姓名<input type="search" value={query} onChange={e => { setQuery(e.target.value); setMember(null); setSubmitError('') }} placeholder="輸入自己的名字" maxLength={100} disabled={busy} /></label>
       {searching && <p role="status">搜尋中…</p>}{searchError && <p role="alert">{searchError}</p>}
@@ -187,7 +217,7 @@ function RegistrationForm({ competition: c, csrf, turnstileSitekey }: { competit
         {submitError && <div className="notice error" role="alert">{submitError}<p>姓名與餐食已保留。若已送出但不確定結果，可再試一次或洽管理員確認。</p></div>}
         <button className="registration-submit" disabled={busy}>{busy ? '報名中，請稍候…' : `確認以 ${member.name} 報名`}</button>
       </>}
-    </form>
+    </form>}
   </>
 }
 

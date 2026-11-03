@@ -13,10 +13,17 @@ const dateTime = (value: string) => new Intl.DateTimeFormat('zh-TW', { dateStyle
 const statusText = { open: '報名中', closed: '報名已截止', ended: '已結束', cancelled: '已取消' }
 
 export function SiteNav() {
+  const more = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    const close = (event: PointerEvent) => { if (more.current && !more.current.contains(event.target as Node)) more.current.open = false }
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && more.current?.open) { more.current.open = false; more.current.querySelector('summary')?.focus() } }
+    document.addEventListener('pointerdown', close); document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', escape) }
+  }, [])
   const pathname = appPathname()
   return <nav className={`site-nav no-print ${pathname.startsWith('/admin') ? 'admin-site-nav' : ''}`} aria-label="網站導覽">
     <a className="site-brand" href={appUrl("/")}>府城球館<span>一起打球，一起進步。</span></a>
-    <div>{[['/', '最新消息'], ['/members', '會員分級表'], ['/competitions', '比賽報名']].map(([href, label]) => <a key={href} href={appUrl(href)} aria-current={(pathname === href || (href === '/competitions' && pathname.startsWith('/register/'))) ? 'page' : undefined}>{label}</a>)}<a className="nav-admin" href={appUrl("/admin")}>管理後台</a></div>
+    <div>{[['/', '最新消息'], ['/members', '會員分級表'], ['/competitions', '比賽報名'], ['/help', '使用說明']].map(([href, label]) => <a key={href} href={appUrl(href)} aria-current={(pathname === href || (href === '/competitions' && pathname.startsWith('/register/'))) ? 'page' : undefined}>{label}</a>)}<details className="nav-more" ref={more}><summary aria-label="更多選項"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg></summary><div className="nav-more-popover"><a href={appUrl("/admin")}>管理後台</a></div></details></div>
   </nav>
 }
 
@@ -42,12 +49,13 @@ export function ClubHome() {
       <section className="home-shortcuts" aria-label="常用功能"><a href={appUrl("/members")}><span>01 / 查名單</span><h2>會員分級表</h2><p>全部級數、姓名搜尋，快速找到自己。</p><strong>查看分級 →</strong></a><a href={appUrl("/competitions")}><span>02 / 參加比賽</span><h2>比賽報名</h2><p>選比賽、找名字，依場次個人報名或雙打組隊。</p><strong>前往報名 →</strong></a></section>
       {loading && <p role="status">載入球館消息中…</p>}
       {error && <div className="notice error" role="alert">{error}<button onClick={() => setRetry(n => n + 1)}>重新載入</button></div>}
-      {!loading && !error && <div className="home-columns"><section aria-labelledby="news-title"><div className="home-section-title"><p className="section-kicker">CLUB NEWS</p><h2 id="news-title">最新公告</h2></div>
-        {!announcements.length && <div className="panel"><p>目前沒有新公告。</p><p>比賽時程與會員分級表仍可隨時查看。</p></div>}
+      {!loading && !error && <div className="home-columns"><section aria-labelledby="news-title"><div className="home-section-title"><p className="section-kicker">NEWS</p><h2 id="news-title">最新公告</h2></div>
+        <article className="panel news-card guide-announcement"><span className="news-pin">使用指南</span><h3>第一次使用？從這裡開始。</h3><p>按右上方「使用說明」，跟著每一步的畫面，學會查詢會員、報名比賽與查看名單。手機也可以使用。</p><a className="guide-nav-example" href={appUrl("/help")}><img src={appUrl("/help/help-button.png")} alt="網站右上角的使用說明按鈕位置" width="560" height="70" /></a><a href={appUrl("/help")}>查看使用說明 →</a></article>
+        {!announcements.length && <div className="panel"><p>目前沒有其他新公告。</p><p>比賽時程與會員分級表仍可隨時查看。</p></div>}
         {announcements.map(item => <article className="panel news-card" key={item.id}><div className="news-meta">{item.is_pinned && <span className="news-pin">置頂公告</span>}{item.published_at && <time dateTime={item.published_at}>{dateTime(item.published_at)}</time>}</div><h3>{item.title}</h3><AnnouncementBody item={item} />{item.photo_id && <img className="announcement-photo" src={appUrl(`/api/public/announcement-media/${item.photo_id}`)} alt={`${item.title}公告照片`} />}</article>)}
       </section><section aria-labelledby="schedule-title"><div className="home-section-title"><p className="section-kicker">MATCH CALENDAR</p><h2 id="schedule-title">比賽時程</h2></div>
         {!ordered.length && <div className="panel"><p>目前尚無已公告的比賽。</p><p>新比賽開放後，會顯示在這裡。</p></div>}
-        {ordered.map(item => <article className="panel schedule-card" key={item.id}><span className={`schedule-status ${item.status}`}>{statusText[item.status]}</span><h3>{item.name}</h3><p>比賽日期：{item.competition_date}</p><p>報名截止：{dateTime(item.registration_deadline)}</p>{item.notes && <p className="news-body">{item.notes}</p>}{(item.status === 'open' || (item.registration_mode === 'doubles' && item.status === 'closed')) && <a className="registration-button" href={appUrl(`/register/${item.id}`)}>{item.registration_mode === 'doubles' ? '查看雙打名單' : '我要報名'}：{item.name}</a>}</article>)}
+        {ordered.map(item => <article className="panel schedule-card" key={item.id}><span className={`schedule-status ${item.status}`}>{statusText[item.status]}</span><h3>{item.name}</h3><p>比賽日期：{item.competition_date}</p><p>報名截止：{dateTime(item.registration_deadline)}</p>{item.notes && <p className="news-body">{item.notes}</p>}{(item.status === 'open' || item.status === 'closed') && <a className="registration-button" href={appUrl(`/register/${item.id}`)}>{item.status === 'closed' ? '查看報名名單' : item.registration_mode === 'doubles' ? '查看雙打名單' : '報名／查看名單'}：{item.name}</a>}</article>)}
       </section></div>}
       <aside className="club-help"><h2>不方便用手機？我們幫你。</h2><p>找不到名字、需要取消或更正，請洽球館管理員。也可以請管理員協助報名。</p></aside>
     </main><footer>府城球館｜球友資訊與比賽報名</footer>

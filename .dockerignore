@@ -42,3 +42,7 @@
 !deploy/docker/club-host-new-check.cmd
 !deploy/docker/club-host-one-shot.example.json
 !deploy/docker/launch-club-host-check.ps1
+
+!frontend/public/
+!frontend/public/help/
+!frontend/public/help/*.png
