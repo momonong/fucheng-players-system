@@ -102,7 +102,20 @@ function Assert-VpcOwner([string]$Path) {
 
 function Get-VpcHash([string]$Text) {$sha=[Security.Cryptography.SHA256]::Create();try{return ([BitConverter]::ToString($sha.ComputeHash($utf8.GetBytes($Text)))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose()}}
 
-function Invoke-VpcChecked([string[]]$Arguments,[int]$Limit=15) {$r=Invoke-ProbeDocker $Arguments $Limit;if($r.timed_out -or $r.exit_code -ne 0){throw 'DOCKER_COMMAND_UNCONFIRMED'};return $r.stdout}
+function Invoke-VpcChecked([string[]]$Arguments,[int]$Limit=15) {
+ $r=Invoke-ProbeDocker $Arguments $Limit
+ if($r.timed_out -or $r.exit_code -ne 0){
+  $command=$Arguments[0..1] -join ' '
+  Write-Host ('DOCKER_FAILED: '+$command+'; exit='+$r.exit_code+'; timeout='+$r.timed_out)
+  # Only known metadata reads can reveal bounded stderr. No command payload,
+  # raw inspect output, application logs, or write-operation stderr is emitted.
+  if($command -cmatch '^(context inspect|info --format|image inspect|inspect --type|inspect --format|container ls|volume inspect|network inspect)$'){
+   Write-Host ('ERROR: '+$r.stderr.Substring(0,[Math]::Min(1500,$r.stderr.Length)))
+  }
+  throw 'DOCKER_COMMAND_UNCONFIRMED'
+ }
+ return $r.stdout
+}
 
 function Get-DeployCompose([string]$Id,[bool]$ExistingDefault) {
  $text=@'
@@ -202,7 +215,7 @@ function Test-DeployPublic {
 }
 
 function Assert-DeployHealthy([bool]$IncludeConnector=$false) {
- foreach($name in @('fucheng-app','fucheng-backup')){if((Invoke-VpcChecked @('inspect','--type','container','--format','{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}',$name)) -cne 'running|healthy'){throw 'STACK_UNHEALTHY'}}
+ foreach($name in @('fucheng-app','fucheng-backup')){if((Invoke-VpcChecked @('inspect','--type','container','--format','{{.State.Status}}|{{with index .State "Health"}}{{.Status}}{{end}}',$name)) -cne 'running|healthy'){throw 'STACK_UNHEALTHY'}}
  if($IncludeConnector -and (Invoke-VpcChecked @('inspect','--type','container','--format','{{.State.Status}}','fucheng-cloudflared')) -cne 'running'){throw 'STACK_UNHEALTHY'}
 }
 function Set-VpcPrivatePath([string]$Path,[bool]$Directory) {
@@ -253,7 +266,7 @@ function Test-UpgradeImageIdentity([string]$Actual,[string]$Reference,[string]$C
 }
 
 function Get-UpgradeContainer([string]$Name) {
- $format='{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"ref":{{json .Config.Image}},"state":{{json .State.Status}},"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}},"labels":{{json .Config.Labels}},"mounts":{{json .Mounts}},"networks":{{json .NetworkSettings.Networks}},"ports":{{json .HostConfig.PortBindings}},"command":{{json .Config.Cmd}},"user":{{json .Config.User}},"readonly":{{json .HostConfig.ReadonlyRootfs}},"network_mode":{{json .HostConfig.NetworkMode}}}'
+ $format='{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"ref":{{json .Config.Image}},"state":{{json .State.Status}},"health":{{with index .State "Health"}}{{json .Status}}{{else}}null{{end}},"labels":{{json .Config.Labels}},"mounts":{{json .Mounts}},"networks":{{json .NetworkSettings.Networks}},"ports":{{json .HostConfig.PortBindings}},"command":{{json .Config.Cmd}},"user":{{json .Config.User}},"readonly":{{json .HostConfig.ReadonlyRootfs}},"network_mode":{{json .HostConfig.NetworkMode}}}'
  return (Invoke-VpcChecked @('inspect','--type','container','--format',$format,$Name))|ConvertFrom-Json
 }
 
