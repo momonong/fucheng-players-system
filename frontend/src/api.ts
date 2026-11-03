@@ -14,6 +14,7 @@ import type {
 } from './types'
 
 import { appUrl } from './paths'
+import { publicGet } from './publicReads'
 
 let csrfToken = ''
 
@@ -32,11 +33,11 @@ export async function request<T>(url: string, options: RequestInit = {}): Promis
   return response.json() as Promise<T>
 }
 
-export async function publicMembers(search = '', level = ''): Promise<PublicMember[]> {
+export async function publicMembers(search = '', level = '', fresh = false): Promise<PublicMember[]> {
   const params = new URLSearchParams()
   if (search) params.set('search', search)
   if (level) params.set('level', level)
-  return request(`/api/public/members?${params}`)
+  return publicGet<PublicMember[]>(`/api/public/members?${params}`, fresh)
 }
 
 export async function login(username: string, password: string): Promise<string> {
@@ -198,6 +199,7 @@ export async function refreshArrangementSession(expectedUsername:string){
 
 // Doubles writes retain uncertainty through the full response body, not just headers.
 export async function doublesRequest<T>(url: string, options: RequestInit = {}, publicCsrf?: string): Promise<T> {
+  if (url.startsWith('/api/public/') && (!options.method || options.method === 'GET')) return publicGet<T>(url)
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), 20000)
   try {

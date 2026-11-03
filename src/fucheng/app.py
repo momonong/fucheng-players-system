@@ -81,8 +81,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def private_responses(request, call_next):
+        from starlette._utils import get_route_path
+        from .static_cache import cache_policy
+        # Mounted StaticFiles may update root_path while dispatching the request.
+        asset_path = get_route_path(request.scope)
         response = await call_next(request)
-        response.headers["Cache-Control"] = "no-store"
+        response.headers["Cache-Control"] = cache_policy(
+            asset_path, request.method, response.status_code, response.headers)
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"

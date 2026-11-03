@@ -19,7 +19,7 @@ try {
  await expect(roster.getByRole('region',{name:'候補名單',exact:true}).getByText('蔡先生',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'更新名單',exact:true}).click();await expect(page.getByRole('button',{name:'更新名單',exact:true})).toBeEnabled();
  const data=await (await page.request.get(base+`/api/public/competitions/${c.id}/registrations`)).json();assert(data.entries.every(e=>Object.keys(e).sort().join()==='distinguishing_note,name,queue_sequence,status'));
- mkdirSync('public/help',{recursive:true});await roster.screenshot({path:'public/help/roster.png'});copyFileSync('public/help/roster.png','../data/help-preview/static/help/roster.png');
+ mkdirSync('src/assets/help',{recursive:true});await roster.screenshot({path:'src/assets/help/roster.png'});copyFileSync('src/assets/help/roster.png','../data/help-preview/static/help/roster.png');
  await page.setViewportSize({width:390,height:844});await page.reload();await expect(roster.getByText('蔡先生',{exact:true})).toBeVisible();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
  // Verify the read-only closed-state UI against an explicit closed response.
  await page.route('**/api/public/registration-rosters',async route=>{const r=await route.fetch();const rows=await r.json();await route.fulfill({response:r,json:rows.map(x=>x.id===c.id?{...x,effective_registration_open:false}:x)});});

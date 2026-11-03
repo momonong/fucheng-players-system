@@ -67,6 +67,7 @@ test('refuses a different public authority before forwarding credentials', async
   }), { fucheng: { async fetch() { called = true; throw Error('unreachable'); } } });
   assert.equal(called, false);
   assert.equal(response.status, 400);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
 });
 
 for (const headers of [{}, { 'CF-Connecting-IP': 'invalid-header-value' }]) {
@@ -88,5 +89,29 @@ test('unbound and disconnected Service return a noncached maintenance response',
     assert.equal(response.status, 503);
     assert.equal(response.headers.get('Cache-Control'), 'no-store');
     assert.doesNotMatch(await response.text(), /PRIVATE_ERROR_SENTINEL/);
+  }
+});
+
+test('caches only successful hashed build assets explicitly allowed by origin', async () => {
+  for (const path of ['/assets/index-ABcd1234.js', '/assets/screen-ABcd1234.png', '/fucheng/assets/index-ABcd1234.css']) {
+    const type = path.endsWith('.png') ? 'image/png' : path.endsWith('.css') ? 'text/css' : 'text/javascript';
+    const response = await worker.fetch(new Request(origin + path, { headers: { 'CF-Connecting-IP': '192.0.2.10' } }), {
+      fucheng: { async fetch() { return new Response('synthetic', { headers: { 'Cache-Control': 'public, max-age=31536000, immutable', 'Content-Type': type } }); } },
+    });
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
+  }
+});
+
+test('API, HTML, media, cookies, mismatched MIME and errors never gain static caching', async () => {
+  for (const [path, status, extra] of [
+    ['/api/public/members', 200, {}], ['/admin', 200, {}], ['/help/home.png', 200, {}],
+    ['/assets/plain.js', 200, {}], ['/api/assets/index-ABcd1234.js', 200, {}],
+    ['/assets/index-ABcd1234.js', 404, {}], ['/assets/index-ABcd1234.js', 200, { 'Set-Cookie': 'synthetic=one' }],
+    ['/assets/index-ABcd1234.js', 200, { 'Content-Type': 'text/html' }],
+  ]) {
+    const response = await worker.fetch(new Request(origin + path, { headers: { 'CF-Connecting-IP': '192.0.2.10' } }), {
+      fucheng: { async fetch() { return new Response('synthetic', { status, headers: { 'Cache-Control': 'public, max-age=31536000, immutable', 'Content-Type': 'text/javascript', ...extra } }); } },
+    });
+    assert.equal(response.headers.get('Cache-Control'), 'no-store', path);
   }
 });

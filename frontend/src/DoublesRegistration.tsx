@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { doublesRequest, refreshArrangementSession } from './api'
 import { appUrl } from './paths'
+import { publicGet } from './publicReads'
+import { useVisibleRefresh } from './useVisibleRefresh'
 import type { AdminDoublesEntry, Competition, DoublesAudit, DoublesEntry, DoublesRoster, DoublesStatus, PublicCompetition } from './types'
 
 type Candidate = { id: string; name: string; distinguishing_note: string | null }
@@ -67,7 +69,7 @@ function useDoublesWrite(refresh: (receivedReceipt: boolean) => Promise<void>, c
       }
     } finally { busy.current = false }
   }
-  return { phase, message, needsChallenge, locked: phase !== 'idle', isBusy: () => busy.current, send, read }
+  return { phase, message, needsChallenge, locked: phase !== 'idle', isBusy: () => busy.current, isLocked: () => busy.current || pending.current !== null || receivedReceipt.current, send, read }
 }
 function Recovery({ write, retry, canRetry = true }: { write: ReturnType<typeof useDoublesWrite>; retry?: () => void; canRetry?: boolean }) {
   return <>{write.message && <div className="notice error" role="alert">{write.message}</div>}
@@ -144,15 +146,33 @@ export function PublicDoublesRegistration({ competitionId, csrf, sitekey }: { co
   const [formError, setFormError] = useState('')
   const challenge = useChallenge(sitekey, !!mode && !!first && (mode === 1 || !!second))
   const submittedMode = useRef<1 | 2>(1)
-  async function refresh() {
-    const data = await doublesRequest<DoublesRoster>(`/api/public/competitions/${competitionId}/doubles`)
-    setRoster(data); setError('')
+  const readSequence = useRef(0)
+  const mounted = useRef(false)
+  async function refresh(fresh = true, background = false) {
+    if (background && write.isLocked()) return
+    const sequence = ++readSequence.current
+    try {
+      const data = await publicGet<DoublesRoster>(`/api/public/competitions/${competitionId}/doubles`, fresh)
+      if (mounted.current && sequence === readSequence.current && (!background || !write.isLocked())) { setRoster(data); setError('') }
+    } catch (failure) {
+      if (mounted.current && sequence === readSequence.current && (!background || !write.isLocked())) {
+        setError((failure as Error).message)
+        if ((failure as { status?: number }).status === 404) setRoster(null)
+        throw failure
+      }
+    }
   }
   const write = useDoublesWrite(async receivedReceipt => {
     await refresh(); if (!receivedReceipt) return; setSuccess(submittedMode.current === 1 ? '已送出單人登記：等待搭檔。' : '已送出兩人組隊：待管理員確認。')
     setMode(null); setFirst(null); setSecond(null)
   }, csrf, sitekey ? challenge.reset : undefined)
-  useEffect(() => { refresh().catch(error => setError(error.message)) }, [competitionId])
+  useEffect(() => {
+    mounted.current = true; void refresh(false, true).catch(() => {})
+    return () => { mounted.current = false; readSequence.current++ }
+  }, [competitionId])
+  useVisibleRefresh(async fresh => {
+    try { await refresh(fresh, true) } catch { /* refresh owns current-generation errors */ }
+  }, 5000, !write.locked)
   function start(value: 1 | 2, member?: Candidate) { setMode(value); setFirst(member || null); setSecond(null); setSuccess(''); setFormError('') }
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -162,7 +182,7 @@ export function PublicDoublesRegistration({ competitionId, csrf, sitekey }: { co
     setFormError(''); submittedMode.current = mode || 1
     await write.send(`/api/public/competitions/${competitionId}/doubles`, { member_ids: mode === 2 ? [first.id, second!.id] : [first.id], ...(sitekey ? { turnstile_token: challenge.token } : {}) })
   }
-  if (!roster) return <>{error ? <div role="alert">{error}<button onClick={() => refresh().catch(error => setError(error.message))}>重新載入雙打名單</button></div> : <p role="status">載入雙打名單中…</p>}</>
+  if (!roster) return <><Recovery write={write} canRetry={!write.needsChallenge || !!challenge.token} retry={() => void write.send(undefined, undefined, challenge.token)} />{error ? <div role="alert">{error}<button disabled={write.locked} onClick={() => refresh().catch(() => {})}>重新載入雙打名單</button></div> : <p role="status">載入雙打名單中…</p>}</>
   const c = roster.competition
   return <div className="doubles-public"><a href={appUrl('/competitions')}>← 回比賽清單</a>
     <section className="panel public-competition-info"><p className="section-kicker">雙打組隊</p><h2>{c.name}</h2><p>比賽日期：{c.competition_date}</p><p>報名截止：{time(c.registration_deadline)}</p>{c.notes && <p>{c.notes}</p>}<Summary competition={c} /><p>{c.doubles_min_total_level === null ? '本場未設級數合計門檻。' : `兩人級數合計至少 ${c.doubles_min_total_level} 級；未達門檻仍可送出，由管理員確認。`}</p></section>
@@ -177,6 +197,9 @@ export function PublicDoublesRegistration({ competitionId, csrf, sitekey }: { co
           {sitekey && <><div ref={challenge.widget} aria-label="安全驗證" />{!challenge.token && <p role="status">安全驗證中，請稍候…</p>}</>}{challenge.error && <p role="alert">{challenge.error}</p>}
           {formError && <p role="alert">{formError}</p>}<button className="registration-submit" disabled={write.locked || (!!sitekey && !challenge.token)}>{mode === 1 ? '確認送出單人登記' : '確認送出兩人組隊'}</button></div>}
       </form>}</section> : <p className="notice">報名已截止，仍可查看名單。</p>}
+    <div className="section-title"><h2>報名名單</h2><button type="button" className="secondary" disabled={write.locked} onClick={() => refresh().catch(() => {})}>更新名單</button></div>
+    <p>名單會自動更新，也可按「更新名單」重新讀取。</p>
+    {error && <p role="alert">名單更新失敗：{error}</p>}
     {(['waiting_partner', 'pending', 'confirmed', 'waitlisted'] as DoublesStatus[]).map(status => <section className="panel doubles-section" key={status}><h2>{states[status]}（{roster.entries.filter(entry => entry.status === status).length} {status === 'waiting_partner' ? '人' : '隊'}）</h2>
       {roster.entries.filter(entry => entry.status === status).map(entry => <article className="doubles-entry" key={entry.id}><p className="doubles-entry-label">{states[status]}・順位 {entry.sequence}</p><EntryMembers entry={entry} />{status === 'waiting_partner' && c.effective_registration_open && <button disabled={write.locked} aria-label={`和 ${entry.members[0].name} 組隊`} onClick={() => { start(2, { id: entry.members[0].member_id, name: entry.members[0].name, distinguishing_note: entry.members[0].distinguishing_note }); document.querySelector('.registration-form')?.scrollIntoView({ behavior: 'instant', block: 'start' }) }}>和這位組隊</button>}</article>)}
       {!roster.entries.some(entry => entry.status === status) && <p>目前沒有{states[status]}的{status === 'waiting_partner' ? '會員' : '隊伍'}。</p>}</section>)}
