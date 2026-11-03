@@ -1,5 +1,7 @@
 import { appUrl, appPathname } from './paths'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { usePublicNavigation } from './navigation'
+import { useVisibleRefresh } from './useVisibleRefresh'
 import * as api from './api'
 import type { AdminMember, AdminSession, AuditEntry, Diet, MemberDraft, PublicMember } from './types'
 import { CompetitionManager } from './CompetitionManager'
@@ -27,12 +29,18 @@ const emptyDraft: MemberDraft = {
 }
 
 export function App() {
+  const route = usePublicNavigation()
   const adminPage = appPathname().startsWith('/admin')
-  return <><SiteNav />{adminPage ? <AdminPage /> : appPathname() === '/help' ? <HelpPage /> : appPathname() === '/members' ? <PublicPage /> : appPathname() === '/' ? <ClubHome /> : <PublicRegistrationPortal />}</>
+  return <><SiteNav />{adminPage ? <AdminPage /> : <PublicContent key={route} />}</>
+}
+function PublicContent() {
+  const pathname = appPathname()
+  useEffect(() => { document.title = ({ '/': '府城球館', '/members': '會員分級表｜府城球館', '/competitions': '比賽報名｜府城球館', '/help': '使用說明｜府城球館' } as Record<string, string>)[pathname] ?? '比賽報名｜府城球館' }, [pathname])
+  return pathname === '/help' ? <HelpPage /> : pathname === '/members' ? <PublicPage /> : pathname === '/' ? <ClubHome /> : <PublicRegistrationPortal />
 }
 
 function PublicPage({ managed = false }: { managed?: boolean }) {
-  const [members, setMembers] = useState<PublicMember[]>([])
+  const [allMembers, setMembers] = useState<PublicMember[]>([])
   const [printMembers, setPrintMembers] = useState<PublicMember[]>([])
   const [search, setSearch] = useState('')
   const [level, setLevel] = useState('')
@@ -41,22 +49,27 @@ function PublicPage({ managed = false }: { managed?: boolean }) {
   const [preparingPrint, setPreparingPrint] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
 
-  useEffect(() => {
-    let active = true
-    const timer = setTimeout(() => {
-      setLoading(true)
-      setError('')
-      api.publicMembers(search, level)
-        .then(result => { if (active) setMembers(result) })
-        .catch((e: Error) => { if (active) setError(e.message) })
-        .finally(() => { if (active) setLoading(false) })
-    }, 150)
-    return () => { active = false; clearTimeout(timer) }
-  }, [search, level])
-
-  useEffect(() => {
-    api.publicMembers('', '').then(setPrintMembers).catch((e: Error) => setError(e.message))
+  const readSequence = useRef(0)
+  const mounted = useRef(false)
+  const load = useCallback(async (fresh = false) => {
+    const sequence = ++readSequence.current
+    setLoading(true); setError('')
+    try {
+      const rows = await api.publicMembers('', '', fresh)
+      if (mounted.current && sequence === readSequence.current) setMembers(rows)
+    } catch (error) {
+      if (mounted.current && sequence === readSequence.current) setError((error as Error).message)
+    } finally { if (mounted.current && sequence === readSequence.current) setLoading(false) }
   }, [])
+  useEffect(() => {
+    mounted.current = true; void load()
+    return () => { mounted.current = false; readSequence.current++ }
+  }, [load])
+  useVisibleRefresh(load, 30000)
+  const members = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase()
+    return allMembers.filter(member => (!level || member.level === Number(level)) && (!query || member.name.toLocaleLowerCase().includes(query) || (member.distinguishing_note ?? '').toLocaleLowerCase().includes(query)))
+  }, [allMembers, search, level])
 
   const groups = useMemo(() => {
     const map = new Map<number, PublicMember[]>()
@@ -74,7 +87,7 @@ function PublicPage({ managed = false }: { managed?: boolean }) {
     setPreparingPrint(true)
     setError('')
     try {
-      setPrintMembers(await api.publicMembers('', ''))
+      setPrintMembers(await api.publicMembers('', '', true))
       setPrintOpen(true)
     } catch (e) {
       setError((e as Error).message)
@@ -87,7 +100,7 @@ function PublicPage({ managed = false }: { managed?: boolean }) {
     <main className="member-roster-page">
       {!managed && <h1 className="visually-hidden">會員分級表</h1>}
       <section className="filters no-print" aria-label="搜尋與篩選">
-        <label>搜尋姓名或辨識註記<input value={search} onChange={e => setSearch(e.target.value)} placeholder="例如：林先生" type="search" /></label>
+        <label>搜尋姓名或辨識註記<input value={search} onChange={e => setSearch(e.target.value)} placeholder="例如：林先生" type="search" maxLength={100} /></label>
         <label>級數<select value={level} onChange={e => setLevel(e.target.value)}><option value="">全部級數</option>{range(1, 10).map(n => <option key={n}>{n}</option>)}</select></label>
         <button type="button" onClick={printRoster} disabled={preparingPrint}>{preparingPrint ? '準備列印中…' : '列印／另存 PDF'}</button>
       </section>

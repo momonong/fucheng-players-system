@@ -1,5 +1,7 @@
 import { appUrl, appPathname } from './paths'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { publicGet } from './publicReads'
+import { useVisibleRefresh } from './useVisibleRefresh'
 import { doublesRequest, request } from './api'
 import { PublicDoublesRegistration } from './DoublesRegistration'
 import type { Diet, PublicCompetition, DoublesRoster } from './types'
@@ -18,6 +20,7 @@ const states: Record<string, string> = { confirmed: '正取', waitlisted: '候�
 const time = (value: string) => new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Taipei' }).format(new Date(value))
 
 async function publicRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
+  if (!options.method || options.method === 'GET') return publicGet<T>(url)
   let response: Response
   try { response = await fetch(appUrl(url), { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...options.headers } }) }
   catch { throw new Error('連線暫時中斷，請檢查網路後重試') }
@@ -38,16 +41,26 @@ export function PublicRegistrationPortal() {
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
   const [rosterRevision, setRosterRevision] = useState(0)
+  const listSequence = useRef(0)
+  const portalMounted = useRef(false)
+  const [individualLocked, setIndividualLocked] = useState(false)
+  const [rosterAvailable, setRosterAvailable] = useState(true)
+  const writeLock = useRef(false)
+  const lockWrite = useCallback((value: boolean) => { writeLock.current = value; setIndividualLocked(value) }, [])
+  const isWriteLocked = useCallback(() => writeLock.current, [])
   const routeId = appPathname().match(/^\/register\/([^/]+)$/)?.[1]
   useEffect(() => {
     let active = true
+    portalMounted.current = true
+    const sequence = ++listSequence.current
     setLoading(true); setError('')
     Promise.all([
-      publicRequest<RegistrationSession>('/api/public/registration-session'),
+      routeId ? publicRequest<RegistrationSession>('/api/public/registration-session') : Promise.resolve({ csrf_token: '', turnstile_sitekey: null }),
       publicRequest<Competition[]>('/api/public/registration-rosters'),
     ]).then(async ([session, competitions]) => {
       if (!active) return
-      setCsrf(session.csrf_token); setTurnstileSitekey(session.turnstile_sitekey); setItems(competitions)
+      setCsrf(session.csrf_token); setTurnstileSitekey(session.turnstile_sitekey)
+      if (sequence === listSequence.current) setItems(competitions)
       if (routeId) {
         const match = competitions.find(c => c.id === routeId)
         if (match) setSelected(match)
@@ -56,15 +69,23 @@ export function PublicRegistrationPortal() {
           catch { if (active) setError('找不到這場比賽的公開名單，請選擇其他比賽或洽管理員。') }
         }
       }
-    }).catch(e => { if (active) { setError(e.message); setLoading(false) } }).finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
+    }).catch(e => { if (active && sequence === listSequence.current) setError(e.message) }).finally(() => { if (active && sequence === listSequence.current) setLoading(false) })
+    return () => { active = false; portalMounted.current = false; listSequence.current++ }
   }, [retry, routeId])
+  useVisibleRefresh(async fresh => {
+    const sequence = ++listSequence.current
+    try {
+      const values = await publicGet<Competition[]>('/api/public/registration-rosters', fresh)
+      if (portalMounted.current && sequence === listSequence.current) { setItems(values); setError('') }
+    } catch (failure) { if (portalMounted.current && sequence === listSequence.current) setError((failure as Error).message) }
+    finally { if (portalMounted.current && sequence === listSequence.current) setLoading(false) }
+  }, 5000, !routeId)
   return <>
     <main className="public-registration">
       <h1 className="visually-hidden">比賽報名</h1>
       <p className="registration-intro">找到自己的名字，就能報名。不用帳號、不用密碼。</p>
       {loading ? <p role="status">載入比賽中…</p> : error ? <div className="notice error" role="alert">{error}<button onClick={() => setRetry(r => r + 1)}>重新載入</button></div> : selected ?
-        selected.registration_mode === 'doubles' ? <PublicDoublesRegistration key={selected.id} competitionId={selected.id} csrf={csrf} sitekey={turnstileSitekey} /> : <><RegistrationForm key={selected.id} competition={selected} csrf={csrf} turnstileSitekey={turnstileSitekey} onRegistered={() => setRosterRevision(n => n + 1)} /><PublicIndividualRoster competitionId={selected.id} revision={rosterRevision} onUpdate={setSelected} /></> : <>
+        selected.registration_mode === 'doubles' ? <PublicDoublesRegistration key={selected.id} competitionId={selected.id} csrf={csrf} sitekey={turnstileSitekey} /> : <><RegistrationForm key={selected.id} competition={selected} csrf={csrf} turnstileSitekey={turnstileSitekey} onRegistered={() => setRosterRevision(n => n + 1)} onLocked={lockWrite} available={rosterAvailable} /><PublicIndividualRoster competitionId={selected.id} revision={rosterRevision} onUpdate={setSelected} locked={individualLocked} isWriteLocked={isWriteLocked} onAvailability={setRosterAvailable} /></> : <>
           <h2>1. 選擇比賽</h2>
           {!items.length && <div className="panel"><p>目前沒有可查看的比賽。</p><p>如需協助，請洽球館管理員。</p></div>}
           <div className="public-competitions">{items.map(c => <article className="panel" key={c.id}>
@@ -77,23 +98,36 @@ export function PublicRegistrationPortal() {
   </>
 }
 
-function PublicIndividualRoster({ competitionId, revision, onUpdate }: { competitionId: string; revision: number; onUpdate: (competition: Competition) => void }) {
+function PublicIndividualRoster({ competitionId, revision, onUpdate, locked, isWriteLocked, onAvailability }: { competitionId: string; revision: number; onUpdate: (competition: Competition) => void; locked: boolean; isWriteLocked: () => boolean; onAvailability: (available: boolean) => void }) {
   const [roster, setRoster] = useState<IndividualRoster | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [refresh, setRefresh] = useState(0)
-  useEffect(() => {
-    let active = true
+  const readSequence = useRef(0)
+  const mounted = useRef(false)
+  const load = useCallback(async (fresh = false) => {
+    if (isWriteLocked()) return
+    const sequence = ++readSequence.current
     setLoading(true); setError('')
-    publicRequest<IndividualRoster>(`/api/public/competitions/${competitionId}/registrations`)
-      .then(value => { if (active) { setRoster(value); onUpdate(value.competition) } })
-      .catch(e => { if (active) setError(e.message) })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [competitionId, revision, refresh, onUpdate])
+    try {
+      const value = await publicGet<IndividualRoster>(`/api/public/competitions/${competitionId}/registrations`, fresh)
+      if (mounted.current && sequence === readSequence.current && !isWriteLocked()) { setRoster(value); onUpdate(value.competition); onAvailability(true) }
+    } catch (failure) {
+      if (mounted.current && sequence === readSequence.current && !isWriteLocked()) {
+        setError((failure as Error).message)
+        if ((failure as { status?: number }).status === 404) { setRoster(null); onAvailability(false) }
+      }
+    } finally { if (mounted.current && sequence === readSequence.current) setLoading(false) }
+  }, [competitionId, onUpdate, isWriteLocked, onAvailability])
+  useEffect(() => {
+    mounted.current = true; void load(revision > 0)
+    return () => { mounted.current = false; readSequence.current++ }
+  }, [load, revision, refresh])
+  useVisibleRefresh(fresh => load(fresh), 5000, !locked)
+
   return <section className="public-roster" aria-label="比賽報名名單">
-    <div className="section-title"><h2>報名名單</h2><button type="button" className="secondary" disabled={loading} onClick={() => setRefresh(n => n + 1)}>{loading ? '更新中…' : '更新名單'}</button></div>
-    <p>依報名順序顯示；同名時請核對註記。候補需由管理員確認遞補。</p>
+    <div className="section-title"><h2>報名名單</h2><button type="button" className="secondary" disabled={loading || locked} onClick={() => setRefresh(n => n + 1)}>{loading ? '更新中…' : '更新名單'}</button></div>
+    <p>名單會自動更新，依報名順序顯示；同名時請核對註記。候補需由管理員確認遞補。</p>
     {error && <p className="notice error" role="alert">名單更新失敗：{error}。請按「更新名單」重試。</p>}
     {loading && !roster && <p role="status">載入名單中…</p>}
     {roster && <div className="public-roster-groups">{(['confirmed', 'waitlisted'] as const).map(status => {
@@ -112,7 +146,7 @@ function CompetitionInfo({ competition: c }: { competition: Competition }) {
     {c.waitlisted > 0 && c.remaining > 0 && <p>空缺由管理員依序確認候補，新報名會加入候補。</p>}</>
 }
 
-function RegistrationForm({ competition: c, csrf, turnstileSitekey, onRegistered }: { competition: Competition; csrf: string; turnstileSitekey: string | null; onRegistered: () => void }) {
+function RegistrationForm({ competition: c, csrf, turnstileSitekey, onRegistered, onLocked, available }: { competition: Competition; csrf: string; turnstileSitekey: string | null; onRegistered: () => void; onLocked: (locked: boolean) => void; available: boolean }) {
   const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [member, setMember] = useState<Candidate | null>(null)
@@ -122,6 +156,8 @@ function RegistrationForm({ competition: c, csrf, turnstileSitekey, onRegistered
   const [searchError, setSearchError] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [unknown, setUnknown] = useState(false)
+  const uncertain = useRef(false)
   const [result, setResult] = useState<Result | null>(null)
   const [turnstileToken, setTurnstileToken] = useState('')
   const [turnstileError, setTurnstileError] = useState('')
@@ -171,7 +207,7 @@ function RegistrationForm({ competition: c, csrf, turnstileSitekey, onRegistered
     event.preventDefault()
     if (!member || lock.current) return
     if (turnstileSitekey && !turnstileToken) { setSubmitError('請稍候，完成安全驗證後再送出'); return }
-    lock.current = true; setBusy(true); setSubmitError('')
+    lock.current = true; onLocked(true); setBusy(true); setSubmitError('')
     const signature = `${member.id}:${diet}`
     if (pending.current?.signature !== signature) pending.current = { signature, key: crypto.randomUUID() }
     try {
@@ -180,10 +216,12 @@ function RegistrationForm({ competition: c, csrf, turnstileSitekey, onRegistered
         body: JSON.stringify({ member_id: member.id, diet, request_id: pending.current.key,
           ...(turnstileSitekey ? { turnstile_token: turnstileToken } : {}) }),
       })
-      setResult(receipt); onRegistered()
+      uncertain.current = false; setUnknown(false); onLocked(false); setResult(receipt); onRegistered()
     } catch (e) {
       const failure = e as Error & { status?: number }
       setSubmitError(failure.message)
+      if (!failure.status || failure.status >= 500 || uncertain.current) { uncertain.current = true; setUnknown(true) }
+      else onLocked(false)
       // Network uncertainty keeps the same token/key for receipt readback;
       // a definite challenge failure gets a fresh token and keeps the key.
       if (failure.status === 422 || failure.status === 503) resetTurnstile()
@@ -200,18 +238,18 @@ function RegistrationForm({ competition: c, csrf, turnstileSitekey, onRegistered
   return <>
     <a href={appUrl("/competitions")}>← 回比賽清單</a>
     <section className="panel public-competition-info"><h2>{c.name}</h2><CompetitionInfo competition={c} /></section>
-    {!c.effective_registration_open ? <p className="notice">報名已截止，仍可查看下方名單。</p> : <form className="panel registration-form" onSubmit={submit}>
+    {(!c.effective_registration_open || !available) && !unknown ? <p className="notice">{available ? '報名已截止，仍可查看下方名單。' : '目前無法讀取這場比賽，暫停新報名；請洽管理員確認。'}</p> : <form className="panel registration-form" onSubmit={submit}>
       <h2>2. 找到自己的名字</h2>
-      <label>搜尋姓名<input type="search" value={query} onChange={e => { setQuery(e.target.value); setMember(null); setSubmitError('') }} placeholder="輸入自己的名字" maxLength={100} disabled={busy} /></label>
+      <label>搜尋姓名<input type="search" value={query} onChange={e => { setQuery(e.target.value); setMember(null); setSubmitError('') }} placeholder="輸入自己的名字" maxLength={100} disabled={busy || unknown} /></label>
       {searching && <p role="status">搜尋中…</p>}{searchError && <p role="alert">{searchError}</p>}
       {searched && !searching && !candidates.length && <p>找不到名字，請洽管理員協助，不用另外註冊。</p>}
       {searched && candidates.length === 20 && <p>符合的名字較多，請輸入更完整的姓名。</p>}
-      {!searching && <div className="public-candidates">{candidates.map(item => <button type="button" disabled={busy} aria-pressed={member?.id === item.id} key={item.id} onClick={() => { setMember(item); setSubmitError('') }}>
+      {!searching && <div className="public-candidates">{candidates.map(item => <button type="button" disabled={busy || unknown} aria-pressed={member?.id === item.id} key={item.id} onClick={() => { setMember(item); setSubmitError('') }}>
         <strong>{item.name}</strong><span>{item.distinguishing_note || '無辨識註記'}{member?.id === item.id ? ' ✓ 已選取' : ''}</span>
       </button>)}</div>}
       {member && <>
         <h2>3. 選擇這次的葷素</h2>
-        <fieldset className="meal-options"><legend>當次餐食</legend>{mealOptions.map(value => <label key={value}><input type="radio" name="meal" value={value} checked={diet === value} disabled={busy} onChange={() => setDiet(value)} />{diets[value]}</label>)}</fieldset>
+        <fieldset className="meal-options"><legend>當次餐食</legend>{mealOptions.map(value => <label key={value}><input type="radio" name="meal" value={value} checked={diet === value} disabled={busy || unknown} onChange={() => setDiet(value)} />{diets[value]}</label>)}</fieldset>
         <div className="registration-confirm"><h2>4. 確認報名</h2><p>姓名：<strong>{member.name}</strong>{member.distinguishing_note && `（${member.distinguishing_note}）`}</p><p>餐食：{diets[diet]}</p><p>請確認選到自己的名字，同名時請核對註記。</p></div>
         {turnstileSitekey && <div className="registration-security"><div ref={widget} aria-label="安全驗證" />{turnstileError && <p role="alert">{turnstileError}</p>}</div>}
         {submitError && <div className="notice error" role="alert">{submitError}<p>姓名與餐食已保留。若已送出但不確定結果，可再試一次或洽管理員確認。</p></div>}

@@ -1,4 +1,6 @@
 import { appUrl, appPathname } from './paths'
+import { helpImages } from './helpImages'
+import { publicGet } from './publicReads'
 import { useEffect, useRef, useState } from 'react'
 import { request } from './api'
 import { logout } from './api'
@@ -21,6 +23,7 @@ export function SiteNav() {
     return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', escape) }
   }, [])
   const pathname = appPathname()
+  useEffect(() => { if (more.current) more.current.open = false }, [pathname])
   return <nav className={`site-nav no-print ${pathname.startsWith('/admin') ? 'admin-site-nav' : ''}`} aria-label="網站導覽">
     <a className="site-brand" href={appUrl("/")}>府城球館<span>一起打球，一起進步。</span></a>
     <div>{[['/', '最新消息'], ['/members', '會員分級表'], ['/competitions', '比賽報名'], ['/help', '使用說明']].map(([href, label]) => <a key={href} href={appUrl(href)} aria-current={(pathname === href || (href === '/competitions' && pathname.startsWith('/register/'))) ? 'page' : undefined}>{label}</a>)}<details className="nav-more" ref={more}><summary aria-label="更多選項"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg></summary><div className="nav-more-popover"><a href={appUrl("/admin")}>管理後台</a></div></details></div>
@@ -36,7 +39,7 @@ export function ClubHome() {
   useEffect(() => {
     let active = true
     setLoading(true); setError('')
-    Promise.all([request<Announcement[]>('/api/public/announcements'), request<Schedule[]>('/api/public/schedule')])
+    Promise.all([publicGet<Announcement[]>('/api/public/announcements'), publicGet<Schedule[]>('/api/public/schedule')])
       .then(([news, events]) => { if (active) { setAnnouncements(news); setSchedule(events) } })
       .catch(e => { if (active) setError(e.message) }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -50,7 +53,7 @@ export function ClubHome() {
       {loading && <p role="status">載入球館消息中…</p>}
       {error && <div className="notice error" role="alert">{error}<button onClick={() => setRetry(n => n + 1)}>重新載入</button></div>}
       {!loading && !error && <div className="home-columns"><section aria-labelledby="news-title"><div className="home-section-title"><p className="section-kicker">NEWS</p><h2 id="news-title">最新公告</h2></div>
-        <article className="panel news-card guide-announcement"><span className="news-pin">使用指南</span><h3>第一次使用？從這裡開始。</h3><p>按右上方「使用說明」，跟著每一步的畫面，學會查詢會員、報名比賽與查看名單。手機也可以使用。</p><a className="guide-nav-example" href={appUrl("/help")}><img src={appUrl("/help/help-button.png")} alt="網站右上角的使用說明按鈕位置" width="560" height="70" /></a><a href={appUrl("/help")}>查看使用說明 →</a></article>
+        <article className="panel news-card guide-announcement"><span className="news-pin">使用指南</span><h3>第一次使用？從這裡開始。</h3><p>按右上方「使用說明」，跟著每一步的畫面，學會查詢會員、報名比賽與查看名單。手機也可以使用。</p><a className="guide-nav-example" href={appUrl("/help")}><img src={helpImages['help-button']} alt="網站右上角的使用說明按鈕位置" width="560" height="70" /></a><a href={appUrl("/help")}>查看使用說明 →</a></article>
         {!announcements.length && <div className="panel"><p>目前沒有其他新公告。</p><p>比賽時程與會員分級表仍可隨時查看。</p></div>}
         {announcements.map(item => <article className="panel news-card" key={item.id}><div className="news-meta">{item.is_pinned && <span className="news-pin">置頂公告</span>}{item.published_at && <time dateTime={item.published_at}>{dateTime(item.published_at)}</time>}</div><h3>{item.title}</h3><AnnouncementBody item={item} />{item.photo_id && <img className="announcement-photo" src={appUrl(`/api/public/announcement-media/${item.photo_id}`)} alt={`${item.title}公告照片`} />}</article>)}
       </section><section aria-labelledby="schedule-title"><div className="home-section-title"><p className="section-kicker">MATCH CALENDAR</p><h2 id="schedule-title">比賽時程</h2></div>
