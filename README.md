@@ -6,6 +6,7 @@
 下列 `momonong.me/fucheng/` 發布段落均為歷史，不是目前入口。
 請從[球館部署與維運指南](docs/club-deployment-runbook.md)開始；Cloudflare 設定及
 故障接續見 [Workers VPC 文件](docs/club-workers-vpc.md)。
+1.4.1 新增[備份輪替](docs/release-1.4.1.md)，週備份與升級前備份各保留最近兩組通過驗證的完整副本，升級收據保留。球館更新請使用 [1.4.1 更新指南](docs/club-vpc-upgrade-1.4.1.md)。
 1.4.0 改善[快取、公開切頁與即時名單](docs/release-1.4.0.md)，會員搜尋／篩選由瀏覽器處理，報名名單於可見頁面約每五秒同步。
 1.3→1.4 使用[新版球館更新指南](docs/club-vpc-upgrade-1.4.0.md)與 Release 的固定指令，原帳號與資料保留；1.4 球館現場更新仍待執行。
 保留舊版 tag，`momonong.me` 的其他功能不變。1.3.0 的[使用說明與公開名單](docs/release-1.3.0.md)及[1.2→1.3 更新指南](docs/club-vpc-upgrade.md)保留作歷史參考。

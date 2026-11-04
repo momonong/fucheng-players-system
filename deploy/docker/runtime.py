@@ -198,31 +198,41 @@ def record(action, **details):
     atomic_json(directory / f"{stamp()}-{action}.json", dict(action=action, **details))
 
 
+def verified_weekly(metadata):
+    if not re.fullmatch(r"weekly-\d{8}-\d{8}T\d+Z-[0-9a-f]{8}\.json", metadata.name):
+        return None
+    database = metadata.with_suffix(".db")
+    media = metadata.with_suffix(".media.tar")
+    if any(path.is_symlink() or not path.is_file() for path in (metadata, database, media)):
+        return None
+    try:
+        info = json.loads(metadata.read_text())
+        due = datetime.fromisoformat(info["scheduled_for"])
+        if (due.tzinfo is None or due != latest_weekly_due(due)
+                or not metadata.name.startswith(f"weekly-{due:%Y%m%d}-")
+                or info.get("file") != database.name
+                or hashlib.sha256(database.read_bytes()).hexdigest() != info.get("sha256")
+                or verified_media_archive(database, info) != media):
+            return None
+        inspect_db(database)
+        return info, due
+    except (OSError, ValueError, KeyError, TypeError, OverflowError, sqlite3.Error, tarfile.TarError, SystemExit):
+        return None
+
+
 def completed_weekly(due):
-    prefix = f"weekly-{due:%Y%m%d}-"
-    for metadata in sorted(BACKUPS.glob(prefix + "*.json"), reverse=True):
-        try:
-            info = json.loads(metadata.read_text())
-            database = metadata.with_suffix(".db")
-            if (info.get("scheduled_for") != due.isoformat() or info.get("file") != database.name
-                    or not database.is_file() or hashlib.sha256(database.read_bytes()).hexdigest() != info.get("sha256")):
-                continue
-            verified_media_archive(database, info)
-            inspect_db(database)
-            return info
-        except (OSError, ValueError, KeyError, SystemExit):
-            continue
+    for metadata in sorted(BACKUPS.glob(f"weekly-{due:%Y%m%d}-*.json"), reverse=True):
+        group = verified_weekly(metadata)
+        if group and group[1] == due:
+            return group[0]
     return None
 
 
 def newest_completed_weekly():
     for metadata in sorted(BACKUPS.glob("weekly-*.json"), reverse=True):
-        try:
-            due = datetime.fromisoformat(json.loads(metadata.read_text())["scheduled_for"])
-            if completed_weekly(due):
-                return due
-        except (OSError, ValueError, KeyError, TypeError):
-            continue
+        group = verified_weekly(metadata)
+        if group:
+            return group[1]
     return None
 
 
@@ -241,7 +251,7 @@ def backup_once(*, automatic=False, due=None):
     with lock("backup.lock"):
         if MAINTENANCE.exists():
             raise SystemExit("Maintenance active; scheduled backup postponed")
-        keep = int(os.getenv("FUCHENG_BACKUP_KEEP", "8"))
+        keep = int(os.getenv("FUCHENG_BACKUP_KEEP", "2"))
         if keep < 2:
             raise SystemExit("Retention must keep at least two weekly backups")
         if automatic and due is None:
@@ -252,27 +262,23 @@ def backup_once(*, automatic=False, due=None):
                 return previous
         prefix = f"weekly-{due:%Y%m%d}" if automatic else "manual"
         result = snapshot(active_path(), prefix, scheduled_for=due.isoformat() if due else None)
-        # Only verified weekly groups are retained/deleted. Manual, pre-update,
-        # pre-restore, exports, and historical daily archives are untouched.
         if automatic:
-            complete = []
-            for candidate in sorted(BACKUPS.glob("weekly-*.db"), reverse=True):
+            complete = [
+                metadata for metadata in sorted(BACKUPS.glob("weekly-*.json"), reverse=True)
+                if verified_weekly(metadata)
+            ]
+            newest = (BACKUPS / result["file"]).with_suffix(".json")
+            if newest not in complete:
+                raise SystemExit("New weekly backup could not be verified")
+            for metadata in complete[keep:]:
                 try:
-                    info = json.loads(candidate.with_suffix(".json").read_text())
-                    if (info.get("file") == candidate.name and
-                            hashlib.sha256(candidate.read_bytes()).hexdigest() == info.get("sha256")):
-                        verified_media_archive(candidate, info)
-                        complete.append(candidate)
-                except (OSError, ValueError, KeyError, SystemExit):
-                    continue
-            for old in complete[keep:]:
-                metadata = old.with_suffix(".json")
-                if not metadata.is_file() or not old.with_suffix(".media.tar").is_file():
-                    continue
-                old.unlink()
-                old.with_suffix(".media.tar").unlink()
-                metadata.unlink()
-        if automatic:
+                    metadata.with_suffix(".db").unlink()
+                    metadata.with_suffix(".media.tar").unlink()
+                    metadata.unlink()
+                except OSError:
+                    print("BACKUP RETENTION INCOMPLETE: inspect backup directory permissions",
+                          file=sys.stderr, flush=True)
+                    break
             atomic_json(DATA / "backup-status.json", dict(ok=True, timestamp=time.time(),
                 last_success_at=time.time(), last_schedule=due.isoformat(), **result))
         print(json.dumps(result), flush=True)
