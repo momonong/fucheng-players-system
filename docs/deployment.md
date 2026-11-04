@@ -212,7 +212,7 @@ Windows 主機健檢的外網 opt-in 改用 `-PreviewOrigin https://momonong.me 
    FUCHENG_APP_IP=172.30.98.2
    FUCHENG_PROXY_IP=172.30.98.3
    FUCHENG_BACKUP_PATH=./backup
-   FUCHENG_BACKUP_KEEP=8
+   FUCHENG_BACKUP_KEEP=2
    FUCHENG_NGROK_CONFIG_FILE=./secrets/ngrok.yml
    ```
 
@@ -278,7 +278,16 @@ Cloudflare profile 的 app 只開 origin internal network 與 Siteverify 所需�
 
 可先在 Cloudflare Free WAF 對 `/api/public/` 加一條計數規則，依實際共享 Wi-Fi 流量設寬鬆門檻，觀察 429／誤攔；再用少量自訂規則擋明顯異常路徑／方法。Free 方案目前提供 [5 條自訂規則](https://developers.cloudflare.com/waf/custom-rules/)與 [1 條 rate limiting rule](https://developers.cloudflare.com/waf/rate-limiting-rules/)；不要依賴付費 bot score、regex 或對 API 套回 HTML 的 Managed Challenge。app 自身另有重啟即清空的有限記憶體入站節流、64 個並發上限、查詢長度與 body／傳送時間上限；既有 SQLite 限流、CSRF、session、version、request_id 及稽核仍保留。共享 IP 可能碰到 429；這不是身分驗證，也不保證抵禦分散式攻擊。正式門檻應在實際流量觀察後調整，不能把合成測試當成誤攔率證據。
 
-`backup` 容器每分鐘依 `Asia/Taipei` 曆法檢查：每週一 04:00 到期，啟動時補做一次最新漏跑週次；維護中或失敗會重試，同週已驗證成組備份不重做。`FUCHENG_BACKUP_KEEP=8` 可調，僅成功完成且 hash 可核對的 `weekly-*.db/.json/.media.tar` 成組計入並刪除超額週備份；手動、更新前、還原前及舊每日檔不受此 retention 影響。`backup/` 是 host bind，只有 backup／ops 掛載；一般 app 看不到備份。每組以 SQLite Backup API 複製 DB，再核對資料庫完整性／外鍵、媒體檔、archive hash，metadata 保存 image ref、schema、manifest hash 與公開 origin／proxy 種類，不保存 secret。管理員頁只顯示最近成功、失敗或逾期；失敗不清理已完成備份。`docker compose --env-file .env -f compose.yaml -f compose.cloudflare.yaml run --rm ops backup` 是額外手動 checkpoint，不能取代週排程。單一主機備份受同機故障影響，最壞資料損失可能接近一週；需另行規劃異地加密匯出。真正災難還原仍未在球館環境演練。
+`backup` 容器每分鐘依 `Asia/Taipei` 曆法檢查：每週一 04:00 到期，啟動時補做一次最新漏跑週次；維護中或失敗會重試，同週已驗證成組備份不重做。`FUCHENG_BACKUP_KEEP=2` 預設保留最近兩組，可設為更大的整數。只有新週備份通過資料庫、媒體封存及雜湊驗證後，才清理超額的完整週備份。`backup/` 是 host bind，只有 backup／ops 掛載；一般 app 看不到備份。每組以 SQLite Backup API 複製 DB，再核對資料庫完整性／外鍵、媒體檔、archive hash，metadata 保存 image ref、schema、manifest hash 與公開 origin／proxy 種類，不保存 secret。管理員頁只顯示最近成功、失敗或逾期；失敗不清理已完成備份。`docker compose --env-file .env -f compose.yaml -f compose.cloudflare.yaml run --rm ops backup` 是額外手動 checkpoint，不能取代週排程。單一主機備份受同機故障影響，最壞資料損失可能接近一週；需另行規劃異地加密匯出。真正災難還原仍未在球館環境演練。
+
+### 球館備份輪替
+
+球館使用新版 [PowerShell 更新器](../deploy/docker/club-vpc-upgrade-retention.ps1) 從正式 1.3.0 或 1.4.0 升級時，會核對原始 Compose 與完整收據鏈，並在切換映像時把例行保留份數改為兩組。現有週備份會在下一次成功完成週備份後輪替。
+
+升級成功且公開健康檢查通過後，更新器按收據鏈保留最近兩組通過驗證的升級前備份。舊組的資料庫、媒體封存及備份描述檔會一起退出保留範圍。升級收據、原 Compose 副本及操作紀錄留供後續核對。無法驗證的備份會保留並提示，清理失敗會顯示警告。
+
+部署前檢查點、獨立手動備份、還原前備份及匯出檔由管理者保管。輪替需要安裝支援此規則的映像及更新器。正式更新使用發布時固定的映像 digest 與腳本雜湊。
+
 
 還原只經 runtime 的受鎖 `restore` 操作：驗 `.db/.json/.media.tar` 與相符 image/schema，在新目標 DB 還原、再次跑 integrity／FK、核對媒體後才切換 active pointer；舊 DB／故障資料保留，舊管理員 session 在新目標失效，稽核 actor 歷史保留。不得直接覆蓋 named volume、以舊 app 開新 schema 或把備份 bind 掛回普通 app。人工部署／切換入口、真實資料遷移、正式密鑰與外部網域均需另外的交付授權。
 

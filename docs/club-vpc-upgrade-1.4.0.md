@@ -1,5 +1,7 @@
 # 球館 1.3.0 → 1.4.0 更新
 
+本頁對應 v1.4.0 的固定發布。新版輪替規則與更新器見[球館備份輪替](deployment.md#球館備份輪替)。
+
 從 [v1.4.0 Release](https://github.com/momonong/fucheng-players-system/releases/tag/v1.4.0) 下載 `update-club-v1.4.0.ps1`，將整段貼進球館 PowerShell。它自動下載固定 Git commit 的更新器、驗證 SHA256，再使用固定映像 manifest／config ID 更新；不用 Git Bash、不用傳資料夾，也不需重新輸入現有金鑰。請先儲存管理後台的編輯；更新期間網站會短暫無法使用。
 
 下列只說明內部參數介面，含佔位字，不是可貼上的現場指令：

@@ -4,12 +4,14 @@ from pathlib import Path
 import pytest
 
 HERE=Path(__file__).resolve().parents[1]
-SCRIPT=HERE/'deploy/docker/club-vpc-upgrade-1.4.0.ps1'
+SCRIPT=HERE/'deploy/docker/club-vpc-upgrade-retention.ps1'
 PWSH=Path(os.environ.get('FUCHENG_TEST_PWSH','pwsh'))
 if not __import__('shutil').which(str(PWSH)):
     pytest.skip('PowerShell runtime is not configured', allow_module_level=True)
 OLD='momonong/fucheng-players-system@sha256:9b8931bd9042d932cbb0ff4f3b30fba82390d9478bac38a9444780efbe919e1e'
 OLD_ID='sha256:63da2c4ddd162c56d2e68e7a7b88a02978081e857b1b850620af109c43564925'
+V140='momonong/fucheng-players-system@sha256:ee43b382014048d2fc12ed6a6a58c27563eee1cc9ae6ffba1cd9c0451a85e48e'
+V140_ID='sha256:3adc4ee8ee494b4e25b2ea12b929b8a15a6d1449a1f624356b8b0b44823a4ca0'
 NEW='momonong/fucheng-players-system@sha256:'+'a'*64
 NEW_ID='sha256:'+'b'*64
 
@@ -67,6 +69,32 @@ if($mode -eq 'multiple_prior'){
  [IO.File]::WriteAllText((Join-Path $d 'upgrade-journal.json'),($p|ConvertTo-Json -Depth 10))
 }
 
+if($mode -cin @('from_140','from_140_bad_backup','from_140_failure','from_140_wrong_link','from_140_retention_retry')){
+ function Seed-RetentionBackup($Directory,$Receipt){
+  $db=Join-Path $Directory $Receipt.backup.file
+  $media=Join-Path $Directory $Receipt.backup.media_file
+  [IO.File]::WriteAllText($db,'synthetic database')
+  [IO.File]::WriteAllText($media,'synthetic archive')
+  $Receipt.backup.sha256=(Get-FileHash $db).Hash.ToLowerInvariant()
+  $Receipt.backup.media_sha256=(Get-FileHash $media).Hash.ToLowerInvariant()
+  $metadata=@{file=$Receipt.backup.file;sha256=$Receipt.backup.sha256;media_file=$Receipt.backup.media_file;media_sha256=$Receipt.backup.media_sha256;revision=$Receipt.backup.schema;integrity='ok';foreign_key_errors=0;restore_config=@{image_ref=$Receipt.old_image;public_origin=$origin;base_path='';proxy_kind='cloudflare'}}
+  [IO.File]::WriteAllText(($db -replace '\.db$','.json'),($metadata|ConvertTo-Json -Depth 5))
+  [IO.File]::WriteAllText((Join-Path $Directory 'upgrade-journal.json'),($Receipt|ConvertTo-Json -Depth 10))
+ }
+ Seed-RetentionBackup $priorDir $prior
+ $script:priorJournal=[IO.File]::ReadAllText((Join-Path $priorDir 'upgrade-journal.json'))
+ $v140Dir=Join-Path $r ('backup/upgrade-'+('d'*32))
+ $null=New-Item -ItemType Directory $v140Dir
+ $previous=FixtureReceipt ('d'*32) $oldImage $oldImageId V140REF V140ID '8'
+ $previous['previous_upgrade_id']=if($mode -eq 'from_140_wrong_link'){'0'*32}else{$prior.id}
+ Seed-RetentionBackup $v140Dir $previous
+ [IO.File]::WriteAllText((Join-Path $v140Dir 'compose.before.yml'),$text)
+ [IO.File]::WriteAllText((Join-Path $v140Dir 'owner.before.txt'),('fucheng-vpc-full-v1|'+(Get-VpcHash $text)))
+ $text=$text.Replace($oldImage,V140REF)
+ [IO.File]::WriteAllText((Join-Path $r 'compose.yml'),$text)
+ [IO.File]::WriteAllText((Join-Path $r 'owner.txt'),('fucheng-vpc-full-v1|'+(Get-VpcHash $text)))
+ if($mode -eq 'from_140_bad_backup'){[IO.File]::AppendAllText((Join-Path $v140Dir $previous.backup.media_file),'corrupt')}
+}
 if($mode -eq 'recipe'){[IO.File]::AppendAllText((Join-Path $r 'compose.yml'),'DRIFT')}
 $script:states=@{app='running';backup='running';cloudflared='running'}
 $script:realIdentity=${function:Assert-UpgradeIdentity}
@@ -90,7 +118,7 @@ function Assert-UpgradeIdentity([string]$Ref,[string]$ImageId,[bool]$RequireHeal
  $out=@();foreach($n in @('app','backup','cloudflared')){$out+=,[pscustomobject]@{service=$n;id=(@{app='1';backup='2';cloudflared='3'}[$n]*64);name=('fucheng-'+$n);state=$script:states[$n]}}
  return ,$out
 }
-function Test-DeployPublic {return ($mode -ne 'public')}
+function Test-DeployPublic {return ($mode -cnotin @('public','from_140_failure'))}
 function Invoke-VpcChecked([string[]]$Arguments,[int]$Limit=15) {
  $script:calls.Add(@($Arguments));$a=$Arguments
  if($a[0] -eq 'context'){if($mode -eq 'remote'){return 'tcp://evil:2376'};return 'npipe:////./pipe/dockerDesktopLinuxEngine'}
@@ -133,12 +161,29 @@ if($mode -eq 'partial' -or $mode -eq 'complete'){
  $u=Join-Path $r ('backup/upgrade-'+('a'*32));$null=New-Item -ItemType Directory $u
  $j=FixtureReceipt ('a'*32) $oldImage $oldImageId TARGET IMAGEID '8';if($mode -eq 'partial'){$j.phase='BACKUP_PENDING'};$j['previous_upgrade_id']=$prior.id
  [IO.File]::WriteAllText((Join-Path $u 'upgrade-journal.json'),($j|ConvertTo-Json -Depth 10));[IO.File]::WriteAllText((Join-Path $u 'compose.before.yml'),$text);[IO.File]::WriteAllText((Join-Path $u 'owner.before.txt'),('fucheng-vpc-full-v1|'+(Get-VpcHash $text)))
- if($mode -eq 'complete'){$text=$text.Replace($oldImage,TARGET);[IO.File]::WriteAllText((Join-Path $r 'compose.yml'),$text);[IO.File]::WriteAllText((Join-Path $r 'owner.txt'),('fucheng-vpc-full-v1|'+(Get-VpcHash $text)))}
+ if($mode -eq 'complete'){$text=$text.Replace($oldImage,TARGET).Replace('FUCHENG_BACKUP_KEEP: "8"','FUCHENG_BACKUP_KEEP: "2"');[IO.File]::WriteAllText((Join-Path $r 'compose.yml'),$text);[IO.File]::WriteAllText((Join-Path $r 'owner.txt'),('fucheng-vpc-full-v1|'+(Get-VpcHash $text)))}
+}
+if($mode -eq 'from_140_retention_retry'){
+ $script:retentionImpl=${function:Remove-SupersededUpgradeBackups}
+ $script:interrupted=$true
+ function Remove-SupersededUpgradeBackups([object[]]$NewestFirst){
+  if($script:interrupted){$script:interrupted=$false;return}
+  & $script:retentionImpl $NewestFirst
+ }
 }
 $env:DOCKER_HOST='';Invoke-ClubUpgrade TARGET IMAGEID
+if($mode -eq 'from_140_retention_retry'){
+ $finalJournal=@(Get-ChildItem -LiteralPath (Join-Path $r 'backup') -Directory -Filter 'upgrade-*'|Where-Object {$_.Name -cne ('upgrade-'+('c'*32)) -and $_.Name -cne ('upgrade-'+('d'*32))})
+ if($finalJournal.Count -ne 1){throw 'FIXTURE_JOURNAL_UNCONFIRMED'}
+ $finalPath=Join-Path $finalJournal[0].FullName 'upgrade-journal.json'
+ $savedJournal=[IO.File]::ReadAllText($finalPath)
+ Invoke-ClubUpgrade TARGET IMAGEID
+ if($savedJournal -cne [IO.File]::ReadAllText($finalPath)){throw 'RECEIPT_CHANGED'}
+}
+if($mode -eq 'from_140'){Invoke-ClubUpgrade TARGET IMAGEID}
 [IO.File]::WriteAllText(CALLS,(@{calls=$calls.ToArray();states=$states;historical_unchanged=($oldJournal -ceq [IO.File]::ReadAllText((Join-Path $r 'deploy-journal.json')));prior_unchanged=($priorJournal -ceq [IO.File]::ReadAllText((Join-Path $priorDir 'upgrade-journal.json')))}|ConvertTo-Json -Depth 12))
 '''
-    for k,v in [('MODE',q(mode)),('ROOT',q(root)),('TARGET',q(NEW)),('IMAGEID',q(NEW_ID)),('CALLS',q(calls))]:body=body.replace(k,v)
+    for k,v in [('MODE',q(mode)),('ROOT',q(root)),('TARGET',q(NEW)),('IMAGEID',q(NEW_ID)),('CALLS',q(calls)),('V140REF',q(V140)),('V140ID',q(V140_ID))]:body=body.replace(k,v)
     r=ps(tmp_path,body)
     assert calls.exists(),r.stdout+r.stderr
     return r,json.loads(calls.read_text()),root
@@ -348,3 +393,40 @@ def test_cleanup_preserves_global_unknown_resource_failure_after_stopping_known_
     j=json.loads(next(p for p in root.glob('backup/upgrade-*/upgrade-journal.json') if p.parent.name!='upgrade-'+'c'*32).read_text())
     assert j['stop_confirmed'] is False
     assert not any(a[0]=='stop' and a[-1]=='9'*64 for a in s['calls'])
+
+
+@pytest.mark.parametrize("mode", ["from_140", "from_140_bad_backup", "from_140_failure", "from_140_wrong_link"])
+def test_upgrade_rotates_only_after_two_verified_checkpoints_and_keeps_receipts(tmp_path, mode):
+    result, state, root = invoke(tmp_path, mode)
+    checkpoints = root / "backup"
+    oldest = checkpoints / ("upgrade-" + "c" * 32)
+    previous = checkpoints / ("upgrade-" + "d" * 32)
+    assert state["historical_unchanged"] and state["prior_unchanged"]
+    for directory in (oldest, previous):
+        assert (directory / "upgrade-journal.json").is_file()
+        assert (directory / "compose.before.yml").is_file()
+        assert (directory / "owner.before.txt").is_file()
+    assert len(list(previous.glob("manual-*"))) == 3
+    if mode == "from_140_wrong_link":
+        assert "code=JOURNAL_INVALID" in result.stdout
+        assert not any(call[0] in ("stop", "create", "compose") for call in state["calls"])
+    elif mode == "from_140_failure":
+        assert "code=PUBLIC_HEALTH_UNCONFIRMED" in result.stdout
+    else:
+        assert "COMPLETE" in result.stdout, result.stdout + result.stderr
+        assert 'FUCHENG_BACKUP_KEEP: "2"' in (root / "compose.yml").read_text()
+        newest, = set(checkpoints.glob("upgrade-*")) - {oldest, previous}
+        assert len(list(newest.glob("manual-*"))) == 3
+        assert json.loads((newest / "upgrade-journal.json").read_text())["previous_upgrade_id"] == "d" * 32
+    assert len(list(oldest.glob("manual-*"))) == (0 if mode == "from_140" else 3)
+    if mode == "from_140":
+        assert "既有目標映像身份" in result.stdout
+        assert sum(call[0] == "pull" for call in state["calls"]) == 1
+
+
+def test_complete_rerun_finishes_retention_after_interruption(tmp_path):
+    result, state, root = invoke(tmp_path, "from_140_retention_retry")
+    assert "既有目標映像身份" in result.stdout, result.stdout + result.stderr
+    assert len(list((root / "backup" / ("upgrade-" + "c" * 32)).glob("manual-*"))) == 0
+    assert state["historical_unchanged"] and state["prior_unchanged"]
+    assert sum(call[0] == "pull" for call in state["calls"]) == 1

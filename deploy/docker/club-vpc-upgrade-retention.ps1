@@ -1,12 +1,14 @@
 ﻿#requires -Version 5.1
 param([string]$TargetImage,[string]$ExpectedImageId)
-# Code-only 1.3.0 -> 1.4.0 update; requires the completed 1.2 -> 1.3 receipt chain. No init, migration, import, restore, or account input.
+# Code-only upgrade from 1.3.0 or 1.4.0. Requires the completed managed receipt chain.
 # Dot sourcing only loads functions for offline regression. Run with -File in Windows.
 $ErrorActionPreference='Stop';$utf8=New-Object Text.UTF8Encoding($false)
 $originalImage='momonong/fucheng-players-system@sha256:0e5a297b0d16876fa56e1b9bed0470c3b8632d55ded6b23ffc5c18315f39e6e2'
 $originalImageId='sha256:2cfa6229bc207b1df68aac4ef94baadb8a5b8bf149f536f1e3f3ee45d0403034'
 $oldImage='momonong/fucheng-players-system@sha256:9b8931bd9042d932cbb0ff4f3b30fba82390d9478bac38a9444780efbe919e1e'
 $oldImageId='sha256:63da2c4ddd162c56d2e68e7a7b88a02978081e857b1b850620af109c43564925'
+$v140Image='momonong/fucheng-players-system@sha256:ee43b382014048d2fc12ed6a6a58c27563eee1cc9ae6ffba1cd9c0451a85e48e'
+$v140ImageId='sha256:3adc4ee8ee494b4e25b2ea12b929b8a15a6d1449a1f624356b8b0b44823a4ca0'
 $appImage=$oldImage
 $tunnelImage='cloudflare/cloudflared@sha256:faa8e0a1475f137c910be6025f43c8e4092fdd35461b31e19fd1390657a1ff39'
 $origin='https://fucheng.momonong.workers.dev'
@@ -316,14 +318,11 @@ function Assert-UpgradeIdentity([string]$Ref,[string]$ImageId,[bool]$RequireHeal
  foreach($service in @('app','backup','cloudflared')){$stack+=,(Assert-UpgradeMember $service $Ref $ImageId $RequireHealthy $AllowMixed)}
  # Match every project container against the exact current/historical receipt.
  $raw=Invoke-VpcChecked @('container','ls','-a','--no-trunc','--format','{{.ID}}|{{.Names}}|{{.Label "com.docker.compose.project"}}')
- $historical=@($deployment.operations|ForEach-Object {$_.id})+@($priorUpgrade.operations|ForEach-Object {$_.id})
- $current=@();if($journal){$current=@($journal.operations|ForEach-Object {$_.id})}
+ $receiptOps=@($deployment.operations)+@($priorUpgrade.operations)+@($intermediateUpgrade.operations)+@($journal.operations)
  foreach($line in @($raw -split "`r?`n"|Where-Object {$_})){
   $parts=$line.Split('|');if($parts.Count -ne 3){throw 'STACK_IDENTITY_MISMATCH'}
   if($parts[2] -cne 'fucheng' -and $parts[1] -cnotmatch '^fucheng-(?:app|backup|cloudflared|op-|upgrade-)'){continue}
   if($parts[0] -cin @($stack|ForEach-Object {$_.id})){continue}
-  if($parts[0] -cnotin ($historical+$current)){throw 'UNKNOWN_FUCHENG_RESOURCE'}
-  $receiptOps=@($deployment.operations)+@($priorUpgrade.operations)+@($journal.operations)
   $matching=@($receiptOps|Where-Object {$_.id -ceq $parts[0]})
   if($matching.Count -ne 1 -or $parts[1] -cne $matching[0].container -or $parts[2] -cne 'fucheng'){throw 'UNKNOWN_FUCHENG_RESOURCE'}
   $state=Invoke-VpcChecked @('inspect','--format','{{.State.Status}}',$parts[0]);if($state -cne 'exited'){throw 'UNKNOWN_FUCHENG_RESOURCE'}
@@ -353,7 +352,7 @@ function Assert-UpgradeCompletedReceipt($Receipt,$Directory,[string]$Source,[str
  if(!$b -or $b.file -cnotmatch '^manual-[0-9TZ]+-[0-9a-f]{8}\.db$' -or $b.media_file -cne ($b.file -replace '\.db$','.media.tar') -or $b.sha256 -cnotmatch '^[a-f0-9]{64}$' -or $b.media_sha256 -cnotmatch '^[a-f0-9]{64}$' -or $b.schema -cne '0015_deployment_diagnostics' -or $b.operation_id -cne $ops[0].id){throw 'JOURNAL_INVALID'}
  # Retained recipe bytes connect each receipt to the preceding release; neither
  # the deployment journal nor previous upgrade files are rewritten.
- $saved=(Get-DeployCompose $deployment.id $deployment.old_default).Replace($oldImage,$Source)
+ $saved=(Get-DeployCompose $deployment.id $deployment.old_default).Replace($appImage,$Source)
  foreach($pair in @(@('compose.before.yml',$saved),@('owner.before.txt',('fucheng-vpc-full-v1|'+(Get-VpcHash $saved))))){
   $path=Join-Path $Directory.FullName $pair[0];Assert-VpcNoLink $path;Assert-VpcOwner $path
   if(!(Test-Path -LiteralPath $path -PathType Leaf) -or [IO.File]::ReadAllText($path) -cne $pair[1]){throw 'UNKNOWN_MANAGED_FILES'}
@@ -441,17 +440,47 @@ function Get-UpgradeSummary([string]$Name,[string]$Image) {
  return $v
 }
 
-function Get-UpgradeBackup {
- $files=@(Get-ChildItem -LiteralPath $checkpointDir -Filter 'manual-*.json')
+function Get-UpgradeBackup([string]$Directory,[string]$SourceImage,[string]$OperationId) {
+ $files=@(Get-ChildItem -LiteralPath $Directory -Filter 'manual-*.json')
  if($files.Count -ne 1){throw 'BACKUP_GROUP_UNCONFIRMED'}
  Assert-VpcNoLink $files[0].FullName;Assert-VpcOwner $files[0].FullName
  $info=[IO.File]::ReadAllText($files[0].FullName)|ConvertFrom-Json
- if($info.file -cnotmatch '^manual-[0-9TZ]+-[0-9a-f]{8}\.db$' -or $files[0].Name -cne ($info.file -replace '\.db$','.json') -or $info.media_file -cne ($info.file -replace '\.db$','.media.tar') -or $info.revision -cne '0015_deployment_diagnostics' -or $info.integrity -cne 'ok' -or $info.foreign_key_errors -ne 0 -or $info.restore_config.image_ref -cne $oldImage -or $info.restore_config.base_path -cne '' -or $info.restore_config.public_origin -cne $origin -or $info.restore_config.proxy_kind -cne 'cloudflare'){throw 'BACKUP_METADATA_MISMATCH'}
+ if($info.file -cnotmatch '^manual-[0-9TZ]+-[0-9a-f]{8}\.db$' -or $files[0].Name -cne ($info.file -replace '\.db$','.json') -or $info.media_file -cne ($info.file -replace '\.db$','.media.tar') -or $info.revision -cne '0015_deployment_diagnostics' -or $info.integrity -cne 'ok' -or $info.foreign_key_errors -ne 0 -or $info.restore_config.image_ref -cne $SourceImage -or $info.restore_config.base_path -cne '' -or $info.restore_config.public_origin -cne $origin -or $info.restore_config.proxy_kind -cne 'cloudflare'){throw 'BACKUP_METADATA_MISMATCH'}
  foreach($pair in @(@($info.file,$info.sha256),@($info.media_file,$info.media_sha256))){
-  $path=Join-Path $checkpointDir $pair[0];Assert-VpcNoLink $path;Assert-VpcOwner $path
+  $path=Join-Path $Directory $pair[0];Assert-VpcNoLink $path;Assert-VpcOwner $path
   if($pair[1] -cnotmatch '^[a-f0-9]{64}$' -or !(Test-Path -LiteralPath $path -PathType Leaf) -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $pair[1]){throw 'BACKUP_HASH_MISMATCH'}
  }
- return [pscustomobject]@{file=$info.file;sha256=$info.sha256;media_file=$info.media_file;media_sha256=$info.media_sha256;schema=$info.revision;operation_id=$journal.operations[0].id}
+ return [pscustomobject]@{file=$info.file;sha256=$info.sha256;media_file=$info.media_file;media_sha256=$info.media_sha256;schema=$info.revision;operation_id=$OperationId}
+}
+
+function Remove-SupersededUpgradeBackups([object[]]$NewestFirst) {
+ $verifiedCount=0
+ foreach($receipt in $NewestFirst){
+  $directory=Join-Path $backupRoot ('upgrade-'+$receipt.id)
+  $backup=$receipt.backup
+  $names=@($backup.file,$backup.media_file,($backup.file -replace '\.db$','.json'))
+  try{
+   $present=@($names | Where-Object {Test-Path -LiteralPath (Join-Path $directory $_)})
+   if($present.Count -eq 0 -and $verifiedCount -gt 0){continue}
+   $actual=Get-UpgradeBackup $directory $receipt.old_image $receipt.operations[0].id
+   foreach($field in @('file','media_file','sha256','media_sha256')){
+    if($actual.$field -cne $backup.$field){throw 'BACKUP_RECEIPT_MISMATCH'}
+   }
+  }catch{
+   Write-Warning ('備份輪替略過無法驗證的備份 '+$receipt.id)
+   if($verifiedCount -eq 0){return}
+   continue
+  }
+  $verifiedCount++
+  if($verifiedCount -le 2){continue}
+  try{
+   foreach($name in $names){[IO.File]::Delete((Join-Path $directory $name))}
+   Write-Host ('已清理舊升級備份 '+$receipt.id+'，收據保留。')
+  }catch{
+   Write-Warning ('備份輪替未完成 '+$receipt.id)
+   return
+  }
+ }
 }
 
 function Stop-UpgradeStack($Stack) {
@@ -495,10 +524,10 @@ function Stop-UpgradeKnownMembers([string]$Ref,[string]$ImageId) {
 }
 
 function Invoke-ClubUpgrade([string]$TargetImage,[string]$ExpectedImageId) {
- $docker=$null;$lock=$null;$journal=$null;$priorUpgrade=$null;$deployment=$null;$stack=$null;$writePhase=$false;$done=$false;$stage='preflight';$upgradeJournalPath=$null
+ $docker=$null;$lock=$null;$journal=$null;$priorUpgrade=$null;$intermediateUpgrade=$null;$deployment=$null;$stack=$null;$writePhase=$false;$done=$false;$stage='preflight';$upgradeJournalPath=$null
  try{
   Assert-VpcWindows
-  if($TargetImage -cnotmatch '^momonong/fucheng-players-system@sha256:[a-f0-9]{64}$' -or $ExpectedImageId -cnotmatch '^sha256:[a-f0-9]{64}$' -or $TargetImage -cin @($oldImage,$originalImage) -or $ExpectedImageId -cin @($oldImageId,$originalImageId)){throw 'TARGET_PIN_REQUIRED'}
+  if($TargetImage -cnotmatch '^momonong/fucheng-players-system@sha256:[a-f0-9]{64}$' -or $ExpectedImageId -cnotmatch '^sha256:[a-f0-9]{64}$' -or $TargetImage -cin @($oldImage,$originalImage,$v140Image) -or $ExpectedImageId -cin @($oldImageId,$originalImageId,$v140ImageId)){throw 'TARGET_PIN_REQUIRED'}
   if($env:DOCKER_HOST -or $env:DOCKER_CONTEXT -or $env:DOCKER_TLS_VERIFY -or $env:DOCKER_CERT_PATH){throw 'DOCKER_HOST_OVERRIDE'}
   $root=Get-UpgradeRoot;Assert-VpcNoLink $root;Assert-VpcOwner $root
   $composePath=Join-Path $root 'compose.yml';$markerPath=Join-Path $root 'owner.txt';$deployJournalPath=Join-Path $root 'deploy-journal.json';$backupRoot=Join-Path $root 'backup'
@@ -512,7 +541,7 @@ function Invoke-ClubUpgrade([string]$TargetImage,[string]$ExpectedImageId) {
   # journal exists yet. Never overwrite a previous process's staged recipe.
   if(@(Get-ChildItem -LiteralPath $root -File|Where-Object {$_.Name -clike '*.next' -or $_.Name -clike '*.upgrade-next'}).Count){throw 'JOURNAL_UPDATE_PENDING'}
   $upgrades=@(Get-ChildItem -LiteralPath $backupRoot -Directory -Filter 'upgrade-*')
-  if($upgrades.Count -lt 1 -or $upgrades.Count -gt 2){throw 'UPGRADE_RECONCILIATION_REQUIRED'}
+  if($upgrades.Count -lt 1 -or $upgrades.Count -gt 3){throw 'UPGRADE_RECONCILIATION_REQUIRED'}
   $priorUpgrade=$null;$targetUpgrade=$null
   foreach($directory in $upgrades){
    Assert-VpcNoLink $directory.FullName;Assert-VpcOwner $directory.FullName
@@ -526,21 +555,33 @@ function Invoke-ClubUpgrade([string]$TargetImage,[string]$ExpectedImageId) {
     if($priorUpgrade){throw 'UPGRADE_RECONCILIATION_REQUIRED'}
     Assert-UpgradeCompletedReceipt $receipt $directory $originalImage $originalImageId $oldImage $oldImageId
     $priorUpgrade=$receipt
-   }elseif($receipt.old_image -ceq $oldImage -and $receipt.target_image -ceq $TargetImage){
+   }elseif($receipt.old_image -ceq $oldImage -and $receipt.target_image -ceq $v140Image){
+    if($intermediateUpgrade){throw 'UPGRADE_RECONCILIATION_REQUIRED'}
+    Assert-UpgradeCompletedReceipt $receipt $directory $oldImage $oldImageId $v140Image $v140ImageId
+    $intermediateUpgrade=$receipt
+   }elseif($receipt.old_image -cin @($oldImage,$v140Image) -and $receipt.target_image -ceq $TargetImage){
     if($targetUpgrade){throw 'UPGRADE_RECONCILIATION_REQUIRED'}
-    Assert-UpgradeCompletedReceipt $receipt $directory $oldImage $oldImageId $TargetImage $ExpectedImageId
     $targetUpgrade=$receipt;$checkpointDir=$directory.FullName;$upgradeJournalPath=$path
    }else{throw 'JOURNAL_INVALID'}
   }
   if(!$priorUpgrade){throw 'UPGRADE_RECONCILIATION_REQUIRED'}
+  $previousReceipt=$priorUpgrade
+  if($intermediateUpgrade){
+   if($intermediateUpgrade.previous_upgrade_id -cne $priorUpgrade.id){throw 'JOURNAL_INVALID'}
+   $previousReceipt=$intermediateUpgrade
+   $oldImage=$v140Image
+   $oldImageId=$v140ImageId
+  }
   if($targetUpgrade){
-   if($targetUpgrade.previous_upgrade_id -cne $priorUpgrade.id){throw 'JOURNAL_INVALID'}
+   if($targetUpgrade.previous_upgrade_id -cne $previousReceipt.id){throw 'JOURNAL_INVALID'}
+   Assert-UpgradeCompletedReceipt $targetUpgrade (Get-Item -LiteralPath $checkpointDir) $oldImage $oldImageId $TargetImage $ExpectedImageId
    $journal=$targetUpgrade
   }
-  $oldCompose=Get-DeployCompose $deployment.id $deployment.old_default
-  $newCompose=$oldCompose.Replace($oldImage,$TargetImage)
-  # Only the two exact pinned image references change. All other recipe bytes stay.
-  if(([regex]::Matches($oldCompose,[regex]::Escape($oldImage))).Count -ne 2){throw 'UNKNOWN_MANAGED_FILES'}
+  $oldCompose=(Get-DeployCompose $deployment.id $deployment.old_default).Replace($appImage,$oldImage)
+  # Historical receipts preserve the exact old recipe with eight weekly backups.
+  if(([regex]::Matches($oldCompose,[regex]::Escape($oldImage))).Count -ne 2 -or
+     ([regex]::Matches($oldCompose,'FUCHENG_BACKUP_KEEP: "8"')).Count -ne 1){throw 'UNKNOWN_MANAGED_FILES'}
+  $newCompose=$oldCompose.Replace($oldImage,$TargetImage).Replace('FUCHENG_BACKUP_KEEP: "8"','FUCHENG_BACKUP_KEEP: "2"')
   $expectedCompose=if($journal){$newCompose}else{$oldCompose}
   $compose=[IO.File]::ReadAllText($composePath);$marker=[IO.File]::ReadAllText($markerPath)
   if($compose -cne $expectedCompose -or $marker -cne ('fucheng-vpc-full-v1|'+(Get-VpcHash $compose))){throw 'UNKNOWN_MANAGED_FILES'}
@@ -554,7 +595,11 @@ function Invoke-ClubUpgrade([string]$TargetImage,[string]$ExpectedImageId) {
    if(!(Test-UpgradeImageIdentity (Invoke-VpcChecked @('image','inspect','--format','{{.Id}}',$TargetImage)) $TargetImage $ExpectedImageId)){throw 'TARGET_IMAGE_MISMATCH'}
    $stack=Assert-UpgradeIdentity $TargetImage $ExpectedImageId $true;Assert-UpgradeNoWriter @($stack|Where-Object {$_.service -cin @('app','backup')}|ForEach-Object {$_.id})
    if(!(Test-DeployPublic)){throw 'PUBLIC_HEALTH_UNCONFIRMED'}
-   Write-Host 'COMPLETE：既有 1.4.0 身份與公開健康通過；未重新備份或重建。';return
+   $retentionReceipts=@($journal)
+   if($intermediateUpgrade){$retentionReceipts+=@($intermediateUpgrade)}
+   $retentionReceipts+=@($priorUpgrade)
+   Remove-SupersededUpgradeBackups $retentionReceipts
+   Write-Host 'COMPLETE：既有目標映像身份與公開健康通過；未重新備份或重建。';return
   }
   if(!(Test-UpgradeImageIdentity (Invoke-VpcChecked @('image','inspect','--format','{{.Id}}',$oldImage)) $oldImage $oldImageId)){throw 'JOURNAL_IMAGE_MISMATCH'}
   $stack=Assert-UpgradeIdentity $oldImage $oldImageId $true
@@ -568,7 +613,7 @@ function Invoke-ClubUpgrade([string]$TargetImage,[string]$ExpectedImageId) {
   Assert-VpcNoLink $checkpointDir;if(Test-Path -LiteralPath $checkpointDir){throw 'EXISTING_BACKUP_TARGET'}
   $null=New-Item -ItemType Directory -Path $checkpointDir;Set-VpcPrivatePath $checkpointDir $true;Assert-VpcOwner $checkpointDir
   $upgradeJournalPath=Join-Path $checkpointDir 'upgrade-journal.json'
-  $journal=[pscustomobject]@{version=1;id=$id;deployment_id=$deployment.id;previous_upgrade_id=$priorUpgrade.id;old_image=$oldImage;old_image_id=$oldImageId;target_image=$TargetImage;target_image_id=$ExpectedImageId;phase='PREPARED';operations=@();backup=$null;before=$null;after=$null;failure_code=$null;stop_confirmed=$null}
+  $journal=[pscustomobject]@{version=1;id=$id;deployment_id=$deployment.id;previous_upgrade_id=$previousReceipt.id;old_image=$oldImage;old_image_id=$oldImageId;target_image=$TargetImage;target_image_id=$ExpectedImageId;phase='PREPARED';operations=@();backup=$null;before=$null;after=$null;failure_code=$null;stop_confirmed=$null}
   Write-UpgradeFile (Join-Path $checkpointDir 'compose.before.yml') $compose
   Write-UpgradeFile (Join-Path $checkpointDir 'owner.before.txt') $marker
   Save-UpgradeJournal
@@ -576,7 +621,7 @@ function Invoke-ClubUpgrade([string]$TargetImage,[string]$ExpectedImageId) {
   Stop-UpgradeStack $stack;Set-UpgradePhase 'STOP_CONFIRMED'
   $stage='backup';Set-UpgradePhase 'BACKUP_PENDING'
   $null=Invoke-UpgradeJob 'backup' $oldImage @('fucheng_data:/data',($checkpointDir+':/backups')) @('/app/runtime.py','backup')
-  $journal.backup=Get-UpgradeBackup;Set-UpgradePhase 'BACKUP_CONFIRMED'
+  $journal.backup=Get-UpgradeBackup $checkpointDir $oldImage $journal.operations[0].id;Set-UpgradePhase 'BACKUP_CONFIRMED'
   $stage='before_summary';$journal.before=Get-UpgradeSummary 'before' $oldImage;Set-UpgradePhase 'BEFORE_CONFIRMED'
   Assert-UpgradeNoWriter
   $stage='switch_recipe';Set-UpgradePhase 'RECIPE_PENDING'
@@ -607,7 +652,11 @@ function Invoke-ClubUpgrade([string]$TargetImage,[string]$ExpectedImageId) {
   if(!$passed){throw 'PUBLIC_HEALTH_UNCONFIRMED'}
   Assert-DeployHealthy $true
   $journal.stop_confirmed=$null;Set-UpgradePhase 'COMPLETE';$done=$true
-  Write-Host ('COMPLETE：1.4.0 更新完成；資料、媒體與 '+[int]$journal.after.admin_count+' 個管理員帳號核對一致。')
+  $retentionReceipts=@($journal)
+  if($intermediateUpgrade){$retentionReceipts+=@($intermediateUpgrade)}
+  $retentionReceipts+=@($priorUpgrade)
+  Remove-SupersededUpgradeBackups $retentionReceipts
+  Write-Host ('COMPLETE：1.4.1 更新完成；資料、媒體與 '+[int]$journal.after.admin_count+' 個管理員帳號核對一致。')
   Write-Host 'https://fucheng.momonong.workers.dev/；請沿用球館原帳密登入。'
   Write-Host ('備份及操作收據：'+$checkpointDir)
  }catch{
